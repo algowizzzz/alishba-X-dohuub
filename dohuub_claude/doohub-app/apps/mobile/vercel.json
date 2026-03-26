@@ -1,6 +1,10 @@
 {
-  "buildCommand": "npm install && npx expo export --platform web",
+  "buildCommand": "npx expo export --platform web",
   "outputDirectory": "dist",
-  "installCommand": "npm install",
-  "framework": null
+  "framework": null,
+  "env": {
+    "EXPO_ROUTER_APP_ROOT": "app",
+    "EXPO_ROUTER_IMPORT_MODE": "lazy",
+    "EXPO_USE_METRO_WORKSPACE_ROOT": "1"
+  }
 }
