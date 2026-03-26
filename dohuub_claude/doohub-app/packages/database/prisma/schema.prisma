@@ -1,0 +1,1060 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// ENUMS
+// ============================================
+
+enum UserRole {
+  CUSTOMER
+  VENDOR
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  BANNED
+}
+
+enum VendorStatus {
+  PENDING
+  APPROVED
+  SUSPENDED
+  REJECTED
+}
+
+enum AddressType {
+  HOME
+  WORK
+  DOCTOR
+  PHARMACY
+  OTHER
+}
+
+enum SubscriptionStatus {
+  TRIAL
+  ACTIVE
+  PAUSED
+  EXPIRED
+  CANCELLED
+}
+
+enum BookingStatus {
+  PENDING
+  ACCEPTED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  DECLINED
+}
+
+enum OrderStatus {
+  PENDING
+  ACCEPTED       // Changed from CONFIRMED
+  IN_PROGRESS    // Changed from PREPARING
+  OUT_FOR_DELIVERY
+  COMPLETED      // Changed from DELIVERED
+  CANCELLED
+}
+
+enum ListingStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  SUSPENDED
+  TRIAL_PERIOD  // NEW: For listings in trial period
+  DELETED
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWED
+  RESOLVED    // Changed from APPROVED
+  DISMISSED   // Changed from REMOVED
+}
+
+enum ServiceCategory {
+  CLEANING
+  HANDYMAN
+  BEAUTY
+  BEAUTY_PRODUCTS    // NEW: Cosmetics/skincare products (separate from beauty services)
+  GROCERIES
+  FOOD               // NEW: Restaurant/prepared food (separate from groceries)
+  RENTALS
+  RIDE_ASSISTANCE    // NEW: Transportation services
+  COMPANIONSHIP      // NEW: Companionship/caregiving support
+  // CAREGIVING - DEPRECATED: Split into RIDE_ASSISTANCE and COMPANIONSHIP
+}
+
+enum CleaningType {
+  DEEP_CLEANING
+  LAUNDRY
+  OFFICE_CLEANING
+}
+
+enum HandymanType {
+  PLUMBING
+  ELECTRICAL
+  INSTALLATION
+  GENERAL_REPAIR
+}
+
+enum BeautyType {
+  MAKEUP
+  HAIR
+  NAILS
+  WELLNESS
+}
+
+enum CaregivingType {
+  RIDE_ASSISTANCE
+  COMPANIONSHIP_SUPPORT
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+// ============================================
+// USER & AUTH MODELS
+// ============================================
+
+model User {
+  id                String      @id @default(cuid())
+  email             String      @unique
+  phone             String?
+  firebaseUid       String?     @unique
+  passwordHash      String?     // For password-based authentication
+  role              UserRole    @default(CUSTOMER)
+  status            UserStatus  @default(ACTIVE)  // For admin moderation
+  isEmailVerified   Boolean     @default(false)
+  isPhoneVerified   Boolean     @default(false)
+  isActive          Boolean     @default(true)    // Kept for backward compatibility
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  profile           UserProfile?
+  addresses         Address[]
+  paymentMethods    PaymentMethod[]
+  bookings          Booking[]
+  orders            Order[]
+  reviews           Review[]
+  reports           Report[]
+  notifications     Notification[]
+  pushTokens        PushToken[]
+  chatConversations ChatConversation[]
+  vendor            Vendor?
+
+  @@index([email])
+  @@index([firebaseUid])
+  @@index([status])
+}
+
+model UserProfile {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  firstName   String
+  lastName    String
+  avatar      String?
+  dateOfBirth DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Address {
+  id          String      @id @default(cuid())
+  userId      String
+  type        AddressType @default(HOME)
+  label       String
+  street      String
+  apartment   String?
+  city        String
+  state       String
+  zipCode     String
+  country     String      @default("USA")
+  latitude    Float?
+  longitude   Float?
+  isDefault   Boolean     @default(false)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bookings Booking[]
+  orders   Order[]
+
+  @@index([userId])
+}
+
+model PaymentMethod {
+  id             String   @id @default(cuid())
+  userId         String
+  stripePaymentMethodId String @unique
+  type           String   // card, bank_account
+  last4          String
+  brand          String?  // visa, mastercard, etc.
+  expiryMonth    Int?
+  expiryYear     Int?
+  isDefault      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model OtpVerification {
+  id        String   @id @default(cuid())
+  email     String
+  otp       String
+  expiresAt DateTime
+  verified  Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([email, otp])
+}
+
+// ============================================
+// VENDOR MODELS
+// ============================================
+
+model Vendor {
+  id                 String             @id @default(cuid())
+  userId             String             @unique
+  businessName       String
+  description        String?
+  logo               String?
+  coverImage         String?
+  contactEmail       String?
+  contactPhone       String?
+  website            String?            // Vendor website URL
+  isMichelle         Boolean            @default(false) // Platform owner's listings
+  status             VendorStatus       @default(PENDING)  // For admin approval workflow
+  subscriptionStatus SubscriptionStatus @default(TRIAL)
+  trialStartedAt     DateTime           @default(now())
+  trialEndsAt        DateTime?
+  stripeAccountId    String?
+  rating             Float              @default(0)
+  reviewCount        Int                @default(0)
+  isActive           Boolean            @default(true)    // Kept for backward compatibility
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  serviceAreas      VendorServiceArea[]
+  availability      VendorAvailability[]
+  categories        VendorCategory[]
+
+  // Legacy listing relations
+  cleaningListings   CleaningListing[]
+  handymanListings   HandymanListing[]
+  beautyListings     BeautyListing[]
+  groceryListings    GroceryListing[]
+  rentalListings     RentalListing[]
+  caregivingListings CaregivingListing[]  // DEPRECATED
+
+  // NEW listing relations
+  foodListings            FoodListing[]
+  beautyProductListings   BeautyProductListing[]
+  rideAssistanceListings  RideAssistanceListing[]
+  companionshipListings   CompanionshipListing[]
+
+  // Store relations (multi-store support)
+  stores            VendorStore[]
+
+  bookings          Booking[]
+  orders            Order[]
+  reviews           Review[]
+  subscription      VendorSubscription?
+  billingHistory    BillingHistory[]
+
+  @@index([userId])
+  @@index([isMichelle])
+  @@index([status])
+  @@index([subscriptionStatus])
+}
+
+model VendorCategory {
+  id         String          @id @default(cuid())
+  vendorId   String
+  category   ServiceCategory
+  isActive   Boolean         @default(true)
+  createdAt  DateTime        @default(now())
+
+  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@unique([vendorId, category])
+}
+
+model VendorServiceArea {
+  id        String   @id @default(cuid())
+  vendorId  String
+  name      String   // e.g., "Downtown Manhattan"
+  zipCodes  String[] // Array of zip codes
+  city      String
+  state     String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@index([vendorId])
+}
+
+model VendorAvailability {
+  id           String   @id @default(cuid())
+  vendorId     String
+  dayOfWeek    Int      // 0-6 (Sunday-Saturday)
+  startTime    String   // "09:00"
+  endTime      String   // "17:00"
+  isAvailable  Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@unique([vendorId, dayOfWeek])
+}
+
+model VendorSubscription {
+  id                   String             @id @default(cuid())
+  vendorId             String             @unique
+  stripeSubscriptionId String?
+  planId               String?            // Plan identifier (basic, professional, enterprise)
+  status               SubscriptionStatus @default(TRIAL)
+  currentPeriodStart   DateTime?
+  currentPeriodEnd     DateTime?
+  trialEndDate         DateTime?          // When trial period ends
+  cancelledAt          DateTime?
+  cancellationReason   String?            // Why subscription was cancelled
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@index([planId])
+}
+
+model BillingHistory {
+  id           String   @id @default(cuid())
+  vendorId     String
+  amount       Float
+  currency     String   @default("USD")
+  description  String
+  invoiceUrl   String?
+  paidAt       DateTime?
+  createdAt    DateTime @default(now())
+
+  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@index([vendorId])
+}
+
+// ============================================
+// VENDOR STORE & REGION MODELS - NEW
+// ============================================
+
+// VendorStore - Multi-store support for vendors
+model VendorStore {
+  id          String          @id @default(cuid())
+  vendorId    String
+  name        String          // businessName
+  category    ServiceCategory // One of 9 categories
+  description String?         // Max 500 chars
+  logo        String?         // Logo image URL
+  phone       String?         // Contact phone (internal only)
+  email       String?         // Contact email (internal only)
+  status      ListingStatus   @default(ACTIVE)  // ACTIVE, PAUSED, SUSPENDED
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  vendor  Vendor              @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  regions VendorStoreRegion[]
+
+  // Legacy listing relations
+  cleaningListings        CleaningListing[]
+  handymanListings        HandymanListing[]
+  beautyListings          BeautyListing[]
+  groceryListings         GroceryListing[]
+  rentalListings          RentalListing[]
+
+  // New listing relations
+  foodListings            FoodListing[]
+  beautyProductListings   BeautyProductListing[]
+  rideAssistanceListings  RideAssistanceListing[]
+  companionshipListings   CompanionshipListing[]
+
+  // Order relation
+  orders                  Order[]
+
+  @@index([vendorId])
+  @@index([category])
+  @@index([status])
+}
+
+// VendorStoreRegion - Junction table for store-region many-to-many
+model VendorStoreRegion {
+  id        String      @id @default(cuid())
+  storeId   String
+  regionId  String
+  isActive  Boolean     @default(true)
+  createdAt DateTime    @default(now())
+
+  store  VendorStore @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  region Region      @relation(fields: [regionId], references: [id])
+
+  @@unique([storeId, regionId])
+  @@index([storeId])
+  @@index([regionId])
+}
+
+// Region - Geographic regions (US + Canada cities)
+model Region {
+  id          String    @id @default(cuid())
+  name        String    // "New York, NY" or "Toronto, ON"
+  city        String    // "New York" or "Toronto"
+  state       String?   // US states: "NY", "CA", etc. (nullable)
+  province    String?   // Canadian provinces: "ON", "BC", etc. (nullable)
+  country     String    @default("USA")  // "USA" or "Canada"
+  countryCode String    @default("US")   // "US" or "CA"
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+
+  storeRegions VendorStoreRegion[]
+
+  @@unique([name, country])
+  @@index([country])
+  @@index([city])
+}
+
+// ============================================
+// LISTING MODELS (Category-Specific)
+// ============================================
+
+// CLEANING SERVICES
+model CleaningListing {
+  id            String        @id @default(cuid())
+  vendorId      String
+  storeId       String?       // Reference to VendorStore
+  title         String
+  description   String
+  cleaningType  CleaningType
+  basePrice     Float
+  priceUnit     String        @default("per_session") // per_hour, per_session
+  images        String[]
+  whatsIncluded String[]      @default([])  // Array of included items
+  duration      Int?          // in minutes
+  status        ListingStatus @default(ACTIVE)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  vendor   Vendor       @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  store    VendorStore? @relation(fields: [storeId], references: [id])
+  bookings Booking[]
+
+  @@index([vendorId])
+  @@index([storeId])
+  @@index([cleaningType])
+  @@index([status])
+}
+
+// HANDYMAN SERVICES
+model HandymanListing {
+  id            String        @id @default(cuid())
+  vendorId      String
+  storeId       String?       // Reference to VendorStore
+  title         String
+  description   String
+  handymanType  HandymanType
+  basePrice     Float
+  hourlyRate    Float?        // Hourly rate for services
+  priceUnit     String        @default("per_hour")
+  services      String[]      @default([])  // List of services offered
+  images        String[]
+  whatsIncluded String[]      @default([])  // Array of included items
+  status        ListingStatus @default(ACTIVE)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  vendor   Vendor       @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  store    VendorStore? @relation(fields: [storeId], references: [id])
+  bookings Booking[]
+
+  @@index([vendorId])
+  @@index([storeId])
+  @@index([handymanType])
+  @@index([status])
+}
+
+// BEAUTY SERVICES
+model BeautyListing {
+  id          String        @id @default(cuid())
+  vendorId    String
+  storeId     String?       // Reference to VendorStore
+  title       String
+  description String
+  beautyType  BeautyType
+  basePrice   Float
+  duration    Int           // in minutes
+  services    String[]      @default([])  // List of services offered
+  images      String[]
+  portfolio   String[]      // Portfolio images
+  status      ListingStatus @default(ACTIVE)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  vendor   Vendor       @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  store    VendorStore? @relation(fields: [storeId], references: [id])
+  bookings Booking[]
+
+  @@index([vendorId])
+  @@index([storeId])
+  @@index([beautyType])
+  @@index([status])
+}
+
+// GROCERIES & FOOD
+model GroceryListing {
+  id          String        @id @default(cuid())
+  vendorId    String
+  storeId     String?       // Reference to VendorStore
+  name        String
+  description String
+  category    String        // Produce, Dairy, Bakery, etc.
+  price       Float
+  unit        String        @default("each") // each, lb, kg, etc.
+  image       String?
+  inStock     Boolean       @default(true)
+  stockCount  Int?
+  status      ListingStatus @default(ACTIVE)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  vendor     Vendor       @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  store      VendorStore? @relation(fields: [storeId], references: [id])
+  orderItems OrderItem[]
+
+  @@index([vendorId])
+  @@index([storeId])
+  @@index([category])
+  @@index([status])
+}
+
+// FOOD (Restaurant/Prepared Food) - NEW
+model FoodListing {
+  id             String        @id @default(cuid())
+  vendorId       String
+  storeId        String?       // Reference to VendorStore
+  name           String        // itemName from frontend
+  description    String        // shortDescription (max 150 chars)
+  cuisines       String[]      // Array of cuisine types
+  category       String        // Main Courses, Appetizers, etc.
+  portionSize    String?       // Small, Regular, Large
+  quantityAmount Float?        // Optional quantity
+  quantityUnit   String?       // lb, kg, Count/Pieces, etc.
+  price          Float
+  image          String?       // productThumbnail
+  restaurantName String?       // Store/vendor name (derived from store)
+  status         ListingStatus @default(ACTIVE)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  vendor     Vendor       @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  store      VendorStore? @relation(fields: [storeId], references: [id])
+  orderItems OrderItem[]
+
+  @@index([vendorId])
+  @@index([storeId])
+  @@index([category])
+  @@index([status])
+}
+
+// BEAUTY PRODUCTS (Cosmetics/Skincare) - NEW
+model BeautyProductListing {
+  id             String        @id @default(cuid())
+  vendorId       String
+  storeId        String?       // Reference to VendorStore
+  name           String        // productName
+  description    String        // shortDescription
+  category       String        // Skincare, Makeup, Hair Care
+  brand          String?       // Brand name
+  price          Float
+  quantityAmount Float?        // Optional
+  quantityUnit   String?       // ml, oz, Count/Pieces
+  image          String?       // productThumbnail
+  inStock        Boolean       @default(true)
+  stockCount     Int?
+  status         ListingStatus @default(ACTIVE)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  vendor     Vendor       @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  store      VendorStore? @relation(fields: [storeId], references: [id])
+  orderItems OrderItem[]
+
+  @@index([vendorId])
+  @@index([storeId])
+  @@index([category])
+  @@index([status])
+}
+
+// RENTAL PROPERTIES
+model RentalListing {
+  id            String        @id @default(cuid())
+  vendorId      String
+  storeId       String?       // Reference to VendorStore
+  title         String
+  description   String
+  propertyType  String        // Apartment, House, Condo, Studio
+  address       String
+  city          String
+  state         String
+  zipCode       String
+  latitude      Float?
+  longitude     Float?
+  bedrooms      Int
+  bathrooms     Float
+  maxGuests     Int?          // Maximum number of guests
+  amenities     String[]
+  images        String[]
+  pricePerNight Float?
+  pricePerWeek  Float?
+  pricePerMonth Float?
+  cleaningFee   Float?        // One-time cleaning fee
+  rules         String[]      @default([])  // House rules
+  minStay       Int           @default(1) // in days
+  maxStay       Int?          // in days
+  status        ListingStatus @default(ACTIVE)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  vendor       Vendor               @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  store        VendorStore?         @relation(fields: [storeId], references: [id])
+  availability RentalAvailability[]
+  bookings     Booking[]
+
+  @@index([vendorId])
+  @@index([storeId])
+  @@index([city, state])
+  @@index([status])
+}
+
+model RentalAvailability {
+  id        String   @id @default(cuid())
+  listingId String
+  date      DateTime
+  isBooked  Boolean  @default(false)
+  price     Float?   // Override price for this date
+
+  listing RentalListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@unique([listingId, date])
+}
+
+// CAREGIVING SERVICES - DEPRECATED: Use RideAssistanceListing or CompanionshipListing instead
+model CaregivingListing {
+  id             String         @id @default(cuid())
+  vendorId       String
+  title          String
+  description    String
+  caregivingType CaregivingType
+  basePrice      Float
+  priceUnit      String         @default("per_hour")
+  services       String[]       @default([])  // List of services offered
+  qualifications String[]       @default([])  // Qualifications/certifications
+  serviceArea    String[]       // Covered zip codes
+  images         String[]
+  status         ListingStatus  @default(ACTIVE)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  vendor   Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  bookings Booking[]
+
+  @@index([vendorId])
+  @@index([caregivingType])
+  @@index([status])
+}
+
+// RIDE ASSISTANCE SERVICES - NEW (replaces CaregivingListing for ride services)
+model RideAssistanceListing {
+  id              String        @id @default(cuid())
+  vendorId        String
+  storeId         String?       // Reference to VendorStore
+  title           String
+  description     String        // shortDescription (max 150 chars)
+  longDescription String?       // Detailed description
+  hourlyRate      Float         // price per hour
+  image           String?       // serviceThumbnail
+  images          String[]      // vehicleImages (up to 5)
+  vehicleTypes    String[]      // ["Standard Vehicle", "Wheelchair Accessible Vehicle"]
+  specialFeatures String?       // comma-separated features string
+  coverageArea    String?       // selected region/city
+  totalSeats      Int?          // number of passenger seats
+  status          ListingStatus @default(ACTIVE)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  vendor   Vendor       @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  store    VendorStore? @relation(fields: [storeId], references: [id])
+  bookings Booking[]
+
+  @@index([vendorId])
+  @@index([storeId])
+  @@index([status])
+  @@index([coverageArea])
+}
+
+// COMPANIONSHIP SUPPORT SERVICES - NEW (replaces CaregivingListing for companionship)
+model CompanionshipListing {
+  id                String        @id @default(cuid())
+  vendorId          String
+  storeId           String?       // Reference to VendorStore
+  title             String        // companionName
+  description       String        // about (max 300 chars)
+  hourlyRate        Float
+  yearsOfExperience Int?          // years of caregiving experience
+  image             String?       // companionPhoto
+  credentialImages  String[]      // uploaded credential/certification photos
+  certifications    String[]      // ["Certified Nursing Assistant", "CPR & First Aid", etc.]
+  specialties       String[]      // ["Dementia Care", "Mobility Assistance", etc.]
+  supportTypes      String[]      // ["Conversation & Social Interaction", "Meal Preparation", etc.]
+  languages         String[]      // languages spoken by the companion
+  status            ListingStatus @default(ACTIVE)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  vendor   Vendor       @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  store    VendorStore? @relation(fields: [storeId], references: [id])
+  bookings Booking[]
+
+  @@index([vendorId])
+  @@index([storeId])
+  @@index([status])
+}
+
+// ============================================
+// BOOKING & ORDER MODELS
+// ============================================
+
+model Booking {
+  id                  String          @id @default(cuid())
+  userId              String
+  vendorId            String
+  addressId           String
+  storeId             String?         // NEW: Reference to VendorStore
+  category            ServiceCategory
+
+  // Polymorphic reference to listing
+  cleaningListingId       String?
+  handymanListingId       String?
+  beautyListingId         String?
+  rentalListingId         String?
+  caregivingListingId     String?     // DEPRECATED
+  rideAssistanceListingId String?     // NEW
+  companionshipListingId  String?     // NEW
+  
+  scheduledDate       DateTime
+  scheduledTime       String          // "10:00"
+  endTime             String?         // For rentals/time-based
+  duration            Int?            // in minutes
+  
+  // Caregiving specific
+  pickupLocation      String?
+  dropoffLocation     String?
+  stops               String[]        // Additional stops
+  isRoundTrip         Boolean         @default(false)
+  
+  specialInstructions String?
+  subtotal            Float
+  serviceFee          Float
+  total               Float
+  status              BookingStatus   @default(PENDING)
+  
+  completedAt         DateTime?
+  cancelledAt         DateTime?
+  cancellationReason  String?
+  
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  user              User               @relation(fields: [userId], references: [id])
+  vendor            Vendor             @relation(fields: [vendorId], references: [id])
+  address           Address            @relation(fields: [addressId], references: [id])
+
+  // Legacy listing relations
+  cleaningListing   CleaningListing?   @relation(fields: [cleaningListingId], references: [id])
+  handymanListing   HandymanListing?   @relation(fields: [handymanListingId], references: [id])
+  beautyListing     BeautyListing?     @relation(fields: [beautyListingId], references: [id])
+  rentalListing     RentalListing?     @relation(fields: [rentalListingId], references: [id])
+  caregivingListing CaregivingListing? @relation(fields: [caregivingListingId], references: [id])
+
+  // NEW listing relations
+  rideAssistanceListing  RideAssistanceListing?  @relation(fields: [rideAssistanceListingId], references: [id])
+  companionshipListing   CompanionshipListing?   @relation(fields: [companionshipListingId], references: [id])
+
+  statusHistory     BookingStatusHistory[]
+  transaction       Transaction?
+  review            Review?
+
+  @@index([userId])
+  @@index([vendorId])
+  @@index([storeId])
+  @@index([status])
+  @@index([scheduledDate])
+}
+
+model BookingStatusHistory {
+  id        String        @id @default(cuid())
+  bookingId String
+  status    BookingStatus
+  note      String?
+  createdAt DateTime      @default(now())
+
+  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId])
+}
+
+// ORDERS (for Groceries & Food)
+model Order {
+  id           String      @id @default(cuid())
+  userId       String
+  vendorId     String
+  storeId      String?     // Reference to VendorStore
+  addressId    String
+  subtotal     Float
+  deliveryFee  Float
+  serviceFee   Float
+  total        Float
+  status       OrderStatus @default(PENDING)
+  specialNotes String?
+  estimatedDelivery DateTime?
+  deliveredAt  DateTime?
+  cancelledAt  DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  user        User           @relation(fields: [userId], references: [id])
+  vendor      Vendor         @relation(fields: [vendorId], references: [id])
+  store       VendorStore?   @relation(fields: [storeId], references: [id])
+  address     Address        @relation(fields: [addressId], references: [id])
+  items       OrderItem[]
+  transaction Transaction?
+
+  @@index([userId])
+  @@index([vendorId])
+  @@index([storeId])
+  @@index([status])
+}
+
+model OrderItem {
+  id          String  @id @default(cuid())
+  orderId     String
+  listingId   String
+  listingType String  @default("GROCERY") // "GROCERY", "FOOD", "BEAUTY_PRODUCT"
+  quantity    Int
+  price       Float
+  total       Float
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  // Polymorphic listing relations (only one will be populated based on listingType)
+  groceryListingId       String?
+  foodListingId          String?
+  beautyProductListingId String?
+
+  groceryListing       GroceryListing?       @relation(fields: [groceryListingId], references: [id])
+  foodListing          FoodListing?          @relation(fields: [foodListingId], references: [id])
+  beautyProductListing BeautyProductListing? @relation(fields: [beautyProductListingId], references: [id])
+
+  @@index([orderId])
+  @@index([listingType])
+}
+
+model Cart {
+  id        String     @id @default(cuid())
+  userId    String     @unique
+  vendorId  String?    // Lock cart to one vendor
+  items     CartItem[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model CartItem {
+  id        String @id @default(cuid())
+  cartId    String
+  listingId String
+  quantity  Int
+
+  cart Cart @relation(fields: [cartId], references: [id], onDelete: Cascade)
+
+  @@unique([cartId, listingId])
+}
+
+// ============================================
+// PAYMENT MODELS
+// ============================================
+
+model Transaction {
+  id                    String        @id @default(cuid())
+  bookingId             String?       @unique
+  orderId               String?       @unique
+  stripePaymentIntentId String?       @unique
+  amount                Float
+  platformFee           Float
+  vendorPayout          Float
+  currency              String        @default("USD")
+  status                PaymentStatus @default(PENDING)
+  paidAt                DateTime?
+  refundedAt            DateTime?
+  refundAmount          Float?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  booking Booking? @relation(fields: [bookingId], references: [id])
+  order   Order?   @relation(fields: [orderId], references: [id])
+
+  @@index([status])
+}
+
+// ============================================
+// REVIEW & REPORT MODELS
+// ============================================
+
+model Review {
+  id             String   @id @default(cuid())
+  userId         String
+  vendorId       String
+  bookingId      String   @unique
+  rating         Int      // 1-5
+  comment        String?
+  vendorResponse String?  // Vendor's reply to the review
+  photos         String[]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user    User    @relation(fields: [userId], references: [id])
+  vendor  Vendor  @relation(fields: [vendorId], references: [id])
+  booking Booking @relation(fields: [bookingId], references: [id])
+
+  @@index([vendorId])
+  @@index([rating])
+}
+
+model Report {
+  id           String       @id @default(cuid())
+  userId       String
+  listingType  String       // cleaning, handyman, beauty, etc.
+  listingId    String
+  reason       String
+  comment      String?
+  status       ReportStatus @default(PENDING)
+  reviewedAt   DateTime?
+  reviewedBy   String?      // Admin user ID
+  resolution   String?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([listingType, listingId])
+  @@index([status])
+}
+
+// ============================================
+// NOTIFICATION & CHAT MODELS
+// ============================================
+
+model Notification {
+  id         String   @id @default(cuid())
+  userId     String?  // Optional for broadcast notifications
+  title      String
+  body       String
+  type       String   // booking_update, order_update, promo, PUSH, etc.
+  data       Json?
+  isRead     Boolean  @default(false)
+  targetType String?  // 'ALL', 'VENDORS', 'CUSTOMERS', 'SPECIFIC'
+  targetIds  String[] // Array of user IDs for specific targeting
+  createdAt  DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@index([targetType])
+}
+
+model PushToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  platform  String   // ios, android, web
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model ChatConversation {
+  id        String        @id @default(cuid())
+  userId    String
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages ChatMessage[]
+
+  @@index([userId])
+}
+
+model ChatMessage {
+  id             String   @id @default(cuid())
+  conversationId String
+  role           String   // user, assistant
+  content        String
+  metadata       Json?    // For service recommendations, etc.
+  createdAt      DateTime @default(now())
+
+  conversation ChatConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+}
+
+// ============================================
+// PLATFORM SETTINGS
+// ============================================
+
+model PlatformSettings {
+  id                    String   @id @default(cuid())
+  platformName          String   @default("DoHuub")
+  platformFeePercentage Float    @default(10)
+  deliveryFeeDefault    Float    @default(5.99)
+  serviceFeePercentage  Float    @default(5)
+  minOrderAmount        Float    @default(10)
+  maxDeliveryRadius     Float    @default(25)
+  supportEmail          String   @default("support@doohub.com")
+  supportPhone          String   @default("+1-800-DOOHUB")
+  termsUrl              String   @default("https://doohub.com/terms")
+  privacyUrl            String   @default("https://doohub.com/privacy")
+  maintenanceMode       Boolean  @default(false)
+  features              Json     @default("{}")
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+

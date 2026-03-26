@@ -1,0 +1,736 @@
+import { useState, useEffect, useCallback } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import {
+  ArrowLeft,
+  Plus,
+  Globe,
+  MapPin,
+  Calendar,
+  DollarSign,
+  Users,
+  Eye,
+  Edit,
+  ToggleLeft,
+  ChevronDown,
+  X,
+  TrendingUp,
+  TrendingDown,
+  Check,
+  Loader2,
+} from "lucide-react";
+import { api } from "../../../services/api";
+import { Button } from "../ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
+import { Switch } from "../ui/switch";
+import { Textarea } from "../ui/textarea";
+import { Checkbox } from "../ui/checkbox";
+import { Label } from "../ui/label";
+import { AdminSidebarRetractable } from "./AdminSidebarRetractable";
+import { AdminTopNav } from "./AdminTopNav";
+
+interface Region {
+  id: string;
+  name: string;
+  countryCode: string;
+  countryName: string;
+  countryFlag: string;
+  isActive: boolean;
+  activeProfiles: number;
+  totalProfiles: number;
+  profiles: {
+    id: string;
+    name: string;
+    category: string;
+    isActive: boolean;
+    listingsCount: number;
+  }[];
+  performance: {
+    bookings: number;
+    bookingsTrend: number;
+    revenue: number;
+    revenueTrend: number;
+    customers: number;
+  };
+  notes: string;
+}
+
+interface Country {
+  code: string;
+  name: string;
+  flag: string;
+  regions: Region[];
+}
+
+export function GeographicRegions() {
+  const navigate = useNavigate();
+  
+  // Sidebar state
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    typeof window !== 'undefined' && window.innerWidth >= 1024 ? false : true
+  );
+
+  const handleSidebarToggle = () => {
+    if (typeof window !== 'undefined' && window.innerWidth >= 1024) {
+      setSidebarCollapsed(!sidebarCollapsed);
+    } else {
+      setSidebarOpen(!sidebarOpen);
+    }
+  };
+
+  // State
+  const [regions, setRegions] = useState<Region[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [filter, setFilter] = useState("all");
+  const [groupBy, setGroupBy] = useState("country");
+  const [selectedRegion, setSelectedRegion] = useState<Region | null>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editedNotes, setEditedNotes] = useState("");
+
+  // Fetch regions from API
+  const fetchRegions = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response: any = await api.get('/admin/regions');
+      const regionsData = Array.isArray(response) ? response : response?.data || [];
+      setRegions(regionsData.map((r: any) => ({
+        id: r.id,
+        name: r.name || 'Unknown Region',
+        countryCode: r.countryCode || 'US',
+        countryName: r.countryName || 'United States',
+        countryFlag: r.countryFlag || '🇺🇸',
+        isActive: r.isActive ?? true,
+        activeProfiles: r.activeProfiles || 0,
+        totalProfiles: r.totalProfiles || 0,
+        profiles: r.profiles || [],
+        performance: {
+          bookings: r.performance?.bookings || 0,
+          bookingsTrend: r.performance?.bookingsTrend || 0,
+          revenue: r.performance?.revenue || 0,
+          revenueTrend: r.performance?.revenueTrend || 0,
+          customers: r.performance?.customers || 0,
+        },
+        notes: r.notes || '',
+      })));
+    } catch (err: any) {
+      console.error('Failed to fetch regions:', err);
+      setError(err?.response?.data?.error || 'Failed to load regions. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchRegions();
+  }, [fetchRegions]);
+
+  // Group regions by country
+  const groupedRegions: Country[] = [];
+  if (groupBy === "country") {
+    const countryMap = new Map<string, Region[]>();
+    
+    regions
+      .filter(region => {
+        if (filter === "all") return true;
+        if (filter === "active") return region.isActive;
+        if (filter === "inactive") return !region.isActive;
+        if (filter === "high") return region.performance.bookings > 100;
+        if (filter === "low") return region.performance.bookings < 50 && region.performance.bookings > 0;
+        return true;
+      })
+      .forEach(region => {
+        if (!countryMap.has(region.countryCode)) {
+          countryMap.set(region.countryCode, []);
+        }
+        countryMap.get(region.countryCode)?.push(region);
+      });
+
+    countryMap.forEach((regionsList, countryCode) => {
+      const firstRegion = regionsList[0];
+      groupedRegions.push({
+        code: countryCode,
+        name: firstRegion.countryName,
+        flag: firstRegion.countryFlag,
+        regions: regionsList,
+      });
+    });
+  }
+
+  const handleToggleRegion = (regionId: string) => {
+    setRegions(regions.map(r => 
+      r.id === regionId ? { ...r, isActive: !r.isActive } : r
+    ));
+  };
+
+  const handleViewDetails = (region: Region) => {
+    setSelectedRegion(region);
+    setEditedNotes(region.notes);
+    setShowDetailModal(true);
+  };
+
+  const handleEditRegion = (region: Region) => {
+    setSelectedRegion(region);
+    setShowEditModal(true);
+  };
+
+  const handleSaveNotes = () => {
+    if (selectedRegion) {
+      setRegions(regions.map(r =>
+        r.id === selectedRegion.id ? { ...r, notes: editedNotes } : r
+      ));
+      setShowDetailModal(false);
+    }
+  };
+
+  const handleToggleProfileInRegion = (profileId: string) => {
+    if (selectedRegion) {
+      const updatedProfiles = selectedRegion.profiles.map(p =>
+        p.id === profileId ? { ...p, isActive: !p.isActive } : p
+      );
+      setSelectedRegion({ ...selectedRegion, profiles: updatedProfiles });
+    }
+  };
+
+  const handleSaveRegionEdit = () => {
+    if (selectedRegion) {
+      setRegions(regions.map(r =>
+        r.id === selectedRegion.id ? selectedRegion : r
+      ));
+      setShowEditModal(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-white">
+      <AdminTopNav onMenuClick={handleSidebarToggle} />
+      <AdminSidebarRetractable
+        isOpen={sidebarOpen}
+        isCollapsed={sidebarCollapsed}
+        onClose={() => setSidebarOpen(false)}
+        activeMenu="michelle"
+      />
+
+      {/* Main Content */}
+      <main
+        className={`
+          mt-[72px] min-h-[calc(100vh-72px)] p-4 sm:p-6 lg:p-8
+          transition-all duration-300
+          ${sidebarCollapsed ? 'lg:ml-[72px]' : 'lg:ml-[280px]'}
+        `}
+      >
+        <div className="max-w-[1400px] mx-auto">
+          {/* Back Navigation */}
+          <Link
+            to="/admin/michelle-profiles"
+            className="inline-flex items-center gap-2 text-sm text-[#6B7280] hover:text-[#1F2937] hover:underline mb-4 sm:mb-6"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span className="hidden sm:inline">Back to Stores</span>
+            <span className="sm:hidden">Back</span>
+          </Link>
+
+          {/* Page Header */}
+          <div className="mb-6 sm:mb-8">
+            <h1 className="text-2xl sm:text-[28px] lg:text-[32px] font-bold text-[#1F2937] mb-2">
+              <span className="hidden sm:inline">Geographic Coverage Management</span>
+              <span className="sm:hidden">Geographic Coverage</span>
+            </h1>
+            <p className="text-sm sm:text-[15px] text-[#6B7280] hidden sm:block">
+              Manage regions where Michelle's profiles operate
+            </p>
+          </div>
+
+          {/* Action Bar */}
+          <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between mb-6 sm:mb-8">
+            <Button
+              className="h-12 bg-[#1F2937] hover:bg-[#111827] text-white font-semibold"
+              onClick={() => {/* Open add region modal */}}
+            >
+              <Plus className="w-[18px] h-[18px] mr-2" />
+              <Globe className="w-[18px] h-[18px] mr-2" />
+              Add New Region
+            </Button>
+
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Select value={filter} onValueChange={setFilter}>
+                <SelectTrigger className="h-12 w-full sm:w-[200px]">
+                  <SelectValue placeholder="Filter by..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Regions</SelectItem>
+                  <SelectItem value="active">Active Only</SelectItem>
+                  <SelectItem value="inactive">Inactive Only</SelectItem>
+                  <SelectItem value="high">High Performance</SelectItem>
+                  <SelectItem value="low">Low Performance</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={groupBy} onValueChange={setGroupBy}>
+                <SelectTrigger className="h-12 w-full sm:w-[200px]">
+                  <SelectValue placeholder="Group by..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="country">By Country</SelectItem>
+                  <SelectItem value="profile">By Profile</SelectItem>
+                  <SelectItem value="performance">By Performance</SelectItem>
+                  <SelectItem value="alphabetical">Alphabetically</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* Error Banner */}
+          {error && (
+            <div className="mb-4 p-4 rounded-lg bg-[#FEE2E2] border border-[#DC2626] text-[#991B1B] flex items-center justify-between">
+              <span className="text-sm font-medium">{error}</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={fetchRegions}
+                className="ml-4 border-[#DC2626] text-[#DC2626] hover:bg-[#FEE2E2]"
+              >
+                Try Again
+              </Button>
+            </div>
+          )}
+
+          {/* Regions List */}
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center py-20">
+              <Loader2 className="w-12 h-12 text-[#6B7280] animate-spin mb-4" />
+              <p className="text-[15px] text-[#6B7280]">Loading regions...</p>
+            </div>
+          ) : groupedRegions.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20">
+              <Globe className="w-16 h-16 text-[#9CA3AF] mb-4" />
+              <h3 className="text-2xl font-bold text-[#1F2937] mb-2">No regions found</h3>
+              <p className="text-[15px] text-[#6B7280]">Add regions to start managing your geographic coverage</p>
+            </div>
+          ) : (
+          <div className="space-y-4 sm:space-y-5">
+            {groupedRegions.map((country) => (
+              <div key={country.code}>
+                {/* Country Header */}
+                <div className="bg-[#F8F9FA] border border-[#E5E7EB] rounded-lg px-4 sm:px-6 py-3 sm:py-4 mb-3 sm:mb-4 flex items-center justify-between">
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <span className="text-2xl sm:text-[32px]">{country.flag}</span>
+                    <div>
+                      <h2 className="text-base sm:text-lg lg:text-xl font-bold text-[#1F2937]">
+                        {country.name}
+                      </h2>
+                      <p className="text-xs sm:text-sm text-[#6B7280]">
+                        {country.regions.length} {country.regions.length === 1 ? 'region' : 'regions'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" className="h-9 px-3 text-sm">
+                        Manage All
+                        <ChevronDown className="w-4 h-4 ml-2" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem>Activate All Regions</DropdownMenuItem>
+                      <DropdownMenuItem>Deactivate All Regions</DropdownMenuItem>
+                      <DropdownMenuItem>Export Region Data</DropdownMenuItem>
+                      <DropdownMenuItem>View Country Analytics</DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+
+                {/* Region Cards */}
+                <div className="space-y-4 sm:space-y-5 sm:ml-8">
+                  {country.regions.map((region) => (
+                    <div
+                      key={region.id}
+                      className="bg-white border border-[#E5E7EB] rounded-xl p-5 sm:p-6 lg:p-7 hover:border-[#1F2937] hover:shadow-md transition-all"
+                    >
+                      {/* Header */}
+                      <div className="flex items-start justify-between mb-5 sm:mb-6">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <MapPin className="w-5 h-5 sm:w-6 sm:h-6 text-[#6B7280] flex-shrink-0" />
+                          <h3 className="text-base sm:text-lg font-bold text-[#1F2937] truncate">
+                            {region.name}
+                          </h3>
+                        </div>
+                        <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2 sm:gap-3 ml-3">
+                          <span className="text-xs sm:text-sm text-[#6B7280] whitespace-nowrap">
+                            {region.isActive ? 'Active' : 'Inactive'}
+                          </span>
+                          <Switch
+                            checked={region.isActive}
+                            onCheckedChange={() => handleToggleRegion(region.id)}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Active Profiles */}
+                      <div className="mb-5">
+                        <div className="flex items-center justify-between mb-3">
+                          <p className="text-sm font-semibold text-[#1F2937]">Active Profiles:</p>
+                          <p className="text-sm text-[#6B7280]">
+                            {region.activeProfiles} of {region.totalProfiles}
+                          </p>
+                        </div>
+                        <div className="space-y-2">
+                          {region.profiles.filter(p => p.isActive).map((profile) => (
+                            <div key={profile.id} className="flex items-center gap-2 text-sm">
+                              <span className="text-[#6B7280]">•</span>
+                              <span className="text-[#1F2937] flex-1 min-w-0">
+                                {profile.name}
+                                <span className="text-[#6B7280] ml-1">
+                                  ({profile.category})
+                                </span>
+                              </span>
+                              <div className="flex items-center gap-1.5 flex-shrink-0">
+                                <span className="w-2 h-2 rounded-full bg-[#10B981]" />
+                                <span className="text-xs text-[#10B981] hidden sm:inline">Active</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Performance Metrics */}
+                      <div className="border-t border-[#E5E7EB] pt-5">
+                        <p className="text-sm font-semibold text-[#1F2937] mb-4">
+                          Performance (This Month):
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
+                          {/* Bookings */}
+                          <div className="flex items-start gap-3">
+                            <Calendar className="w-5 h-5 text-[#6B7280] flex-shrink-0 mt-0.5" />
+                            <div>
+                              <p className="text-xs text-[#6B7280] mb-1">Bookings</p>
+                              <p className="text-xl font-bold text-[#1F2937]">
+                                {region.performance.bookings}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Revenue */}
+                          <div className="flex items-start gap-3">
+                            <DollarSign className="w-5 h-5 text-[#6B7280] flex-shrink-0 mt-0.5" />
+                            <div>
+                              <p className="text-xs text-[#6B7280] mb-1">Revenue</p>
+                              <p className="text-xl font-bold text-[#1F2937]">
+                                ${region.performance.revenue.toLocaleString()}
+                              </p>
+                              {region.performance.revenueTrend !== 0 && (
+                                <div className="flex items-center gap-1 mt-1">
+                                  {region.performance.revenueTrend > 0 ? (
+                                    <TrendingUp className="w-3 h-3 text-[#10B981]" />
+                                  ) : (
+                                    <TrendingDown className="w-3 h-3 text-[#DC2626]" />
+                                  )}
+                                  <span className={`text-xs ${region.performance.revenueTrend > 0 ? 'text-[#10B981]' : 'text-[#DC2626]'}`}>
+                                    {Math.abs(region.performance.revenueTrend)}%
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Customers */}
+                          <div className="flex items-start gap-3">
+                            <Users className="w-5 h-5 text-[#6B7280] flex-shrink-0 mt-0.5" />
+                            <div>
+                              <p className="text-xs text-[#6B7280] mb-1">Customers</p>
+                              <p className="text-xl font-bold text-[#1F2937]">
+                                {region.performance.customers}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex flex-col sm:flex-row gap-3 mt-5 pt-5 border-t border-[#E5E7EB]">
+                        <Button
+                          variant="outline"
+                          className="h-10 flex-1 sm:flex-none"
+                          onClick={() => handleViewDetails(region)}
+                        >
+                          <Eye className="w-4 h-4 mr-2" />
+                          <span className="hidden sm:inline">View Details</span>
+                          <span className="sm:hidden">Details</span>
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="h-10 flex-1 sm:flex-none"
+                          onClick={() => handleEditRegion(region)}
+                        >
+                          <Edit className="w-4 h-4 mr-2" />
+                          <span className="hidden sm:inline">Edit Region</span>
+                          <span className="sm:hidden">Edit</span>
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="h-10 flex-1 sm:flex-none text-[#DC2626] border-[#FEE2E2] hover:bg-[#FEE2E2] hover:text-[#DC2626]"
+                        >
+                          <ToggleLeft className="w-4 h-4 mr-2" />
+                          <span className="hidden sm:inline">Deactivate All</span>
+                          <span className="sm:hidden">Deactivate</span>
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+          )}
+        </div>
+      </main>
+
+      {/* Region Detail Modal */}
+      {showDetailModal && selectedRegion && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/60 z-50 transition-opacity"
+            onClick={() => setShowDetailModal(false)}
+          />
+          <div className="fixed inset-0 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-[90%] sm:max-w-[800px] sm:max-h-[90vh] bg-white sm:rounded-2xl z-50 overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-[#E5E7EB] px-5 sm:px-8 py-4 sm:py-6 flex items-center justify-between">
+              <h2 className="text-xl sm:text-2xl font-bold text-[#1F2937]">
+                {selectedRegion.name} Details
+              </h2>
+              <button
+                onClick={() => setShowDetailModal(false)}
+                className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-[#F3F4F6] transition-colors"
+              >
+                <X className="w-5 h-5 text-[#6B7280]" />
+              </button>
+            </div>
+
+            <div className="p-5 sm:p-8 space-y-6">
+              {/* Region Status */}
+              <div className="flex items-center gap-2">
+                <span className="text-base font-semibold text-[#1F2937]">Region Status:</span>
+                <div className="flex items-center gap-2">
+                  <span className={`w-3 h-3 rounded-full ${selectedRegion.isActive ? 'bg-[#10B981]' : 'bg-[#9CA3AF]'}`} />
+                  <span className={`text-base font-semibold ${selectedRegion.isActive ? 'text-[#10B981]' : 'text-[#9CA3AF]'}`}>
+                    {selectedRegion.isActive ? 'Active' : 'Inactive'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Active Profiles */}
+              <div>
+                <h3 className="text-lg font-bold text-[#1F2937] mb-4">
+                  Active Profiles ({selectedRegion.activeProfiles}):
+                </h3>
+                <div className="space-y-3">
+                  {selectedRegion.profiles.filter(p => p.isActive).map((profile) => (
+                    <div key={profile.id} className="bg-[#F8F9FA] border border-[#E5E7EB] rounded-lg p-4">
+                      <div className="flex items-start gap-3">
+                        <Check className="w-5 h-5 text-[#10B981] flex-shrink-0 mt-0.5" />
+                        <div className="flex-1">
+                          <p className="text-base font-bold text-[#1F2937] mb-1">{profile.name}</p>
+                          <p className="text-sm text-[#6B7280] mb-2">
+                            Category: {profile.category}
+                          </p>
+                          <p className="text-sm text-[#6B7280]">
+                            Status: Active | Listings: {profile.listingsCount}
+                          </p>
+                          <Button
+                            variant="link"
+                            className="h-auto p-0 text-sm text-[#3B82F6] hover:underline mt-2"
+                          >
+                            Manage Profile in Region
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Performance Trends */}
+              <div className="border-t border-[#E5E7EB] pt-6">
+                <h3 className="text-lg font-bold text-[#1F2937] mb-4">
+                  Performance Summary
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="bg-[#F8F9FA] rounded-lg p-4">
+                    <p className="text-sm text-[#6B7280] mb-2">Total Bookings</p>
+                    <p className="text-2xl font-bold text-[#1F2937]">
+                      {selectedRegion.performance.bookings}
+                    </p>
+                  </div>
+                  <div className="bg-[#F8F9FA] rounded-lg p-4">
+                    <p className="text-sm text-[#6B7280] mb-2">Total Revenue</p>
+                    <p className="text-2xl font-bold text-[#1F2937]">
+                      ${selectedRegion.performance.revenue.toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="bg-[#F8F9FA] rounded-lg p-4">
+                    <p className="text-sm text-[#6B7280] mb-2">Total Customers</p>
+                    <p className="text-2xl font-bold text-[#1F2937]">
+                      {selectedRegion.performance.customers}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Region Notes */}
+              <div className="border-t border-[#E5E7EB] pt-6">
+                <h3 className="text-lg font-bold text-[#1F2937] mb-3">Region Notes</h3>
+                <Textarea
+                  value={editedNotes}
+                  onChange={(e) => setEditedNotes(e.target.value)}
+                  placeholder="Add internal notes about this region (not visible to customers)..."
+                  className="min-h-[100px] resize-none border-2"
+                  maxLength={500}
+                />
+                <p className="text-xs text-[#9CA3AF] mt-2 text-right">
+                  {editedNotes.length} / 500
+                </p>
+              </div>
+
+              {/* Actions */}
+              <div className="flex flex-col-reverse sm:flex-row gap-3 justify-end pt-6 border-t border-[#E5E7EB]">
+                <Button
+                  variant="outline"
+                  className="h-11"
+                  onClick={() => setShowDetailModal(false)}
+                >
+                  Close
+                </Button>
+                <Button
+                  className="h-11 bg-[#1F2937] hover:bg-[#111827] text-white"
+                  onClick={handleSaveNotes}
+                >
+                  Save Notes
+                </Button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Edit Region Modal */}
+      {showEditModal && selectedRegion && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/60 z-50 transition-opacity"
+            onClick={() => setShowEditModal(false)}
+          />
+          <div className="fixed inset-0 sm:inset-auto sm:top-1/2 sm:left-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:w-[90%] sm:max-w-[800px] sm:max-h-[90vh] bg-white sm:rounded-2xl z-50 overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-[#E5E7EB] px-5 sm:px-8 py-4 sm:py-6 flex items-center justify-between">
+              <h2 className="text-xl sm:text-2xl font-bold text-[#1F2937]">
+                Edit Region: {selectedRegion.name}
+              </h2>
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-[#F3F4F6] transition-colors"
+              >
+                <X className="w-5 h-5 text-[#6B7280]" />
+              </button>
+            </div>
+
+            <div className="p-5 sm:p-8 space-y-6">
+              {/* Select Active Profiles */}
+              <div>
+                <h3 className="text-lg font-bold text-[#1F2937] mb-4">
+                  Select Active Profiles:
+                </h3>
+                <div className="space-y-3">
+                  {selectedRegion.profiles.map((profile) => (
+                    <div
+                      key={profile.id}
+                      className={`border rounded-lg p-4 transition-all ${
+                        profile.isActive
+                          ? 'border-[#10B981] bg-[#D1FAE5]'
+                          : 'border-[#E5E7EB] bg-white'
+                      }`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <Checkbox
+                          checked={profile.isActive}
+                          onCheckedChange={() => handleToggleProfileInRegion(profile.id)}
+                          className="mt-0.5"
+                        />
+                        <div className="flex-1">
+                          <Label className="text-base font-semibold text-[#1F2937] cursor-pointer">
+                            {profile.name}
+                          </Label>
+                          <p className="text-sm text-[#6B7280] mt-1">
+                            {profile.listingsCount > 0
+                              ? `Listings in region: ${profile.listingsCount}`
+                              : 'No listings yet'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Region Settings */}
+              <div className="border-t border-[#E5E7EB] pt-6">
+                <h3 className="text-lg font-bold text-[#1F2937] mb-4">
+                  Region-Specific Settings:
+                </h3>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <Checkbox id="featured" />
+                    <Label htmlFor="featured" className="text-sm text-[#1F2937] cursor-pointer">
+                      Feature this region (appears first)
+                    </Label>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Checkbox id="delivery" />
+                    <Label htmlFor="delivery" className="text-sm text-[#1F2937] cursor-pointer">
+                      Special delivery area
+                    </Label>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Checkbox id="advance" />
+                    <Label htmlFor="advance" className="text-sm text-[#1F2937] cursor-pointer">
+                      Requires advance booking
+                    </Label>
+                  </div>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex flex-col-reverse sm:flex-row gap-3 justify-end pt-6 border-t border-[#E5E7EB]">
+                <Button
+                  variant="outline"
+                  className="h-11"
+                  onClick={() => setShowEditModal(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  className="h-11 bg-[#1F2937] hover:bg-[#111827] text-white"
+                  onClick={handleSaveRegionEdit}
+                >
+                  Save Changes
+                </Button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}

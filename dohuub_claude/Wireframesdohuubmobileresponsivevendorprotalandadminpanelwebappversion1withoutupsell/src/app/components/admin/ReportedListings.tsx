@@ -1,0 +1,284 @@
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { api } from "../../../services/api";
+import {
+  AlertTriangle,
+  X,
+  Ban,
+} from "lucide-react";
+import { Button } from "../ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "../ui/dialog";
+import { AdminSidebarRetractable } from "./AdminSidebarRetractable";
+import { AdminTopNav } from "./AdminTopNav";
+
+interface ListingReport {
+  id: string;
+  listingName: string;
+  vendorId: string;
+  vendorName: string;
+  customerName: string;
+  reportReason: string;
+  reportExplanation: string;
+  reportedAt: string;
+}
+
+// Mock data - Only listing reports
+const mockReports: ListingReport[] = [
+  {
+    id: "1",
+    listingName: "Deep Cleaning Service",
+    vendorId: "V001",
+    vendorName: "CleanCo Services",
+    customerName: "John D.",
+    reportReason: "Service Not As Described",
+    reportExplanation:
+      "Service advertised as 3-hour deep clean. Vendor left after 90 minutes, many areas not cleaned as promised. When questioned, claimed 3 hours is 'maximum' not standard. Very disappointed.",
+    reportedAt: "2026-01-03",
+  },
+  {
+    id: "2",
+    listingName: "Professional Plumbing Repair",
+    vendorId: "V002",
+    vendorName: "QuickFix Pro",
+    customerName: "Maria S.",
+    reportReason: "Safety Concerns",
+    reportExplanation:
+      "The vendor did not follow proper safety protocols. No protective equipment was used and water was left running after the job, causing minor flooding in my basement.",
+    reportedAt: "2026-01-02",
+  },
+  {
+    id: "3",
+    listingName: "Home Beauty Services",
+    vendorId: "V003",
+    vendorName: "Glam Squad Mobile",
+    customerName: "Sarah K.",
+    reportReason: "Misleading Pricing",
+    reportExplanation:
+      "Listing showed $50 for haircut but was charged $120 at completion. Hidden fees were not disclosed upfront. This is deceptive pricing.",
+    reportedAt: "2025-12-28",
+  const navigate = useNavigate();
+  const [showActionModal, setShowActionModal] = useState(false);
+  const [actionType, setActionType] = useState<"ignore" | "suspend" | null>(null);
+
+  const handleAction = (action: "ignore" | "suspend") => {
+    setActionType(action);
+    setShowActionModal(true);
+  };
+
+  const confirmAction = () => {
+    // Handle action confirmation
+    setShowActionModal(false);
+  };
+
+  return (
+    <>
+      <div className="bg-white border border-[#E5E7EB] rounded-xl p-5 sm:p-6 mb-5 hover:shadow-lg transition-shadow">
+        {/* Header */}
+        <div className="flex items-start justify-between mb-4">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-[#DC2626] flex-shrink-0 mt-0.5" />
+            <div>
+              <h3 className="text-lg font-bold text-[#1F2937] mb-1">{report.reportReason}</h3>
+              <p className="text-sm text-[#6B7280]">
+                Reported {new Date(report.reportedAt).toLocaleDateString()}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Info Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4 pb-4 border-b border-[#E5E7EB]">
+          <div>
+            <p className="text-xs text-[#6B7280] mb-1">Listing</p>
+            <p className="text-sm font-semibold text-[#1F2937]">{report.listingName}</p>
+          </div>
+          <div>
+            <p className="text-xs text-[#6B7280] mb-1">Vendor</p>
+            <button
+              onClick={() => navigate(`/admin/vendors/${report.vendorId}`)}
+              className="text-sm font-semibold text-[#3B82F6] hover:underline"
+            >
+              {report.vendorName}
+            </button>
+          </div>
+          <div>
+            <p className="text-xs text-[#6B7280] mb-1">Reported by</p>
+            <p className="text-sm font-semibold text-[#1F2937]">{report.customerName}</p>
+          </div>
+        </div>
+
+        {/* Report Explanation */}
+        <div className="mb-4">
+          <p className="text-sm font-semibold text-[#1F2937] mb-2">Explanation:</p>
+          <div className="bg-[#F9FAFB] border border-[#E5E7EB] px-4 py-3 rounded-lg">
+            <p className="text-sm text-[#4B5563]">{report.reportExplanation}</p>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex flex-wrap gap-2 pt-4 border-t border-[#E5E7EB]">
+          <Button 
+            size="sm" 
+            variant="outline"
+            onClick={() => handleAction("ignore")}
+          >
+            <X className="w-4 h-4 mr-2" />
+            Ignore
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="text-[#DC2626] border-[#FECACA]"
+            onClick={() => handleAction("suspend")}
+          >
+            <Ban className="w-4 h-4 mr-2" />
+            Suspend Vendor
+          </Button>
+        </div>
+      </div>
+
+      {/* Action Confirmation Modal */}
+      <Dialog open={showActionModal} onOpenChange={setShowActionModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {actionType === "suspend" ? "Suspend Vendor?" : "Ignore Report?"}
+            </DialogTitle>
+            <DialogDescription>
+              {actionType === "suspend"
+                ? `This will suspend ${report.vendorName}'s account. All their listings will be hidden and they won't be able to accept new bookings.`
+                : "This will dismiss the report and no action will be taken."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowActionModal(false)}>
+              Cancel
+            </Button>
+            <Button
+              className={actionType === "suspend" ? "bg-[#DC2626] hover:bg-[#B91C1C]" : ""}
+              onClick={confirmAction}
+            >
+              {actionType === "suspend" ? "Suspend Vendor" : "Ignore Report"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+export function ReportedListings() {
+  // Sidebar state
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    typeof window !== "undefined" && window.innerWidth >= 1024 ? false : true
+  );
+
+  const handleSidebarToggle = () => {
+    if (typeof window !== "undefined" && window.innerWidth >= 1024) {
+      setSidebarCollapsed(!sidebarCollapsed);
+    } else {
+      setSidebarOpen(!sidebarOpen);
+    }
+  };
+
+  const [reports, setReports] = useState<ListingReport[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch moderation reports from API
+  useEffect(() => {
+    const fetchReports = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        const response: any = await api.getModerationReports({ status: "pending" });
+        const mappedReports: ListingReport[] = (response.reports || response || []).map((report: any) => ({
+          id: report.id,
+          listingName: report.listing?.name || report.listingName,
+          vendorId: report.vendor?.id || report.vendorId,
+          vendorName: report.vendor?.name || report.vendorName,
+          customerName: report.customer?.name || report.customerName,
+          reportReason: report.reason || report.reportReason,
+          reportExplanation: report.explanation || report.reportExplanation || report.description,
+          reportedAt: report.createdAt || report.reportedAt,
+        }));
+
+        setReports(mappedReports);
+      } catch (err: any) {
+        console.error("Failed to fetch reports:", err);
+        setError(err.response?.data?.error || "Failed to load reports. Please try again later.");
+        setReports([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchReports();
+  }, []);
+
+  return (
+    <div className="min-h-screen bg-white">
+      <AdminTopNav onMenuClick={handleSidebarToggle} />
+      <AdminSidebarRetractable
+        isOpen={sidebarOpen}
+        isCollapsed={sidebarCollapsed}
+        onClose={() => setSidebarOpen(false)}
+        activeMenu="moderation"
+      />
+
+      {/* Main Content */}
+      <main
+        className={`
+          pt-[72px] min-h-screen transition-all duration-300
+          ${sidebarCollapsed ? "lg:pl-[72px]" : "lg:pl-[280px]"}
+        `}
+      >
+        <div className="p-4 sm:p-6 lg:p-8 max-w-[1400px] mx-auto">
+          {/* Header */}
+          <div className="mb-6">
+            <h1 className="text-2xl sm:text-[28px] lg:text-[32px] font-bold text-[#1F2937] mb-2">
+              Reported Listings
+            </h1>
+            <p className="text-sm sm:text-[15px] text-[#6B7280]">
+              Review customer reports and take action
+            </p>
+          </div>
+
+          {/* Stats */}
+          <div className="bg-[#F9FAFB] border border-[#E5E7EB] rounded-xl p-4 mb-6">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-[#F59E0B]" />
+              <p className="text-sm font-semibold text-[#1F2937]">
+                {reports.length} {reports.length === 1 ? "Report" : "Reports"} Pending Review
+              </p>
+            </div>
+          </div>
+
+          {/* Report Cards */}
+          {reports.length === 0 ? (
+            <div className="text-center py-12">
+              <AlertTriangle className="w-12 h-12 text-[#D1D5DB] mx-auto mb-3" />
+              <p className="text-[#6B7280]">No reports to review</p>
+            </div>
+          ) : (
+            <div>
+              {reports.map((report) => (
+                <ReportCard key={report.id} report={report} />
+              ))}
+            </div>
+          )}
+        </div>
+      </main>
+    </div>
+  );
+}

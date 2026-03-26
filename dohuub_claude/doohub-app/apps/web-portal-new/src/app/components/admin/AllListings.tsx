@@ -1,0 +1,1258 @@
+import { useState, useEffect, useCallback } from "react";
+import { Link, useParams, useNavigate } from "react-router-dom";
+import { api } from "../../../services/api";
+import {
+  Search,
+  Filter,
+  Download,
+  Eye,
+  Edit,
+  Trash2,
+  MoreVertical,
+  MapPin,
+  DollarSign,
+  Star,
+  ArrowLeft,
+  AlertTriangle,
+  X,
+  CheckCircle,
+  Play,
+  Pause,
+  Flag,
+  Package,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
+import { Button } from "../ui/button";
+import { Input } from "../ui/input";
+import { Checkbox } from "../ui/checkbox";
+import { Textarea } from "../ui/textarea";
+import { Label } from "../ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "../ui/dialog";
+import { AdminSidebarRetractable } from "./AdminSidebarRetractable";
+import { AdminTopNav } from "./AdminTopNav";
+
+interface Listing {
+  id: string;
+  name: string;
+  vendorId: string;
+  vendorName: string;
+  category: string;
+  status: "active" | "inactive" | "flagged" | "draft" | "rejected";
+  price: string;
+  regions: string[];
+  bookings: number;
+  rating: number;
+  reviewCount: number;
+  imageUrl?: string;
+  createdAt: string;
+  updatedAt: string;
+  views?: number;
+  flagReason?: string;
+  flaggedAt?: string;
+}
+
+const getCategoryIcon = (category: string) => {
+  const icons: Record<string, string> = {
+    "Cleaning Services": "🧹",
+    "Handyman Services": "🔧",
+    "Grocery": "🛒",
+    "Beauty Services": "💄",
+    "Beauty Products": "🛍️",
+    "Food": "🍲",
+    "Rental Properties": "🏠",
+    "Caregiving Services": "👵",
+    "Ride Assistance": "🚗",
+    "Companionship Support": "🤝",
+  };
+  return icons[category] || "📋";
+};
+
+const getStatusConfig = (status: string) => {
+  const configs: Record<
+    string,
+    { label: string; icon: string; bg: string; border: string; text: string; borderLeft: string }
+  > = {
+    active: {
+      label: "Active",
+      icon: "✅",
+      bg: "bg-[#D1FAE5]",
+      border: "border-[#10B981]",
+      text: "text-[#10B981]",
+      borderLeft: "border-l-[#10B981]",
+    },
+    inactive: {
+      label: "Inactive",
+      icon: "⏸️",
+      bg: "bg-[#F3F4F6]",
+      border: "border-[#9CA3AF]",
+      text: "text-[#9CA3AF]",
+      borderLeft: "border-l-[#9CA3AF]",
+    },
+    flagged: {
+      label: "Flagged",
+      icon: "🚩",
+      bg: "bg-[#FEF3C7]",
+      border: "border-[#F59E0B]",
+      text: "text-[#F59E0B]",
+      borderLeft: "border-l-[#F59E0B]",
+    },
+    draft: {
+      label: "Draft",
+      icon: "📝",
+      bg: "bg-[#F3F4F6]",
+      border: "border-[#D1D5DB]",
+      text: "text-[#9CA3AF]",
+      borderLeft: "border-l-[#D1D5DB]",
+    },
+    rejected: {
+      label: "Rejected",
+      icon: "❌",
+      bg: "bg-[#FEE2E2]",
+      border: "border-[#DC2626]",
+      text: "text-[#DC2626]",
+      borderLeft: "border-l-[#DC2626]",
+    },
+  };
+  return configs[status] || configs.inactive;
+};
+
+function ListingCard({
+  listing,
+  isSelected,
+  onSelect,
+  isBulkMode,
+  onToggleStatus,
+  onFlagListing,
+  onReviewFlag,
+}: {
+  listing: Listing;
+  isSelected: boolean;
+  onSelect: (id: string) => void;
+  isBulkMode: boolean;
+  onToggleStatus: (id: string) => void;
+  onFlagListing: (id: string, reason: string, details: string) => void;
+  onReviewFlag: (id: string) => void;
+}) {
+  const navigate = useNavigate();
+  const [showFlagModal, setShowFlagModal] = useState(false);
+  const [flagReason, setFlagReason] = useState("");
+  const [flagDetails, setFlagDetails] = useState("");
+  const [showLightbox, setShowLightbox] = useState(false);
+
+  const statusConfig = getStatusConfig(listing.status);
+
+  const handleToggleStatus = () => {
+    const action = listing.status === "active" ? "deactivate" : "activate";
+    if (!window.confirm(`Are you sure you want to ${action} this listing?`)) return;
+    onToggleStatus(listing.id);
+  };
+
+  const handleFlag = () => {
+    onFlagListing(listing.id, flagReason, flagDetails);
+    setShowFlagModal(false);
+    setFlagReason("");
+    setFlagDetails("");
+  };
+
+  return (
+    <>
+      <div
+        className={`bg-white border border-[#E5E7EB] border-l-4 ${statusConfig.borderLeft} rounded-xl p-4 sm:p-5 lg:p-6 mb-5 hover:border-[#1F2937] hover:shadow-lg transition-all relative`}
+      >
+        {/* Bulk Select Checkbox */}
+        {isBulkMode && (
+          <div className="absolute top-5 left-5 z-10">
+            <Checkbox
+              checked={isSelected}
+              onCheckedChange={() => onSelect(listing.id)}
+              className="w-5 h-5"
+            />
+          </div>
+        )}
+
+        <div className={`flex flex-col lg:flex-row gap-4 ${isBulkMode ? "ml-8" : ""}`}>
+          {/* Image */}
+          <div className="flex-shrink-0">
+            {listing.imageUrl ? (
+              <img
+                src={listing.imageUrl}
+                alt={listing.name}
+                className="w-full h-[180px] lg:w-[160px] lg:h-[120px] rounded-lg object-cover cursor-pointer"
+                onClick={() => setShowLightbox(true)}
+              />
+            ) : (
+              <div className="w-full h-[180px] lg:w-[160px] lg:h-[120px] rounded-lg bg-[#F8F9FA] border border-[#E5E7EB] flex items-center justify-center">
+                <span className="text-4xl">{getCategoryIcon(listing.category)}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Info */}
+          <div className="flex-1 min-w-0">
+            {/* Flagged Alert Banner */}
+            {listing.status === "flagged" && listing.flagReason && (
+              <div className="bg-[#FEF3C7] border border-[#F59E0B] border-l-4 rounded-lg px-3 py-2.5 mb-3 flex items-start gap-2">
+                <AlertTriangle className="w-5 h-5 text-[#F59E0B] flex-shrink-0 mt-0.5" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-[#92400E] mb-1">
+                    Flagged: {listing.flagReason}
+                  </p>
+                  {listing.flaggedAt && (
+                    <p className="text-xs text-[#92400E]">
+                      Flagged on {new Date(listing.flaggedAt).toLocaleDateString()}
+                    </p>
+                  )}
+                </div>
+                <Button size="sm" variant="outline" className="h-8 text-xs flex-shrink-0" onClick={() => onReviewFlag(listing.id)}>
+                  Review Flag
+                </Button>
+              </div>
+            )}
+
+            {/* Header */}
+            <div className="flex items-start justify-between gap-3 mb-2">
+              <button
+                onClick={() => navigate(`/admin/listings/${listing.id}`)}
+                className="text-lg lg:text-xl font-bold text-[#1F2937] hover:text-[#3B82F6] hover:underline text-left"
+              >
+                {listing.name}
+              </button>
+
+              {/* Status Badge */}
+              <div
+                className={`flex items-center gap-1.5 px-3 py-1 ${statusConfig.bg} border ${statusConfig.border} rounded-full flex-shrink-0`}
+              >
+                <span className="text-sm">{statusConfig.icon}</span>
+                <span className={`text-sm font-semibold ${statusConfig.text}`}>
+                  {statusConfig.label}
+                </span>
+              </div>
+            </div>
+
+            {/* Vendor & Category */}
+            <button
+              onClick={() => navigate(`/admin/vendors/${listing.vendorId}`)}
+              className="text-sm text-[#6B7280] hover:text-[#3B82F6] hover:underline mb-1 block"
+            >
+              by {listing.vendorName}
+            </button>
+            <p className="text-sm text-[#6B7280] mb-3">
+              {getCategoryIcon(listing.category)} {listing.category}
+            </p>
+
+            {/* Details Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm mb-4">
+              <div>
+                <span className="font-semibold text-[#1F2937]">Price: </span>
+                <span className="text-[#1F2937]">{listing.price}</span>
+              </div>
+              <div>
+                <span className="font-semibold text-[#6B7280]">Regions: </span>
+                <span className="text-[#6B7280]">
+                  {listing.regions.length <= 2
+                    ? listing.regions.join(", ")
+                    : `${listing.regions[0]} +${listing.regions.length - 1} more`}
+                </span>
+              </div>
+              <div>
+                <span className="font-semibold text-[#6B7280]">Performance: </span>
+                <span className="text-[#6B7280]">
+                  {listing.bookings} bookings | {listing.rating}⭐ ({listing.reviewCount} reviews)
+                </span>
+              </div>
+              <div>
+                <span className="font-semibold text-[#9CA3AF]">Last Updated: </span>
+                <span className="text-[#9CA3AF]">
+                  {new Date(listing.updatedAt).toLocaleDateString()}
+                </span>
+              </div>
+              {listing.views && (
+                <div className="sm:col-span-2">
+                  <span className="font-semibold text-[#6B7280]">Views: </span>
+                  <span className="text-[#6B7280]">
+                    {listing.views.toLocaleString()} views (last 30 days)
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Actions - Mobile */}
+            <div className="flex flex-wrap gap-2 lg:hidden">
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1 sm:flex-none"
+                onClick={() => navigate(`/admin/listings/${listing.id}`)}
+              >
+                <Eye className="w-4 h-4 mr-2" />
+                View
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1 sm:flex-none"
+                onClick={() => navigate(`/admin/listings/${listing.id}/edit`)}
+              >
+                <Edit className="w-4 h-4 mr-2" />
+                Edit
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className={`flex-1 sm:flex-none ${
+                  listing.status === "active"
+                    ? "text-[#F59E0B] border-[#FED7AA]"
+                    : "text-[#10B981] border-[#D1FAE5]"
+                }`}
+                onClick={handleToggleStatus}
+              >
+                {listing.status === "active" ? (
+                  <>
+                    <Pause className="w-4 h-4 mr-2" />
+                    Deactivate
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-4 h-4 mr-2" />
+                    Activate
+                  </>
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-[#DC2626] border-[#FECACA]"
+                onClick={() => setShowFlagModal(true)}
+              >
+                <Flag className="w-4 h-4 mr-2" />
+                {listing.status === "flagged" ? "Unflag" : "Flag"}
+              </Button>
+            </div>
+          </div>
+
+          {/* Actions - Desktop */}
+          <div className="hidden lg:flex flex-col gap-2 w-[140px] flex-shrink-0">
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full justify-start"
+              onClick={() => navigate(`/admin/listings/${listing.id}`)}
+            >
+              <Eye className="w-4 h-4 mr-2" />
+              View Details
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full justify-start"
+              onClick={() => navigate(`/admin/listings/${listing.id}/edit`)}
+            >
+              <Edit className="w-4 h-4 mr-2" />
+              Edit
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className={`w-full justify-start ${
+                listing.status === "active"
+                  ? "text-[#F59E0B] border-[#FED7AA]"
+                  : "text-[#10B981] border-[#D1FAE5]"
+              }`}
+              onClick={handleToggleStatus}
+            >
+              {listing.status === "active" ? (
+                <>
+                  <Pause className="w-4 h-4 mr-2" />
+                  Deactivate
+                </>
+              ) : (
+                <>
+                  <Play className="w-4 h-4 mr-2" />
+                  Activate
+                </>
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full justify-start text-[#DC2626] border-[#FECACA]"
+              onClick={() => setShowFlagModal(true)}
+            >
+              <Flag className="w-4 h-4 mr-2" />
+              {listing.status === "flagged" ? "Unflag" : "Flag"}
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Flag Modal */}
+      <Dialog open={showFlagModal} onOpenChange={setShowFlagModal}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Flag Listing for Review</DialogTitle>
+            <DialogDescription>Listing: {listing.name}</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="flag-reason">Flag Reason *</Label>
+              <Select value={flagReason} onValueChange={setFlagReason}>
+                <SelectTrigger id="flag-reason" className="mt-1.5">
+                  <SelectValue placeholder="Select reason..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="misleading">Misleading information</SelectItem>
+                  <SelectItem value="inappropriate">Inappropriate content</SelectItem>
+                  <SelectItem value="quality">Low quality or spam</SelectItem>
+                  <SelectItem value="policy">Policy violation</SelectItem>
+                  <SelectItem value="pricing">Pricing issues</SelectItem>
+                  <SelectItem value="other">Other (specify below)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="flag-details">Additional Details</Label>
+              <Textarea
+                id="flag-details"
+                value={flagDetails}
+                onChange={(e) => setFlagDetails(e.target.value)}
+                placeholder="Provide more information about the issue..."
+                className="mt-1.5 min-h-[100px]"
+                maxLength={500}
+              />
+              <p className="text-xs text-[#9CA3AF] mt-1">{flagDetails.length} / 500</p>
+            </div>
+
+            <div className="flex items-start gap-2 p-3 bg-[#FEF3C7] border border-[#F59E0B] rounded-lg">
+              <AlertTriangle className="w-5 h-5 text-[#F59E0B] flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-[#92400E]">
+                This will add the listing to the moderation queue for review.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowFlagModal(false)}>
+              Cancel
+            </Button>
+            <Button
+              className="bg-[#F59E0B] hover:bg-[#D97706] text-white"
+              onClick={handleFlag}
+              disabled={!flagReason}
+            >
+              Flag Listing
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Image Lightbox */}
+      {showLightbox && listing.imageUrl && (
+        <div
+          className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
+          onClick={() => setShowLightbox(false)}
+        >
+          <div className="relative max-w-4xl max-h-[90vh]">
+            <button
+              className="absolute -top-10 right-0 text-white hover:text-gray-300"
+              onClick={() => setShowLightbox(false)}
+            >
+              <X className="w-8 h-8" />
+            </button>
+            <img
+              src={listing.imageUrl}
+              alt={listing.name}
+              className="max-w-full max-h-[85vh] object-contain rounded-lg"
+              onClick={(e) => e.stopPropagation()}
+            />
+            <p className="text-white text-center mt-4 text-lg font-semibold">
+              {listing.name}
+            </p>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+export function AllListings() {
+  const navigate = useNavigate();
+
+  // Sidebar state
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    typeof window !== "undefined" && window.innerWidth >= 1024 ? false : true
+  );
+
+  const handleSidebarToggle = () => {
+    if (typeof window !== "undefined" && window.innerWidth >= 1024) {
+      setSidebarCollapsed(!sidebarCollapsed);
+    } else {
+      setSidebarOpen(!sidebarOpen);
+    }
+  };
+
+  // State
+  const [listings, setListings] = useState<Listing[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [vendorFilter, setVendorFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [regionFilter, setRegionFilter] = useState("all");
+  const [sortBy, setSortBy] = useState("recent");
+  const [bulkMode, setBulkMode] = useState(false);
+  const [selectedListings, setSelectedListings] = useState<string[]>([]);
+  const [showFlaggedAlert, setShowFlaggedAlert] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isBulkUpdating, setIsBulkUpdating] = useState(false);
+  const itemsPerPage = 20;
+
+  // Vendors and regions for filters
+  const [vendors, setVendors] = useState<{ id: string; name: string }[]>([]);
+  const [regions, setRegions] = useState<{ id: string; name: string }[]>([]);
+
+  // Fetch listings from API
+  const fetchListings = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await api.getListings();
+      const listingData = Array.isArray(response) ? response : (response as any)?.data || [];
+      setListings(listingData.map((l: any) => ({
+        id: l.id,
+        name: l.title || l.name || 'Unknown',
+        vendorId: l.vendorId || l.storeId,
+        vendorName: l.vendorName || l.storeName || 'Unknown Vendor',
+        category: l.category || l.type || 'General',
+        status: (l.status || 'active').toLowerCase() as Listing['status'],
+        price: l.price || 0,
+        priceUnit: l.priceUnit || 'per service',
+        bookings: l.bookings || l.bookingCount || 0,
+        rating: l.rating || 0,
+        reviewCount: l.reviewCount || 0,
+        imageUrl: l.imageUrl || l.image || l.images?.[0],
+        regions: l.regions || [],
+        createdAt: l.createdAt || new Date().toISOString(),
+        flagReason: l.flagReason,
+        flaggedAt: l.flaggedAt,
+      })));
+    } catch (err: any) {
+      console.error('Failed to fetch listings:', err);
+      setError(err?.response?.data?.error || 'Failed to load listings. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  // Fetch listings on mount
+  useEffect(() => {
+    fetchListings();
+  }, [fetchListings]);
+
+  // Fetch vendors for filter dropdown
+  useEffect(() => {
+    const fetchVendors = async () => {
+      try {
+        const response: any = await api.get('/admin/michelle-profiles');
+        const vendorData = Array.isArray(response) ? response : response?.data || [];
+        setVendors(vendorData.map((v: any) => ({
+          id: v.id,
+          name: v.businessName || v.name || 'Unknown Vendor',
+        })));
+      } catch (err) {
+        console.error('Failed to fetch vendors for filter:', err);
+      }
+    };
+    fetchVendors();
+  }, []);
+
+  // Fetch regions for filter dropdown
+  useEffect(() => {
+    const fetchRegions = async () => {
+      try {
+        const response: any = await api.get('/regions');
+        const regionData = Array.isArray(response) ? response : response?.data || [];
+        setRegions(regionData.map((r: any) => ({
+          id: r.id || r.name,
+          name: r.name || r.city || `${r.city}, ${r.state}`,
+        })));
+      } catch (err) {
+        console.error('Failed to fetch regions for filter:', err);
+      }
+    };
+    fetchRegions();
+  }, []);
+
+  // Helper to get listing type for API call
+  const getListingType = (category: string): string => {
+    const typeMap: Record<string, string> = {
+      'Cleaning Services': 'cleaning',
+      'Handyman Services': 'handyman',
+      'Beauty Services': 'beauty',
+      'Food Services': 'food',
+      'Grocery': 'groceries',
+      'Rental Properties': 'rentals',
+      'Ride Assistance': 'ride-assistance',
+      'Companionship Support': 'companionship',
+    };
+    return typeMap[category] || 'general';
+  };
+
+  // Bulk action handlers with API integration
+  const handleBulkActivate = async () => {
+    if (!window.confirm(`Are you sure you want to activate ${selectedListings.length} listing(s)?`)) return;
+
+    setIsBulkUpdating(true);
+    try {
+      // Try to update via API (loop through selected listings)
+      await Promise.allSettled(
+        selectedListings.map(async (listingId) => {
+          const listing = listings.find(l => l.id === listingId);
+          if (listing) {
+            const type = getListingType(listing.category);
+            await api.updateListingStatus(type, listingId, 'ACTIVE');
+          }
+        })
+      );
+    } catch (err) {
+      console.error('Some listings failed to update via API:', err);
+    }
+
+    // Update local state regardless
+    setListings((prev) =>
+      prev.map((l) =>
+        selectedListings.includes(l.id) ? { ...l, status: "active" as const } : l
+      )
+    );
+    setSelectedListings([]);
+    setIsBulkUpdating(false);
+  };
+
+  const handleBulkDeactivate = async () => {
+    if (!window.confirm(`Are you sure you want to deactivate ${selectedListings.length} listing(s)?`)) return;
+
+    setIsBulkUpdating(true);
+    try {
+      await Promise.allSettled(
+        selectedListings.map(async (listingId) => {
+          const listing = listings.find(l => l.id === listingId);
+          if (listing) {
+            const type = getListingType(listing.category);
+            await api.updateListingStatus(type, listingId, 'INACTIVE');
+          }
+        })
+      );
+    } catch (err) {
+      console.error('Some listings failed to update via API:', err);
+    }
+
+    setListings((prev) =>
+      prev.map((l) =>
+        selectedListings.includes(l.id) ? { ...l, status: "inactive" as const } : l
+      )
+    );
+    setSelectedListings([]);
+    setIsBulkUpdating(false);
+  };
+
+  const handleBulkFlag = async () => {
+    if (!window.confirm(`Are you sure you want to flag ${selectedListings.length} listing(s) for review?`)) return;
+
+    setIsBulkUpdating(true);
+    try {
+      await Promise.allSettled(
+        selectedListings.map(async (listingId) => {
+          const listing = listings.find(l => l.id === listingId);
+          if (listing) {
+            const type = getListingType(listing.category);
+            await api.updateListingStatus(type, listingId, 'FLAGGED');
+          }
+        })
+      );
+    } catch (err) {
+      console.error('Some listings failed to update via API:', err);
+    }
+
+    setListings((prev) =>
+      prev.map((l) =>
+        selectedListings.includes(l.id)
+          ? { ...l, status: "flagged" as const, flagReason: "Bulk flagged for review", flaggedAt: new Date().toISOString().split("T")[0] }
+          : l
+      )
+    );
+    setSelectedListings([]);
+    setIsBulkUpdating(false);
+  };
+
+  // Export handlers
+  const handleExportCSV = () => {
+    const headers = ["ID", "Name", "Vendor", "Category", "Status", "Price", "Bookings", "Rating", "Reviews"];
+    const csvData = filteredListings.map((l) => [
+      l.id,
+      l.name,
+      l.vendorName,
+      l.category,
+      l.status,
+      l.price,
+      l.bookings,
+      l.rating,
+      l.reviewCount,
+    ]);
+    const csvContent = [headers, ...csvData].map((row) => row.join(",")).join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `listings-export-${new Date().toISOString().split("T")[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportExcel = () => {
+    // For Excel, we'll export as CSV with .xlsx extension (basic implementation)
+    // In production, use a library like xlsx or exceljs
+    const headers = ["ID", "Name", "Vendor", "Category", "Status", "Price", "Bookings", "Rating", "Reviews"];
+    const csvData = filteredListings.map((l) => [
+      l.id,
+      l.name,
+      l.vendorName,
+      l.category,
+      l.status,
+      l.price,
+      l.bookings,
+      l.rating,
+      l.reviewCount,
+    ]);
+    const csvContent = [headers, ...csvData].map((row) => row.join("\t")).join("\n");
+    const blob = new Blob([csvContent], { type: "application/vnd.ms-excel" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `listings-export-${new Date().toISOString().split("T")[0]}.xls`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Individual listing handlers
+  const handleToggleStatus = (listingId: string) => {
+    setListings((prev) =>
+      prev.map((l) =>
+        l.id === listingId
+          ? { ...l, status: l.status === "active" ? ("inactive" as const) : ("active" as const) }
+          : l
+      )
+    );
+  };
+
+  const handleFlagListing = (listingId: string, reason: string, details: string) => {
+    setListings((prev) =>
+      prev.map((l) =>
+        l.id === listingId
+          ? {
+              ...l,
+              status: "flagged" as const,
+              flagReason: reason + (details ? `: ${details}` : ""),
+              flaggedAt: new Date().toISOString().split("T")[0],
+            }
+          : l
+      )
+    );
+  };
+
+  const handleReviewFlag = (listingId: string) => {
+    // Navigate to listing detail page for review
+    navigate(`/admin/listings/${listingId}`);
+  };
+
+  // Calculate stats
+  const totalListings = listings.length;
+  const activeListings = listings.filter((l) => l.status === "active").length;
+  const inactiveListings = listings.filter((l) => l.status === "inactive").length;
+  const flaggedListings = listings.filter((l) => l.status === "flagged").length;
+  const avgRating =
+    listings.reduce((sum, l) => sum + l.rating, 0) / listings.length || 0;
+
+  // Filter listings
+  const filteredListings = listings.filter((listing) => {
+    // Search
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      const matchesSearch =
+        listing.name.toLowerCase().includes(query) ||
+        listing.vendorName.toLowerCase().includes(query) ||
+        listing.id.toLowerCase().includes(query);
+      if (!matchesSearch) return false;
+    }
+
+    // Vendor filter
+    if (vendorFilter !== "all" && listing.vendorId !== vendorFilter) {
+      return false;
+    }
+
+    // Category filter
+    if (categoryFilter !== "all" && listing.category !== categoryFilter) {
+      return false;
+    }
+
+    // Status filter
+    if (statusFilter !== "all" && listing.status !== statusFilter) {
+      return false;
+    }
+
+    // Region filter
+    if (regionFilter !== "all") {
+      const hasRegion = listing.regions.some((r) => r === regionFilter);
+      if (!hasRegion) return false;
+    }
+
+    return true;
+  });
+
+  // Sort listings
+  const sortedListings = [...filteredListings].sort((a, b) => {
+    if (sortBy === "recent") return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    if (sortBy === "oldest") return new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
+    if (sortBy === "bookings") return b.bookings - a.bookings;
+    if (sortBy === "rating-high") return b.rating - a.rating;
+    if (sortBy === "rating-low") return a.rating - b.rating;
+    if (sortBy === "alphabetical") return a.name.localeCompare(b.name);
+    return 0;
+  });
+
+  // Pagination
+  const totalPages = Math.ceil(sortedListings.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedListings = sortedListings.slice(startIndex, endIndex);
+
+  const handleSelectListing = (id: string) => {
+    setSelectedListings((prev) =>
+      prev.includes(id) ? prev.filter((lid) => lid !== id) : [...prev, id]
+    );
+  };
+
+  const handleDeselectAll = () => {
+    setSelectedListings([]);
+  };
+
+  return (
+    <div className="min-h-screen bg-white">
+      <AdminTopNav onMenuClick={handleSidebarToggle} />
+      <AdminSidebarRetractable
+        isOpen={sidebarOpen}
+        isCollapsed={sidebarCollapsed}
+        onClose={() => setSidebarOpen(false)}
+        activeMenu="listings"
+      />
+
+      {/* Main Content */}
+      <main
+        className={`
+          mt-[72px] min-h-[calc(100vh-72px)] p-4 sm:p-6 lg:p-8
+          transition-all duration-300
+          ${sidebarCollapsed ? "lg:ml-[72px]" : "lg:ml-[280px]"}
+        `}
+      >
+        <div className="max-w-[1400px] mx-auto">
+          {/* Page Header */}
+          <div className="mb-6">
+            <h1 className="text-2xl sm:text-[28px] lg:text-[32px] font-bold text-[#1F2937] mb-2">
+              All Listings
+            </h1>
+            <p className="text-sm sm:text-[15px] text-[#6B7280] hidden sm:block">
+              Platform-Wide Service & Product Listings
+            </p>
+          </div>
+
+          {/* Listings Summary Metrics */}
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-5 mb-6">
+            <div className="bg-white border border-[#E5E7EB] rounded-xl p-4 sm:p-5">
+              <p className="text-xs uppercase text-[#6B7280] mb-2">Total</p>
+              <p className="text-2xl sm:text-[28px] font-bold text-[#1F2937]">
+                {totalListings.toLocaleString()}
+              </p>
+              <p className="text-xs text-[#6B7280] mt-1">All listings</p>
+            </div>
+
+            <div
+              className="bg-white border border-[#E5E7EB] rounded-xl p-4 sm:p-5 cursor-pointer hover:border-[#10B981] transition-colors"
+              onClick={() => setStatusFilter("active")}
+            >
+              <p className="text-xs uppercase text-[#6B7280] mb-2">Active</p>
+              <p className="text-2xl sm:text-[28px] font-bold text-[#10B981]">
+                {activeListings.toLocaleString()}
+              </p>
+              <p className="text-xs text-[#6B7280] mt-1">
+                {Math.round((activeListings / totalListings) * 100)}% of total
+              </p>
+            </div>
+
+            <div
+              className="bg-white border border-[#E5E7EB] rounded-xl p-4 sm:p-5 cursor-pointer hover:border-[#9CA3AF] transition-colors"
+              onClick={() => setStatusFilter("inactive")}
+            >
+              <p className="text-xs uppercase text-[#6B7280] mb-2">Inactive</p>
+              <p className="text-2xl sm:text-[28px] font-bold text-[#9CA3AF]">
+                {inactiveListings.toLocaleString()}
+              </p>
+              <p className="text-xs text-[#6B7280] mt-1">
+                {Math.round((inactiveListings / totalListings) * 100)}% of total
+              </p>
+            </div>
+
+            <div
+              className="bg-white border border-[#E5E7EB] rounded-xl p-4 sm:p-5 cursor-pointer hover:border-[#F59E0B] transition-colors"
+              onClick={() => setStatusFilter("flagged")}
+            >
+              <p className="text-xs uppercase text-[#6B7280] mb-2">Flagged</p>
+              <p className="text-2xl sm:text-[28px] font-bold text-[#F59E0B]">
+                {flaggedListings.toLocaleString()}
+              </p>
+              <p className="text-xs text-[#6B7280] mt-1">Needs review</p>
+            </div>
+
+            <div className="bg-white border border-[#E5E7EB] rounded-xl p-4 sm:p-5 col-span-2 lg:col-span-1">
+              <p className="text-xs uppercase text-[#6B7280] mb-2">Avg Rating</p>
+              <p className="text-2xl sm:text-[28px] font-bold text-[#1F2937]">
+                {avgRating.toFixed(1)} ⭐
+              </p>
+              <p className="text-xs text-[#6B7280] mt-1">Platform average</p>
+            </div>
+          </div>
+
+          {/* Flagged Listings Alert */}
+          {flaggedListings > 0 && showFlaggedAlert && (
+            <div className="bg-[#FEF3C7] border border-[#F59E0B] border-l-4 rounded-lg px-4 py-3 mb-6 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <AlertTriangle className="w-6 h-6 text-[#F59E0B] flex-shrink-0" />
+                <p className="text-sm sm:text-base font-semibold text-[#92400E]">
+                  {flaggedListings} listing{flaggedListings > 1 ? "s" : ""} flagged for review
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  className="bg-[#F59E0B] hover:bg-[#D97706] text-white"
+                  onClick={() => setStatusFilter("flagged")}
+                >
+                  Review Flagged →
+                </Button>
+                <button
+                  onClick={() => setShowFlaggedAlert(false)}
+                  className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-[#FDE68A] transition-colors"
+                >
+                  <X className="w-5 h-5 text-[#92400E]" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Search & Filter Bar */}
+          <div className="space-y-3 mb-6">
+            {/* Search + Primary Filters */}
+            <div className="flex flex-col lg:flex-row gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[#9CA3AF]" />
+                <Input
+                  type="text"
+                  placeholder="🔍 Search listings by name, vendor, or ID..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="h-12 pl-12 pr-4 text-[15px]"
+                />
+              </div>
+
+              <Select value={vendorFilter} onValueChange={setVendorFilter}>
+                <SelectTrigger className="h-12 w-full lg:w-[200px]">
+                  <SelectValue placeholder="Vendor: All" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Vendors</SelectItem>
+                  {vendors.map((vendor) => (
+                    <SelectItem key={vendor.id} value={vendor.id}>
+                      {vendor.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                <SelectTrigger className="h-12 w-full lg:w-[200px]">
+                  <SelectValue placeholder="Category: All" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Categories</SelectItem>
+                  <SelectItem value="Cleaning Services">🧹 Cleaning Services</SelectItem>
+                  <SelectItem value="Handyman Services">🔧 Handyman Services</SelectItem>
+                  <SelectItem value="Grocery">🛒 Grocery</SelectItem>
+                  <SelectItem value="Beauty Services">💄 Beauty Services</SelectItem>
+                  <SelectItem value="Beauty Products">🛍️ Beauty Products</SelectItem>
+                  <SelectItem value="Food">🍲 Food</SelectItem>
+                  <SelectItem value="Rental Properties">🏠 Rental Properties</SelectItem>
+                  <SelectItem value="Ride Assistance">🚗 Ride Assistance</SelectItem>
+                  <SelectItem value="Companionship Support">🤝 Companionship Support</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="h-12 w-full lg:w-[200px]">
+                  <SelectValue placeholder="Status: All" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="active">✅ Active</SelectItem>
+                  <SelectItem value="inactive">⏸️ Inactive</SelectItem>
+                  <SelectItem value="flagged">🚩 Flagged</SelectItem>
+                  <SelectItem value="draft">📝 Draft</SelectItem>
+                  <SelectItem value="rejected">❌ Rejected</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={regionFilter} onValueChange={setRegionFilter}>
+                <SelectTrigger className="h-12 w-full lg:w-[200px]">
+                  <SelectValue placeholder="Region: All" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Regions</SelectItem>
+                  {regions.map((region) => (
+                    <SelectItem key={region.id} value={region.name}>
+                      {region.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Sort + Actions */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <Select value={sortBy} onValueChange={setSortBy}>
+                <SelectTrigger className="h-12 w-full sm:w-[200px]">
+                  <SelectValue placeholder="Sort..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="recent">Most Recent</SelectItem>
+                  <SelectItem value="oldest">Oldest First</SelectItem>
+                  <SelectItem value="bookings">Most Bookings</SelectItem>
+                  <SelectItem value="rating-high">Highest Rated</SelectItem>
+                  <SelectItem value="rating-low">Lowest Rated</SelectItem>
+                  <SelectItem value="alphabetical">Alphabetically</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Button
+                variant={bulkMode ? "default" : "outline"}
+                className={`h-12 sm:ml-auto ${bulkMode ? "bg-[#1F2937]" : ""}`}
+                onClick={() => {
+                  setBulkMode(!bulkMode);
+                  if (bulkMode) setSelectedListings([]);
+                }}
+              >
+                <CheckCircle className="w-4 h-4 mr-2" />
+                {bulkMode ? "Exit Bulk Mode" : "Bulk Select Mode"}
+              </Button>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="h-12">
+                    <Download className="w-4 h-4 mr-2" />
+                    Export Data
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={handleExportCSV}>
+                    <Download className="w-4 h-4 mr-2" />
+                    Export as CSV
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleExportExcel}>
+                    <Download className="w-4 h-4 mr-2" />
+                    Export as Excel
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+
+            {/* Bulk Actions Bar */}
+            {bulkMode && selectedListings.length > 0 && (
+              <div className="bg-[#E0F2FE] border border-[#3B82F6] rounded-lg px-4 sm:px-6 py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <p className="text-sm font-semibold text-[#1E3A8A]">
+                  {selectedListings.length} listing{selectedListings.length > 1 ? "s" : ""} selected
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button size="sm" className="bg-[#10B981] hover:bg-[#059669] text-white" onClick={handleBulkActivate}>
+                    <Play className="w-4 h-4 mr-2" />
+                    Activate Selected
+                  </Button>
+                  <Button size="sm" variant="outline" className="text-[#9CA3AF] border-[#E5E7EB]" onClick={handleBulkDeactivate}>
+                    <Pause className="w-4 h-4 mr-2" />
+                    Deactivate Selected
+                  </Button>
+                  <Button size="sm" variant="outline" className="text-[#F59E0B] border-[#FED7AA]" onClick={handleBulkFlag}>
+                    <Flag className="w-4 h-4 mr-2" />
+                    Flag Selected
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={handleDeselectAll}
+                    className="text-[#3B82F6]"
+                  >
+                    Deselect All
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Error Banner */}
+          {error && (
+            <div className="mb-4 p-4 rounded-lg bg-[#FEE2E2] border border-[#DC2626] text-[#991B1B] flex items-center justify-between">
+              <span className="text-sm font-medium">{error}</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={fetchListings}
+                className="ml-4 border-[#DC2626] text-[#DC2626] hover:bg-[#FEE2E2]"
+              >
+                Try Again
+              </Button>
+            </div>
+          )}
+
+          {/* Listing Cards */}
+          {isLoading ? (
+            <div className="flex flex-col items-center justify-center py-20">
+              <div className="w-12 h-12 border-4 border-[#E5E7EB] border-t-[#1F2937] rounded-full animate-spin mb-4" />
+              <p className="text-[15px] text-[#6B7280]">Loading listings...</p>
+            </div>
+          ) : paginatedListings.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20">
+              <div className="w-[120px] h-[120px] rounded-full bg-[#F8F9FA] flex items-center justify-center mb-6">
+                <Package className="w-16 h-16 text-[#9CA3AF]" />
+              </div>
+              <h3 className="text-2xl font-bold text-[#1F2937] mb-2">No listings found</h3>
+              <p className="text-[15px] text-[#6B7280] mb-6">Try adjusting your search or filters</p>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setSearchQuery("");
+                  setVendorFilter("all");
+                  setCategoryFilter("all");
+                  setStatusFilter("all");
+                  setRegionFilter("all");
+                }}
+              >
+                Clear All Filters
+              </Button>
+            </div>
+          ) : (
+            <>
+              {paginatedListings.map((listing) => (
+                <ListingCard
+                  key={listing.id}
+                  listing={listing}
+                  isSelected={selectedListings.includes(listing.id)}
+                  onSelect={handleSelectListing}
+                  isBulkMode={bulkMode}
+                  onToggleStatus={handleToggleStatus}
+                  onFlagListing={handleFlagListing}
+                  onReviewFlag={handleReviewFlag}
+                />
+              ))}
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-8">
+                  <p className="text-sm text-[#6B7280]">
+                    Showing {startIndex + 1}-{Math.min(endIndex, sortedListings.length)} of{" "}
+                    {sortedListings.length} listings
+                  </p>
+
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={currentPage === 1}
+                      onClick={() => setCurrentPage(currentPage - 1)}
+                      className="h-10 px-3"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                      <span className="hidden sm:inline ml-1">Prev</span>
+                    </Button>
+
+                    <div className="hidden sm:flex items-center gap-2">
+                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                        let pageNum;
+                        if (totalPages <= 5) {
+                          pageNum = i + 1;
+                        } else if (currentPage <= 3) {
+                          pageNum = i + 1;
+                        } else if (currentPage >= totalPages - 2) {
+                          pageNum = totalPages - 4 + i;
+                        } else {
+                          pageNum = currentPage - 2 + i;
+                        }
+
+                        return (
+                          <Button
+                            key={pageNum}
+                            variant={currentPage === pageNum ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setCurrentPage(pageNum)}
+                            className={`h-10 w-10 ${
+                              currentPage === pageNum ? "bg-[#1F2937] text-white" : ""
+                            }`}
+                          >
+                            {pageNum}
+                          </Button>
+                        );
+                      })}
+                    </div>
+
+                    <span className="sm:hidden text-sm text-[#6B7280]">
+                      Page {currentPage} of {totalPages}
+                    </span>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={currentPage === totalPages}
+                      onClick={() => setCurrentPage(currentPage + 1)}
+                      className="h-10 px-3"
+                    >
+                      <span className="hidden sm:inline mr-1">Next</span>
+                      <ChevronRight className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </main>
+    </div>
+  );
+}

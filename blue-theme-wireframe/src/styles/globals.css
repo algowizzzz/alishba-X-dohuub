@@ -1,0 +1,389 @@
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --font-size: 16px;
+
+  /* ===== DOHUUB BRAND COLORS ===== */
+  /* Primary Brand Gradient (from logo) */
+  --primary-gradient-start: #4CA6FA;
+  --primary-gradient-end: #1D4AAD;
+  --primary-gradient: linear-gradient(135deg, var(--primary-gradient-start) 0%, var(--primary-gradient-end) 100%);
+
+  /* Primary solid color (mid-tone of gradient) */
+  --primary: #2E7AD9;
+  --primary-light: #4CA6FA;
+  --primary-dark: #1D4AAD;
+  --primary-foreground: #ffffff;
+
+  /* Backgrounds - Light blue tinted for immersive feel */
+  --background: #F0F7FF;
+  --background-secondary: #E3F0FF;
+  --foreground: #1E293B;
+
+  /* Cards & Surfaces */
+  --card: #E8F1FC;
+  --card-foreground: #1E293B;
+  --surface-elevated: #FFFFFF;
+  --popover: #ffffff;
+  --popover-foreground: #1E293B;
+
+  /* Form Elements */
+  --input-background: #FFFFFF;
+
+  /* Interactive Elements */
+  --button-secondary-bg: #F0F7FF;
+  --chip-background: #E0EDFF;
+
+  /* Icon Containers */
+  --icon-surface: #DBEAFE;
+  --avatar-surface: #E0EDFF;
+
+  /* Secondary - Lighter blue tones */
+  --secondary: #E0EDFF;
+  --secondary-foreground: #1D4AAD;
+
+  /* Muted - Soft blue-gray */
+  --muted: #E8F1FC;
+  --muted-foreground: #64748B;
+
+  /* Accent - Complementary light blue */
+  --accent: #DBEAFE;
+  --accent-foreground: #1E40AF;
+
+  /* ===== COMPLEMENTARY COLORS ===== */
+  /* Success - Green */
+  --success: #10B981;
+  --success-light: #D1FAE5;
+  --success-foreground: #ffffff;
+
+  /* Warning - Amber */
+  --warning: #F59E0B;
+  --warning-light: #FEF3C7;
+  --warning-foreground: #ffffff;
+
+  /* Destructive - Red */
+  --destructive: #EF4444;
+  --destructive-light: #FEE2E2;
+  --destructive-foreground: #ffffff;
+
+  /* Info - Blue (matches primary) */
+  --info: #3B82F6;
+  --info-light: #DBEAFE;
+  --info-foreground: #ffffff;
+
+  /* ===== UI ELEMENTS ===== */
+  --border: rgba(45, 122, 217, 0.15);
+  --input: transparent;
+  --input-background: #ffffff;
+  --input-border: rgba(45, 122, 217, 0.2);
+  --switch-background: #CBD5E1;
+  --switch-checked: var(--primary);
+
+  /* Focus & Ring */
+  --ring: #4CA6FA;
+  --ring-offset: #ffffff;
+
+  /* Font weights */
+  --font-weight-medium: 500;
+  --font-weight-normal: 400;
+
+  /* ===== CHART COLORS ===== */
+  --chart-1: #4CA6FA;
+  --chart-2: #1D4AAD;
+  --chart-3: #10B981;
+  --chart-4: #F59E0B;
+  --chart-5: #8B5CF6;
+
+  /* Border radius */
+  --radius: 0.625rem;
+
+  /* ===== SIDEBAR ===== */
+  --sidebar: #ffffff;
+  --sidebar-foreground: #1E293B;
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #E0EDFF;
+  --sidebar-accent-foreground: #1D4AAD;
+  --sidebar-border: rgba(45, 122, 217, 0.1);
+  --sidebar-ring: #4CA6FA;
+}
+
+/* Dark mode - keeping for future use but not the focus */
+.dark {
+  --primary-gradient-start: #60B5FF;
+  --primary-gradient-end: #2E7AD9;
+  --primary-gradient: linear-gradient(135deg, var(--primary-gradient-start) 0%, var(--primary-gradient-end) 100%);
+
+  --primary: #60B5FF;
+  --primary-light: #8ECAFF;
+  --primary-dark: #2E7AD9;
+  --primary-foreground: #0F172A;
+
+  --background: #0F172A;
+  --background-secondary: #1E293B;
+  --foreground: #F1F5F9;
+
+  --card: #1E293B;
+  --card-foreground: #F1F5F9;
+  --surface-elevated: #334155;
+  --popover: #1E293B;
+  --popover-foreground: #F1F5F9;
+
+  /* Form Elements */
+  --input-background: #1E293B;
+
+  /* Interactive Elements */
+  --button-secondary-bg: #0F172A;
+  --chip-background: #1E3A5F;
+
+  /* Icon Containers */
+  --icon-surface: #1E3A5F;
+  --avatar-surface: #1E3A5F;
+
+  --secondary: #1E3A5F;
+  --secondary-foreground: #60B5FF;
+
+  --muted: #334155;
+  --muted-foreground: #94A3B8;
+
+  --accent: #1E3A5F;
+  --accent-foreground: #60B5FF;
+
+  --success: #34D399;
+  --success-light: #064E3B;
+  --success-foreground: #0F172A;
+
+  --warning: #FBBF24;
+  --warning-light: #78350F;
+  --warning-foreground: #0F172A;
+
+  --destructive: #F87171;
+  --destructive-light: #7F1D1D;
+  --destructive-foreground: #0F172A;
+
+  --info: #60A5FA;
+  --info-light: #1E3A8A;
+  --info-foreground: #0F172A;
+
+  --border: rgba(96, 181, 255, 0.15);
+  --input: transparent;
+  --input-background: #1E293B;
+  --input-border: rgba(96, 181, 255, 0.2);
+  --switch-background: #475569;
+  --switch-checked: var(--primary);
+
+  --ring: #60B5FF;
+  --ring-offset: #0F172A;
+
+  --font-weight-medium: 500;
+  --font-weight-normal: 400;
+
+  --chart-1: #60B5FF;
+  --chart-2: #2E7AD9;
+  --chart-3: #34D399;
+  --chart-4: #FBBF24;
+  --chart-5: #A78BFA;
+
+  --sidebar: #1E293B;
+  --sidebar-foreground: #F1F5F9;
+  --sidebar-primary: #60B5FF;
+  --sidebar-primary-foreground: #0F172A;
+  --sidebar-accent: #1E3A5F;
+  --sidebar-accent-foreground: #60B5FF;
+  --sidebar-border: rgba(96, 181, 255, 0.1);
+  --sidebar-ring: #60B5FF;
+}
+
+@theme inline {
+  /* Core colors */
+  --color-background: var(--background);
+  --color-background-secondary: var(--background-secondary);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+
+  /* Form & Interactive */
+  --color-input-background: var(--input-background);
+  --color-button-secondary-bg: var(--button-secondary-bg);
+  --color-chip-background: var(--chip-background);
+  --color-icon-surface: var(--icon-surface);
+  --color-avatar-surface: var(--avatar-surface);
+
+  /* Primary with gradient support */
+  --color-primary: var(--primary);
+  --color-primary-light: var(--primary-light);
+  --color-primary-dark: var(--primary-dark);
+  --color-primary-foreground: var(--primary-foreground);
+
+  /* Secondary & Accent */
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+
+  /* Semantic colors */
+  --color-success: var(--success);
+  --color-success-light: var(--success-light);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-light: var(--warning-light);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-light: var(--destructive-light);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-info: var(--info);
+  --color-info-light: var(--info-light);
+  --color-info-foreground: var(--info-foreground);
+
+  /* UI elements */
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-input-background: var(--input-background);
+  --color-input-border: var(--input-border);
+  --color-switch-background: var(--switch-background);
+  --color-switch-checked: var(--switch-checked);
+  --color-ring: var(--ring);
+
+  /* Charts */
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  /* Radius */
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  /* Sidebar */
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/**
+ * Base typography. This is not applied to elements which have an ancestor with a Tailwind text class.
+ */
+@layer base {
+  :where(:not(:has([class*=' text-']), :not(:has([class^='text-'])))) {
+    h1 {
+      font-size: var(--text-2xl);
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+    }
+
+    h2 {
+      font-size: var(--text-xl);
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+    }
+
+    h3 {
+      font-size: var(--text-lg);
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+    }
+
+    h4 {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+    }
+
+    p {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-normal);
+      line-height: 1.5;
+    }
+
+    label {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+    }
+
+    button {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-medium);
+      line-height: 1.5;
+    }
+
+    input {
+      font-size: var(--text-base);
+      font-weight: var(--font-weight-normal);
+      line-height: 1.5;
+    }
+  }
+}
+
+html {
+  font-size: var(--font-size);
+}
+
+/* ===== DOHUUB GRADIENT UTILITIES ===== */
+@layer utilities {
+  /* Primary gradient background */
+  .bg-gradient-primary {
+    background: var(--primary-gradient);
+  }
+
+  /* Gradient text */
+  .text-gradient-primary {
+    background: var(--primary-gradient);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  /* Gradient border */
+  .border-gradient-primary {
+    border: 2px solid transparent;
+    background: linear-gradient(var(--card), var(--card)) padding-box,
+                var(--primary-gradient) border-box;
+  }
+
+  /* Gradient shadow for buttons */
+  .shadow-gradient-primary {
+    box-shadow: 0 4px 14px 0 rgba(76, 166, 250, 0.39);
+  }
+
+  /* Hover states for gradient buttons */
+  .hover-gradient-primary:hover {
+    background: linear-gradient(135deg, var(--primary-gradient-end) 0%, var(--primary-gradient-start) 100%);
+    box-shadow: 0 6px 20px 0 rgba(76, 166, 250, 0.5);
+  }
+
+  /* Glass effect for cards */
+  .glass-card {
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+  }
+
+  /* Subtle gradient overlay for headers */
+  .bg-gradient-header {
+    background: linear-gradient(180deg, var(--background) 0%, var(--background-secondary) 100%);
+  }
+}

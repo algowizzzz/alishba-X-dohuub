@@ -1,0 +1,444 @@
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, ScrollView, Image, Switch } from 'react-native';
+import { router, useLocalSearchParams } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { colors, fontSize } from '../../../../../src/constants/theme';
+
+const CATEGORY_TABS = ['All', 'Makeup', 'Skincare', 'Haircare', 'Fragrances', 'Tools & Brushes', 'Bath & Body'];
+
+const SAMPLE_PRODUCTS = [
+  { id: '1',  name: 'Matte Liquid Lipstick',   description: 'Long-lasting matte finish',    category: 'Makeup',          price: 18.99, size: '5ml',   image: 'https://images.unsplash.com/photo-1586495777744-4e6232bf2176?w=200&h=200&fit=crop' },
+  { id: '2',  name: 'Foundation SPF 30',        description: 'Full coverage, all-day wear', category: 'Makeup',          price: 34.99, size: '30ml',  image: 'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?w=200&h=200&fit=crop' },
+  { id: '3',  name: 'Mascara Volume Boost',     description: 'Volumizing & lengthening',    category: 'Makeup',          price: 14.99, size: '10ml',  image: 'https://images.unsplash.com/photo-1512496015851-a90fb38ba796?w=200&h=200&fit=crop' },
+  { id: '4',  name: 'Eyeshadow Palette',        description: '12 pigmented shades',         category: 'Makeup',          price: 29.99, size: '12g',   image: 'https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=200&h=200&fit=crop' },
+  { id: '5',  name: 'Vitamin C Serum',          description: 'Brightening & anti-aging',    category: 'Skincare',        price: 42.99, size: '30ml',  image: 'https://images.unsplash.com/photo-1571875257727-256c39da42af?w=200&h=200&fit=crop' },
+  { id: '6',  name: 'Hydrating Face Cream',     description: '24-hour moisture barrier',    category: 'Skincare',        price: 28.99, size: '50ml',  image: 'https://images.unsplash.com/photo-1556228578-0d85b1a4d571?w=200&h=200&fit=crop' },
+  { id: '7',  name: 'Retinol Night Cream',      description: 'Anti-wrinkle, firming',       category: 'Skincare',        price: 38.99, size: '50ml',  image: 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=200&h=200&fit=crop' },
+  { id: '8',  name: 'Micellar Cleansing Water', description: 'Gentle makeup remover',       category: 'Skincare',        price: 12.99, size: '200ml', image: 'https://images.unsplash.com/photo-1608248597279-f99d160bfcbc?w=200&h=200&fit=crop' },
+  { id: '9',  name: 'Argan Oil Hair Serum',     description: 'Frizz control & shine',       category: 'Haircare',        price: 22.99, size: '100ml', image: 'https://images.unsplash.com/photo-1519735777090-ec97162dc266?w=200&h=200&fit=crop' },
+  { id: '10', name: 'Color-Safe Shampoo',       description: 'Nourishing & gentle',         category: 'Haircare',        price: 16.99, size: '250ml', image: 'https://images.unsplash.com/photo-1535585209827-a15fcdbc4c2d?w=200&h=200&fit=crop' },
+  { id: '11', name: 'Deep Conditioning Mask',   description: 'Intense repair treatment',    category: 'Haircare',        price: 19.99, size: '200ml', image: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=200&h=200&fit=crop' },
+  { id: '12', name: 'Floral Eau de Parfum',     description: 'Fresh floral notes',          category: 'Fragrances',      price: 65.99, size: '50ml',  image: 'https://images.unsplash.com/photo-1541643600914-78b084683702?w=200&h=200&fit=crop' },
+  { id: '13', name: 'Oud & Amber Perfume',      description: 'Rich, warm oriental',         category: 'Fragrances',      price: 79.99, size: '75ml',  image: 'https://images.unsplash.com/photo-1592945403244-b3fbafd7f539?w=200&h=200&fit=crop' },
+  { id: '14', name: 'Kabuki Brush Set',         description: 'Professional 5-piece set',    category: 'Tools & Brushes', price: 32.99, size: '5 pcs', image: 'https://images.unsplash.com/photo-1487412947147-5cebf100ffc2?w=200&h=200&fit=crop' },
+  { id: '15', name: 'Eyelash Curler',           description: 'Salon-quality curl',          category: 'Tools & Brushes', price: 11.99, size: '1 pc',  image: 'https://images.unsplash.com/photo-1512496015851-a90fb38ba796?w=200&h=200&fit=crop' },
+  { id: '16', name: 'Rose Bath Salts',          description: 'Relaxing & moisturizing',     category: 'Bath & Body',     price: 14.99, size: '300g',  image: 'https://images.unsplash.com/photo-1570194065650-d99fb4d44e62?w=200&h=200&fit=crop' },
+  { id: '17', name: 'Shea Body Butter',         description: 'Rich, ultra-nourishing',      category: 'Bath & Body',     price: 17.99, size: '200ml', image: 'https://images.unsplash.com/photo-1614159869907-bb2b3fbbf3f7?w=200&h=200&fit=crop' },
+];
+
+type Step = 'products' | 'checkout' | 'confirm';
+
+export default function BeautyProductsCatalog() {
+  const params = useLocalSearchParams<{ id: string; name: string; isPoweredByDoHuub: string; rating: string }>();
+  const isPoweredByDoHuub = params.isPoweredByDoHuub === 'true';
+
+  const [step, setStep] = useState<Step>('products');
+  const [activeTab, setActiveTab] = useState('All');
+  const [cart, setCart] = useState<Record<string, number>>({});
+  const [redeemPoints, setRedeemPoints] = useState(false);
+
+  const filteredProducts = activeTab === 'All'
+    ? SAMPLE_PRODUCTS
+    : SAMPLE_PRODUCTS.filter(p => p.category === activeTab);
+
+  const cartItems = SAMPLE_PRODUCTS.filter(p => cart[p.id] > 0);
+  const subtotal = cartItems.reduce((sum, p) => sum + cart[p.id] * p.price, 0);
+  const deliveryFee = 2.99;
+  const pointsDiscount = redeemPoints ? Math.min(5.00, subtotal * 0.1) : 0;
+  const total = subtotal + deliveryFee - pointsDiscount;
+  const cartCount = Object.values(cart).reduce((a, b) => a + b, 0);
+  const pointsEarned = isPoweredByDoHuub ? Math.floor(total) : 0;
+  const orderNumber = `BP-${Math.floor(10000 + Math.random() * 90000)}`;
+
+  const addToCart = (id: string) => setCart(prev => ({ ...prev, [id]: (prev[id] || 0) + 1 }));
+  const removeFromCart = (id: string) => setCart(prev => {
+    if (!prev[id]) return prev;
+    const updated = { ...prev, [id]: prev[id] - 1 };
+    if (updated[id] === 0) delete updated[id];
+    return updated;
+  });
+
+  // ─── CONFIRM SCREEN ────────────────────────────────────────────────────────
+  if (step === 'confirm') {
+    return (
+      <SafeAreaView style={styles.container}>
+        <ScrollView contentContainerStyle={styles.confirmScroll} showsVerticalScrollIndicator={false}>
+          {/* Success circle */}
+          <View style={styles.successCircle}>
+            <Ionicons name="checkmark" size={40} color="#FFF" />
+          </View>
+          <Text style={styles.successTitle}>Order Placed!</Text>
+          <Text style={styles.successSubtitle}>Order #{orderNumber}</Text>
+
+          {/* Points earned */}
+          {isPoweredByDoHuub && (
+            <View style={styles.pointsEarnedCard}>
+              <Ionicons name="gift-outline" size={18} color="#D97706" />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.pointsEarnedTitle}>+{pointsEarned} Points Earned!</Text>
+                <Text style={styles.pointsEarnedSub}>Added to your rewards wallet after delivery</Text>
+              </View>
+            </View>
+          )}
+
+          {/* Order summary */}
+          <View style={styles.sectionCard}>
+            <Text style={styles.sectionTitle}>Order Summary</Text>
+            {cartItems.map(p => (
+              <View key={p.id} style={styles.summaryRow}>
+                <Text style={styles.summaryLabel}>{p.name} × {cart[p.id]}</Text>
+                <Text style={styles.summaryValue}>${(p.price * cart[p.id]).toFixed(2)}</Text>
+              </View>
+            ))}
+            <View style={[styles.summaryRow, { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.06)' }]}>
+              <Text style={styles.summaryLabel}>Subtotal</Text>
+              <Text style={styles.summaryValue}>${subtotal.toFixed(2)}</Text>
+            </View>
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Delivery Fee</Text>
+              <Text style={styles.summaryValue}>${deliveryFee.toFixed(2)}</Text>
+            </View>
+            {redeemPoints && (
+              <View style={styles.summaryRow}>
+                <Text style={[styles.summaryLabel, { color: '#D97706' }]}>Points Redeemed</Text>
+                <Text style={[styles.summaryValue, { color: '#D97706' }]}>-${pointsDiscount.toFixed(2)}</Text>
+              </View>
+            )}
+            <View style={[styles.summaryRow, { marginTop: 4 }]}>
+              <Text style={styles.totalLabel}>Total</Text>
+              <Text style={styles.totalValue}>${total.toFixed(2)}</Text>
+            </View>
+          </View>
+
+          {/* Delivery info */}
+          <View style={styles.sectionCard}>
+            <Text style={styles.sectionTitle}>Delivery Details</Text>
+            <View style={styles.infoRow}>
+              <Ionicons name="location-outline" size={16} color={colors.text.secondary} />
+              <Text style={styles.infoText}>123 Main Street, Dubai</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <Ionicons name="card-outline" size={16} color={colors.text.secondary} />
+              <Text style={styles.infoText}>Card •••• 9012</Text>
+            </View>
+          </View>
+
+          <TouchableOpacity style={styles.primaryActionBtn} onPress={() => router.push('/(tabs)' as any)}>
+            <Text style={styles.primaryActionBtnText}>Back to Home</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.secondaryActionBtn} onPress={() => router.push('/rewards' as any)}>
+            <Text style={styles.secondaryActionBtnText}>View My Rewards</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  // ─── CHECKOUT SCREEN ───────────────────────────────────────────────────────
+  if (step === 'checkout') {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => setStep('products')}>
+            <Ionicons name="arrow-back" size={20} color={colors.text.primary} />
+          </TouchableOpacity>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.headerTitle}>Checkout</Text>
+            <Text style={styles.headerSubtitle}>{cartCount} item{cartCount !== 1 ? 's' : ''}</Text>
+          </View>
+        </View>
+
+        <ScrollView contentContainerStyle={styles.checkoutScroll} showsVerticalScrollIndicator={false}>
+          {/* Delivery Address */}
+          <View style={styles.sectionCard}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Delivery Address</Text>
+              <TouchableOpacity><Text style={styles.changeLink}>Change</Text></TouchableOpacity>
+            </View>
+            <View style={styles.infoRow}>
+              <Ionicons name="location-outline" size={16} color={colors.text.secondary} />
+              <Text style={styles.infoText}>123 Main Street, Dubai</Text>
+            </View>
+          </View>
+
+          {/* Order Items */}
+          <View style={styles.sectionCard}>
+            <Text style={styles.sectionTitle}>Order Items</Text>
+            {cartItems.map(p => (
+              <View key={p.id} style={styles.checkoutItem}>
+                <Image source={{ uri: p.image }} style={styles.checkoutItemIcon} resizeMode="cover" />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.checkoutItemName}>{p.name}</Text>
+                  <Text style={styles.checkoutItemSize}>{p.size}</Text>
+                </View>
+                <Text style={styles.checkoutItemQty}>× {cart[p.id]}</Text>
+                <Text style={styles.checkoutItemPrice}>${(p.price * cart[p.id]).toFixed(2)}</Text>
+              </View>
+            ))}
+          </View>
+
+          {/* Redeem Points */}
+          {isPoweredByDoHuub && (
+            <View style={styles.redeemCard}>
+              <View style={styles.redeemLeft}>
+                <Ionicons name="gift-outline" size={18} color="#D97706" />
+                <View>
+                  <Text style={styles.redeemTitle}>Redeem Points</Text>
+                  <Text style={styles.redeemSub}>You have 500 pts · Save up to $5.00</Text>
+                </View>
+              </View>
+              <Switch
+                value={redeemPoints}
+                onValueChange={setRedeemPoints}
+                trackColor={{ false: '#E5E7EB', true: '#FDE68A' }}
+                thumbColor={redeemPoints ? '#D97706' : '#FFF'}
+              />
+            </View>
+          )}
+
+          {/* Price Details */}
+          <View style={styles.sectionCard}>
+            <Text style={styles.sectionTitle}>Price Details</Text>
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Subtotal</Text>
+              <Text style={styles.summaryValue}>${subtotal.toFixed(2)}</Text>
+            </View>
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Delivery Fee</Text>
+              <Text style={styles.summaryValue}>${deliveryFee.toFixed(2)}</Text>
+            </View>
+            {redeemPoints && (
+              <View style={styles.summaryRow}>
+                <Text style={[styles.summaryLabel, { color: '#D97706' }]}>Points Redeemed</Text>
+                <Text style={[styles.summaryValue, { color: '#D97706' }]}>-${pointsDiscount.toFixed(2)}</Text>
+              </View>
+            )}
+            <View style={[styles.summaryRow, { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.06)' }]}>
+              <Text style={styles.totalLabel}>Total</Text>
+              <Text style={styles.totalValue}>${total.toFixed(2)}</Text>
+            </View>
+          </View>
+
+          {/* Points Banner */}
+          {isPoweredByDoHuub && (
+            <View style={styles.pointsBanner}>
+              <Ionicons name="gift-outline" size={16} color="#D97706" />
+              <Text style={styles.pointsBannerText}>You'll earn {Math.floor(total)} points on this order</Text>
+            </View>
+          )}
+
+          <TouchableOpacity style={styles.placeOrderBtn} onPress={() => setStep('confirm')}>
+            <Text style={styles.placeOrderBtnText}>Confirm & Place Order · ${total.toFixed(2)}</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  // ─── PRODUCTS SCREEN ───────────────────────────────────────────────────────
+  return (
+    <SafeAreaView style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={20} color={colors.text.primary} />
+        </TouchableOpacity>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.headerTitle}>{params.name || 'Beauty Products'}</Text>
+          <Text style={styles.headerSubtitle}>Browse products</Text>
+        </View>
+        <TouchableOpacity style={styles.cartIconBtn} onPress={cartCount > 0 ? () => setStep('checkout') : undefined}>
+          <Ionicons name="cart-outline" size={22} color={colors.text.primary} />
+          {cartCount > 0 && (
+            <View style={styles.cartDot}><Text style={styles.cartDotText}>{cartCount}</Text></View>
+          )}
+        </TouchableOpacity>
+      </View>
+
+      {/* Points Banner */}
+      {isPoweredByDoHuub && (
+        <View style={styles.pointsBanner}>
+          <Ionicons name="gift-outline" size={16} color="#D97706" />
+          <Text style={styles.pointsBannerText}>Earn points on every purchase · 1 point per $1 spent</Text>
+        </View>
+      )}
+
+      {/* Category Tabs */}
+      <View style={styles.tabs}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={{ height: 52, flexShrink: 0 }}
+          contentContainerStyle={styles.tabsContent}
+        >
+          {CATEGORY_TABS.map(tab => (
+            <TouchableOpacity
+              key={tab}
+              style={[styles.tab, activeTab === tab && styles.tabActive]}
+              onPress={() => setActiveTab(tab)}
+            >
+              <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>{tab}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+
+      {/* Products List */}
+      <FlatList
+        data={filteredProducts}
+        keyExtractor={item => item.id}
+        contentContainerStyle={styles.list}
+        showsVerticalScrollIndicator={false}
+        renderItem={({ item }) => (
+          <View style={styles.productCard}>
+            <Image source={{ uri: item.image }} style={styles.productIconWrap} resizeMode="cover" />
+            <View style={styles.productInfo}>
+              <Text style={styles.productName}>{item.name}</Text>
+              <Text style={styles.productDesc}>{item.description}</Text>
+              <View style={styles.productMeta}>
+                <Text style={styles.productSize}>{item.size}</Text>
+                <Text style={styles.productPrice}>${item.price.toFixed(2)}</Text>
+              </View>
+            </View>
+            <View style={styles.qtyControls}>
+              {cart[item.id] ? (
+                <View style={styles.qtyRow}>
+                  <TouchableOpacity style={styles.qtyBtn} onPress={() => removeFromCart(item.id)}>
+                    <Ionicons name="remove" size={16} color={colors.primary} />
+                  </TouchableOpacity>
+                  <Text style={styles.qtyNum}>{cart[item.id]}</Text>
+                  <TouchableOpacity style={styles.qtyBtn} onPress={() => addToCart(item.id)}>
+                    <Ionicons name="add" size={16} color={colors.primary} />
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <TouchableOpacity style={styles.addBtn} onPress={() => addToCart(item.id)}>
+                  <Ionicons name="add" size={18} color="#FFF" />
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        )}
+      />
+
+      {/* Cart Footer — tappable, goes to checkout */}
+      {cartCount > 0 && (
+        <TouchableOpacity style={styles.cartFooter} activeOpacity={0.85} onPress={() => setStep('checkout')}>
+          <View style={styles.cartCountBadge}><Text style={styles.cartCountText}>{cartCount}</Text></View>
+          <Text style={styles.cartFooterLabel}>View Cart</Text>
+          <Text style={styles.cartFooterTotal}>${subtotal.toFixed(2)}</Text>
+          <Ionicons name="arrow-forward" size={18} color="#FFF" />
+        </TouchableOpacity>
+      )}
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
+
+  // Header
+  header: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingHorizontal: 20, paddingTop: 16, paddingBottom: 16,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    borderBottomWidth: 1, borderBottomColor: 'rgba(46,122,217,0.08)',
+    borderBottomLeftRadius: 24, borderBottomRightRadius: 24,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.06, shadowRadius: 15, elevation: 3,
+  },
+  backBtn: { padding: 8, borderRadius: 12, backgroundColor: '#FFF', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 },
+  headerTitle: { fontSize: fontSize.md, fontWeight: '600', color: colors.text.primary },
+  headerSubtitle: { fontSize: fontSize.sm, color: colors.text.secondary, marginTop: 2 },
+  cartIconBtn: { padding: 8, borderRadius: 12, backgroundColor: '#FFF', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 },
+  cartDot: { position: 'absolute', top: 4, right: 4, width: 16, height: 16, borderRadius: 8, backgroundColor: '#EC4899', alignItems: 'center', justifyContent: 'center' },
+  cartDotText: { fontSize: 9, fontWeight: '700', color: '#FFF' },
+
+  // Points banner
+  pointsBanner: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    marginHorizontal: 20, marginTop: 12,
+    backgroundColor: '#FFFBEB', borderRadius: 10, padding: 10,
+    borderWidth: 1, borderColor: '#FDE68A',
+  },
+  pointsBannerText: { fontSize: fontSize.xs, color: '#92400E', fontWeight: '500', flex: 1 },
+
+  // Tabs
+  tabs: { marginTop: 12 },
+  tabsContent: { paddingHorizontal: 20, paddingBottom: 8, height: 52, alignItems: 'center' },
+  tab: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 99, backgroundColor: '#F5F5F5', borderWidth: 1, borderColor: 'rgba(0,0,0,0.08)', marginRight: 8 },
+  tabActive: { backgroundColor: '#EC4899', borderColor: '#EC4899' },
+  tabText: { fontSize: 13, color: colors.text.secondary, fontWeight: '500' },
+  tabTextActive: { color: '#FFF' },
+
+  // Products
+  list: { padding: 20, gap: 12, paddingBottom: 100 },
+  productCard: {
+    backgroundColor: '#FFF', borderRadius: 12, padding: 14,
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    borderWidth: 1, borderColor: 'rgba(236,72,153,0.1)',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
+  },
+  productIconWrap: { width: 72, height: 72, borderRadius: 12, flexShrink: 0, overflow: 'hidden' },
+  productInfo: { flex: 1, minWidth: 0 },
+  productName: { fontSize: fontSize.sm, fontWeight: '600', color: colors.text.primary, marginBottom: 3 },
+  productDesc: { fontSize: fontSize.xs, color: colors.text.secondary, marginBottom: 6 },
+  productMeta: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  productSize: { fontSize: fontSize.xs, color: colors.text.secondary, backgroundColor: '#F5F5F5', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 99 },
+  productPrice: { fontSize: fontSize.sm, fontWeight: '700', color: colors.primary },
+  qtyControls: { flexShrink: 0 },
+  addBtn: { width: 34, height: 34, borderRadius: 99, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
+  qtyRow: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: 'rgba(46,122,217,0.2)', borderRadius: 99, paddingHorizontal: 8, paddingVertical: 6 },
+  qtyBtn: { width: 22, height: 22, alignItems: 'center', justifyContent: 'center' },
+  qtyNum: { fontSize: fontSize.sm, fontWeight: '600', color: colors.text.primary, minWidth: 18, textAlign: 'center' },
+
+  // Cart footer
+  cartFooter: {
+    position: 'absolute', bottom: 24, left: 20, right: 20,
+    backgroundColor: colors.primary, borderRadius: 16, padding: 16,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    shadowColor: colors.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 12, elevation: 6,
+  },
+  cartCountBadge: { width: 26, height: 26, borderRadius: 13, backgroundColor: 'rgba(255,255,255,0.25)', alignItems: 'center', justifyContent: 'center' },
+  cartCountText: { fontSize: fontSize.xs, fontWeight: '700', color: '#FFF' },
+  cartFooterLabel: { fontSize: fontSize.sm, fontWeight: '600', color: '#FFF', flex: 1, marginLeft: 10 },
+  cartFooterTotal: { fontSize: fontSize.md, fontWeight: '700', color: '#FFF', marginRight: 8 },
+
+  // Checkout / Confirm shared
+  checkoutScroll: { padding: 20, gap: 16, paddingBottom: 40 },
+  confirmScroll: { padding: 20, gap: 16, paddingBottom: 40, alignItems: 'center' },
+  sectionCard: { backgroundColor: '#FFF', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: 'rgba(46,122,217,0.08)', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 1 },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
+  sectionTitle: { fontSize: fontSize.sm, fontWeight: '700', color: colors.text.primary, marginBottom: 10 },
+  changeLink: { fontSize: fontSize.xs, color: colors.primary, fontWeight: '500' },
+  infoRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  infoText: { fontSize: fontSize.sm, color: colors.text.secondary },
+  checkoutItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.05)' },
+  checkoutItemIcon: { width: 48, height: 48, borderRadius: 8, overflow: 'hidden' },
+  checkoutItemName: { fontSize: fontSize.sm, fontWeight: '500', color: colors.text.primary },
+  checkoutItemSize: { fontSize: fontSize.xs, color: colors.text.secondary },
+  checkoutItemQty: { fontSize: fontSize.sm, color: colors.text.secondary },
+  checkoutItemPrice: { fontSize: fontSize.sm, fontWeight: '600', color: colors.text.primary, minWidth: 60, textAlign: 'right' },
+  redeemCard: { backgroundColor: '#FFFBEB', borderRadius: 14, padding: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: '#FDE68A' },
+  redeemLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 },
+  redeemTitle: { fontSize: fontSize.sm, fontWeight: '600', color: '#92400E' },
+  redeemSub: { fontSize: fontSize.xs, color: '#B45309' },
+  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
+  summaryLabel: { fontSize: fontSize.sm, color: colors.text.secondary },
+  summaryValue: { fontSize: fontSize.sm, color: colors.text.primary, fontWeight: '500' },
+  totalLabel: { fontSize: fontSize.sm, fontWeight: '700', color: colors.text.primary },
+  totalValue: { fontSize: fontSize.md, fontWeight: '700', color: colors.primary },
+  placeOrderBtn: { backgroundColor: colors.primary, borderRadius: 14, paddingVertical: 16, alignItems: 'center', marginTop: 8 },
+  placeOrderBtnText: { fontSize: fontSize.sm, fontWeight: '700', color: '#FFF' },
+
+  // Confirm screen
+  successCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#22C55E', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
+  successTitle: { fontSize: 22, fontWeight: '700', color: colors.text.primary },
+  successSubtitle: { fontSize: fontSize.sm, color: colors.text.secondary, marginBottom: 8 },
+  pointsEarnedCard: { backgroundColor: '#FFFBEB', borderRadius: 14, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, borderColor: '#FDE68A', width: '100%' },
+  pointsEarnedTitle: { fontSize: fontSize.sm, fontWeight: '700', color: '#92400E' },
+  pointsEarnedSub: { fontSize: fontSize.xs, color: '#B45309' },
+  primaryActionBtn: { backgroundColor: colors.primary, borderRadius: 14, paddingVertical: 15, alignItems: 'center', width: '100%', marginTop: 8 },
+  primaryActionBtnText: { fontSize: fontSize.sm, fontWeight: '700', color: '#FFF' },
+  secondaryActionBtn: { borderRadius: 14, paddingVertical: 14, alignItems: 'center', width: '100%', borderWidth: 1, borderColor: 'rgba(46,122,217,0.2)' },
+  secondaryActionBtnText: { fontSize: fontSize.sm, fontWeight: '600', color: colors.primary },
+});

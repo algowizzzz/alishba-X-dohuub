@@ -1,0 +1,22 @@
+## dependencies
+**/node_modules/
+
+## local tooling / editor state
+.claude/
+
+## env / secrets
+**/.env
+**/.env.*
+.mcp.json
+**/*CREDENTIALS*.md
+**/*credentials*.md
+**/*secret*.md
+**/*.pem
+**/*.key
+
+## common build artifacts
+**/dist/
+**/build/
+**/.expo/
+**/.next/
+**/.turbo/
