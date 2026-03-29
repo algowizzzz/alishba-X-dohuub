@@ -11,7 +11,7 @@
       "distribution": "internal",
       "env": {
         "EXPO_ROUTER_APP_ROOT": "app",
-        "EXPO_ROUTER_IMPORT_MODE": "lazy"
+        "EXPO_ROUTER_IMPORT_MODE": "sync"
       },
       "android": {
         "buildType": "apk"
