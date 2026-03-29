@@ -143,7 +143,7 @@ export default function BookingsScreen() {
   };
 
   // Use mock data as fallback when no real bookings
-  const displayBookings = bookings.length > 0 ? bookings : MOCK_BOOKINGS;
+  const displayBookings = [...MOCK_BOOKINGS, ...bookings];
 
   const filteredBookings = displayBookings.filter((booking: any) => {
     if (activeTab === 'All') return true;
