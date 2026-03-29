@@ -12,7 +12,9 @@
       "env": {
         "EXPO_ROUTER_APP_ROOT": "app",
         "EXPO_ROUTER_IMPORT_MODE": "sync",
-        "EXPO_NO_DOCTOR": "1"
+        "EXPO_NO_DOCTOR": "1",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://qiotpmjbhjpegylqgrwd.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "sb_publishable_cyDVvfP9gm6PYGKtQ21EpQ_1DjEJDeA"
       },
       "android": {
         "buildType": "apk"
