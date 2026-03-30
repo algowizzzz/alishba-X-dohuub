@@ -5,7 +5,12 @@ module.exports = function (api) {
     plugins: [
       'react-native-reanimated/plugin',
       ['transform-inline-environment-variables', {
-        include: ['EXPO_ROUTER_APP_ROOT', 'EXPO_ROUTER_IMPORT_MODE'],
+        include: [
+          'EXPO_ROUTER_APP_ROOT',
+          'EXPO_ROUTER_IMPORT_MODE',
+          'EXPO_PUBLIC_SUPABASE_URL',
+          'EXPO_PUBLIC_SUPABASE_ANON_KEY',
+        ],
       }],
     ],
   };
