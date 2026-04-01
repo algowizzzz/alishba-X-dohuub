@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 
+// BUNDLE_MARKER_DOHUUB_XK9F2 - if this string is in the bundle, app code is being bundled
 const supabaseUrl = 'https://qiotpmjbhjpegylqgrwd.supabase.co';
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFpb3RwbWpiaGpwZWd5bHFncndkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0NDQ3MTAsImV4cCI6MjA4NDAyMDcxMH0.NnH4WAZOflA0twj9qoD0Nqa7LVvBqIi6PRvuS3zuZ9c';
 
