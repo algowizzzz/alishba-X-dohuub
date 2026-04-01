@@ -44,7 +44,8 @@
     "react-native-svg": "15.8.0",
     "react-native-web": "~0.19.13",
     "web-streams-polyfill": "^3.3.2",
-    "zustand": "^4.4.7"
+    "zustand": "^4.4.7",
+    "expo-font": "~13.0.4"
   },
   "devDependencies": {
     "@babel/core": "^7.24.0",
