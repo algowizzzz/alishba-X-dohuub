@@ -28,8 +28,8 @@ import { spacing, fontSize, borderRadius } from '../../src/constants/theme';
  * - "Sign In" button (white bg, blue text)
  */
 export default function EmailSignInScreen() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('demo@dohuub.com');
+  const [password, setPassword] = useState('Abcd@1234!');
   const { login, isLoading } = useAuthStore();
 
   const handleSignIn = async () => {

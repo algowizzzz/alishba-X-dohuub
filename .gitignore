@@ -20,3 +20,6 @@
 **/.expo/
 **/.next/
 **/.turbo/
+
+# Local Netlify folder
+.netlify

@@ -1,6 +1,10 @@
 import { Tabs } from 'expo-router';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Platform, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const TAB_COUNT = 4;
+const TAB_WIDTH = SCREEN_WIDTH / TAB_COUNT;
 
 function TabIcon({
   name,
@@ -34,14 +38,17 @@ export default function TabsLayout() {
         tabBarStyle: {
           backgroundColor: '#2E7AD9',
           borderTopWidth: 0,
-          height: 72,
-          paddingBottom: 8,
-          paddingTop: 8,
+          height: Platform.OS === 'android' ? 64 : 80,
+          paddingBottom: Platform.OS === 'android' ? 6 : 20,
+          paddingTop: 6,
+          borderTopLeftRadius: 20,
+          borderTopRightRadius: 20,
+          position: 'absolute',
           shadowColor: '#1D4ADD',
           shadowOffset: { width: 0, height: -4 },
           shadowOpacity: 0.2,
           shadowRadius: 10,
-          elevation: 10,
+          elevation: 15,
         },
       }}
     >
@@ -87,12 +94,14 @@ export default function TabsLayout() {
 const styles = StyleSheet.create({
   tabItem: {
     alignItems: 'center',
-    gap: 3,
+    justifyContent: 'center',
+    width: TAB_WIDTH,
+    gap: 2,
   },
   iconBox: {
-    width: 44,
-    height: 36,
-    borderRadius: 10,
+    width: 40,
+    height: 32,
+    borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -100,12 +109,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.2)',
   },
   label: {
-    fontSize: 11,
-    fontWeight: '400',
+    fontSize: 10,
+    fontWeight: '500',
     color: 'rgba(255,255,255,0.65)',
+    textAlign: 'center',
   },
   labelActive: {
     color: '#FFFFFF',
-    fontWeight: '600',
+    fontWeight: '700',
   },
 });

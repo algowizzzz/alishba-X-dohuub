@@ -26,17 +26,22 @@ export function MainHeader({
 }: MainHeaderProps) {
   return (
     <View style={styles.container}>
-      {/* Location Selector */}
-      <TouchableOpacity style={styles.locationButton} onPress={onLocationPress}>
-        <Ionicons name="location-outline" size={18} color={colors.primary} />
-        <Text style={styles.locationText}>{locationLabel}</Text>
-        <Ionicons name="chevron-down" size={14} color={colors.text.muted} />
-      </TouchableOpacity>
+      {/* Left: Location Selector */}
+      <View style={styles.leftSection}>
+        <Text style={styles.homeTitle}>Home</Text>
+        <TouchableOpacity style={styles.locationButton} onPress={onLocationPress}>
+          <Ionicons name="location" size={14} color={colors.primary} />
+          <Text style={styles.locationText} numberOfLines={1}>{locationLabel}</Text>
+          <Ionicons name="chevron-down" size={12} color={colors.primary} />
+        </TouchableOpacity>
+      </View>
 
       {/* Right Side Icons */}
       <View style={styles.rightIcons}>
         <TouchableOpacity style={styles.iconButton} onPress={onNotificationsPress}>
-          <Ionicons name="notifications-outline" size={24} color={colors.text.primary} />
+          <View style={styles.iconCircle}>
+            <Ionicons name="notifications-outline" size={20} color={colors.text.primary} />
+          </View>
           {hasUnreadNotifications && <View style={styles.notificationDot} />}
         </TouchableOpacity>
 
@@ -44,7 +49,9 @@ export function MainHeader({
           style={styles.iconButton}
           onPress={onProfilePress || (() => router.push('/(tabs)/profile'))}
         >
-          <Ionicons name="person-outline" size={24} color={colors.text.primary} />
+          <View style={styles.iconCircle}>
+            <Ionicons name="person-outline" size={20} color={colors.text.primary} />
+          </View>
         </TouchableOpacity>
       </View>
     </View>
@@ -57,7 +64,16 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  leftSection: {
+    flex: 1,
+    gap: 2,
+  },
+  homeTitle: {
+    fontSize: fontSize.xl,
+    fontWeight: '700',
+    color: colors.text.primary,
   },
   locationButton: {
     flexDirection: 'row',
@@ -65,9 +81,10 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   locationText: {
-    fontSize: fontSize.md,
-    fontWeight: '600',
-    color: colors.text.primary,
+    fontSize: fontSize.xs,
+    fontWeight: '500',
+    color: colors.text.secondary,
+    maxWidth: 180,
   },
   rightIcons: {
     flexDirection: 'row',
@@ -75,17 +92,26 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   iconButton: {
-    padding: spacing.xs,
     position: 'relative',
+  },
+  iconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.background,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   notificationDot: {
     position: 'absolute',
-    top: spacing.xs,
-    right: spacing.xs,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    top: 2,
+    right: 2,
+    width: 9,
+    height: 9,
+    borderRadius: 5,
     backgroundColor: colors.status.error,
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
   },
 });
 

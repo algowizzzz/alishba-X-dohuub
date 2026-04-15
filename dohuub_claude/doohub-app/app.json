@@ -1,0 +1,11 @@
+{
+  "expo": {
+    "name": "DoHuub",
+    "slug": "doohub",
+    "version": "1.0.5",
+    "android": { "package": "com.doohub.app" },
+    "ios": { "bundleIdentifier": "com.doohub.app", "supportsTablet": true },
+    "extra": { "eas": { "projectId": "a98d727e-80f6-4d2b-a795-c3d3400744aa" } },
+    "owner": "sa5425592"
+  }
+}

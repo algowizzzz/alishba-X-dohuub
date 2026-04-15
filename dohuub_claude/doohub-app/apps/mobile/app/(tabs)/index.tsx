@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   RefreshControl,
   Image,
+  Platform,
+  StatusBar,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -176,7 +178,7 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        <View style={{ height: spacing.xxl }} />
+        <View style={{ height: 100 }} />
       </ScrollView>
 
       {/* Location Selector Modal */}
@@ -198,17 +200,15 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   header: {
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    paddingTop: 60,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(46, 122, 217, 0.08)',
+    backgroundColor: '#FFFFFF',
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 8 : 60,
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 15,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
   },
   locationBanner: {
     flexDirection: 'row',
