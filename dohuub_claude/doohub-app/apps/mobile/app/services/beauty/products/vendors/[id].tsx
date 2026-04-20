@@ -26,7 +26,7 @@ const SAMPLE_PRODUCTS = [
   { id: '17', name: 'Shea Body Butter',         description: 'Rich, ultra-nourishing',      category: 'Bath & Body',     price: 17.99, size: '200ml', image: 'https://images.unsplash.com/photo-1614159869907-bb2b3fbbf3f7?w=200&h=200&fit=crop' },
 ];
 
-type Step = 'products' | 'checkout' | 'confirm';
+type Step = 'products' | 'checkout' | 'review' | 'confirm';
 
 export default function BeautyProductsCatalog() {
   const params = useLocalSearchParams<{ id: string; name: string; isPoweredByDoHuub: string; rating: string }>();
@@ -58,7 +58,88 @@ export default function BeautyProductsCatalog() {
     return updated;
   });
 
-  // ─── CONFIRM SCREEN ────────────────────────────────────────────────────────
+  // ─── REVIEW / CONFIRM ORDER — matching boss wireframe ────────────────────
+  if (step === 'review') {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => setStep('checkout')}>
+            <Ionicons name="arrow-back" size={20} color="#1E293B" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Confirm Order</Text>
+        </View>
+
+        <ScrollView contentContainerStyle={{ padding: 24, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
+          {/* Delivery Address */}
+          <Text style={styles.sectionTitle}>Delivery Address</Text>
+          <View style={[styles.sectionCard, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 12 }}>
+              <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#E8F1FC', alignItems: 'center', justifyContent: 'center' }}>
+                <Ionicons name="location" size={18} color="#2E7AD9" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 15, fontWeight: '500', color: '#1E293B' }}>Home</Text>
+                <Text style={{ fontSize: 13, color: '#64748B', marginTop: 2 }}>123 Main Street, Apt 4B, New York, NY 10001</Text>
+              </View>
+            </View>
+            <TouchableOpacity style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(46,122,217,0.2)', backgroundColor: 'rgba(46,122,217,0.05)' }}>
+              <Text style={{ fontSize: 13, fontWeight: '500', color: '#2E7AD9' }}>Change</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Payment Method */}
+          <Text style={styles.sectionTitle}>Payment Method</Text>
+          <View style={[styles.sectionCard, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, gap: 12 }}>
+              <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#E8F1FC', alignItems: 'center', justifyContent: 'center' }}>
+                <Ionicons name="card" size={18} color="#2E7AD9" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 15, fontWeight: '500', color: '#1E293B' }}>Credit Card</Text>
+                <Text style={{ fontSize: 13, color: '#64748B', marginTop: 2 }}>•••• •••• •••• 9012</Text>
+              </View>
+            </View>
+            <TouchableOpacity style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(46,122,217,0.2)', backgroundColor: 'rgba(46,122,217,0.05)' }}>
+              <Text style={{ fontSize: 13, fontWeight: '500', color: '#2E7AD9' }}>Change</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Order Summary */}
+          <Text style={styles.sectionTitle}>Order Summary</Text>
+          <View style={styles.sectionCard}>
+            {cartItems.map(p => (
+              <View key={p.id} style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+                <Text style={{ fontSize: 14, color: '#1E293B' }}>{p.name} × {cart[p.id]}</Text>
+                <Text style={{ fontSize: 14, color: '#1E293B' }}>${(p.price * cart[p.id]).toFixed(2)}</Text>
+              </View>
+            ))}
+            <View style={{ height: 1, backgroundColor: 'rgba(46,122,217,0.1)', marginVertical: 12 }} />
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+              <Text style={{ fontSize: 14, color: '#64748B' }}>Subtotal</Text>
+              <Text style={{ fontSize: 14, color: '#1E293B' }}>${subtotal.toFixed(2)}</Text>
+            </View>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+              <Text style={{ fontSize: 14, color: '#64748B' }}>Delivery Fee</Text>
+              <Text style={{ fontSize: 14, color: '#1E293B' }}>${deliveryFee.toFixed(2)}</Text>
+            </View>
+            <View style={{ height: 1, backgroundColor: 'rgba(46,122,217,0.1)', marginVertical: 12 }} />
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <Text style={{ fontSize: 15, fontWeight: '600', color: '#1E293B' }}>Total</Text>
+              <Text style={{ fontSize: 15, fontWeight: '600', color: '#2E7AD9' }}>${total.toFixed(2)}</Text>
+            </View>
+          </View>
+        </ScrollView>
+
+        <View style={styles.checkoutFooter}>
+          <TouchableOpacity style={styles.confirmBtn} onPress={() => router.replace('/(tabs)/bookings' as any)}>
+            <Text style={styles.confirmBtnText}>Place Order • ${total.toFixed(2)}</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // ─── ORDER PLACED SCREEN ──────────────────────────────────────────────────
   if (step === 'confirm') {
     return (
       <SafeAreaView style={styles.container}>
@@ -150,55 +231,68 @@ export default function BeautyProductsCatalog() {
 
         <ScrollView contentContainerStyle={styles.checkoutScroll} showsVerticalScrollIndicator={false}>
           {/* Delivery Address */}
+          <Text style={styles.sectionTitle}>Delivery Address</Text>
           <View style={styles.sectionCard}>
             <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Delivery Address</Text>
+              <View style={styles.infoRow}>
+                <Ionicons name="location-outline" size={16} color={colors.text.secondary} />
+                <Text style={styles.infoText}>123 Main Street, Dubai</Text>
+              </View>
               <TouchableOpacity><Text style={styles.changeLink}>Change</Text></TouchableOpacity>
-            </View>
-            <View style={styles.infoRow}>
-              <Ionicons name="location-outline" size={16} color={colors.text.secondary} />
-              <Text style={styles.infoText}>123 Main Street, Dubai</Text>
             </View>
           </View>
 
           {/* Order Items */}
+          <Text style={styles.sectionTitle}>Order Items</Text>
           <View style={styles.sectionCard}>
-            <Text style={styles.sectionTitle}>Order Items</Text>
             {cartItems.map(p => (
               <View key={p.id} style={styles.checkoutItem}>
-                <Image source={{ uri: p.image }} style={styles.checkoutItemIcon} resizeMode="cover" />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.checkoutItemName}>{p.name}</Text>
-                  <Text style={styles.checkoutItemSize}>{p.size}</Text>
+                <View style={styles.checkoutItemImgWrap}>
+                  <Image source={{ uri: p.image }} style={styles.checkoutItemIcon} resizeMode="cover" />
+                  <View style={styles.checkoutItemFallback}>
+                    <Ionicons name="bag-outline" size={24} color="#2E7AD9" />
+                  </View>
                 </View>
-                <Text style={styles.checkoutItemQty}>× {cart[p.id]}</Text>
-                <Text style={styles.checkoutItemPrice}>${(p.price * cart[p.id]).toFixed(2)}</Text>
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <Text style={styles.checkoutItemName}>{p.name}</Text>
+                    <Text style={styles.checkoutItemTotal}>${(p.price * cart[p.id]).toFixed(2)}</Text>
+                  </View>
+                  <Text style={styles.checkoutItemUnitPrice}>${p.price.toFixed(2)}</Text>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+                    <View style={styles.qtyControls}>
+                      <TouchableOpacity
+                        style={styles.qtyBtn}
+                        onPress={() => {
+                          if (cart[p.id] > 1) setCart({ ...cart, [p.id]: cart[p.id] - 1 });
+                        }}
+                      >
+                        <Ionicons name="remove" size={18} color="#1E293B" />
+                      </TouchableOpacity>
+                      <Text style={styles.qtyText}>{cart[p.id]}</Text>
+                      <TouchableOpacity
+                        style={styles.qtyBtn}
+                        onPress={() => setCart({ ...cart, [p.id]: cart[p.id] + 1 })}
+                      >
+                        <Ionicons name="add" size={18} color="#1E293B" />
+                      </TouchableOpacity>
+                    </View>
+                    <TouchableOpacity onPress={() => {
+                      const newCart = { ...cart };
+                      delete newCart[p.id];
+                      setCart(newCart);
+                    }}>
+                      <Ionicons name="trash-outline" size={20} color="#94A3B8" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
               </View>
             ))}
           </View>
 
-          {/* Redeem Points */}
-          {isPoweredByDoHuub && (
-            <View style={styles.redeemCard}>
-              <View style={styles.redeemLeft}>
-                <Ionicons name="gift-outline" size={18} color="#D97706" />
-                <View>
-                  <Text style={styles.redeemTitle}>Redeem Points</Text>
-                  <Text style={styles.redeemSub}>You have 500 pts · Save up to $5.00</Text>
-                </View>
-              </View>
-              <Switch
-                value={redeemPoints}
-                onValueChange={setRedeemPoints}
-                trackColor={{ false: '#E5E7EB', true: '#FDE68A' }}
-                thumbColor={redeemPoints ? '#D97706' : '#FFF'}
-              />
-            </View>
-          )}
-
           {/* Price Details */}
+          <Text style={styles.sectionTitle}>Price Details</Text>
           <View style={styles.sectionCard}>
-            <Text style={styles.sectionTitle}>Price Details</Text>
             <View style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>Subtotal</Text>
               <Text style={styles.summaryValue}>${subtotal.toFixed(2)}</Text>
@@ -219,18 +313,15 @@ export default function BeautyProductsCatalog() {
             </View>
           </View>
 
-          {/* Points Banner */}
-          {isPoweredByDoHuub && (
-            <View style={styles.pointsBanner}>
-              <Ionicons name="gift-outline" size={16} color="#D97706" />
-              <Text style={styles.pointsBannerText}>You'll earn {Math.floor(total)} points on this order</Text>
-            </View>
-          )}
-
-          <TouchableOpacity style={styles.placeOrderBtn} onPress={() => setStep('confirm')}>
-            <Text style={styles.placeOrderBtnText}>Confirm & Place Order · ${total.toFixed(2)}</Text>
-          </TouchableOpacity>
+          <View style={{ height: 24 }} />
         </ScrollView>
+
+        {/* Fixed bottom button matching boss */}
+        <View style={styles.checkoutFooter}>
+          <TouchableOpacity style={styles.confirmBtn} onPress={() => setStep('review')}>
+            <Text style={styles.confirmBtnText}>Confirm Address and Payment</Text>
+          </TouchableOpacity>
+        </View>
       </SafeAreaView>
     );
   }
@@ -406,15 +497,23 @@ const styles = StyleSheet.create({
   // Checkout / Confirm shared
   checkoutScroll: { padding: 20, gap: 16, paddingBottom: 40 },
   confirmScroll: { padding: 20, gap: 16, paddingBottom: 40, alignItems: 'center' },
-  sectionCard: { backgroundColor: '#FFF', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: 'rgba(46,122,217,0.08)', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 1 },
+  sectionCard: { backgroundColor: '#FFF', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: 'rgba(46,122,217,0.08)', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 1, marginBottom: 16 },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   sectionTitle: { fontSize: fontSize.sm, fontWeight: '700', color: colors.text.primary, marginBottom: 10 },
   changeLink: { fontSize: fontSize.xs, color: colors.primary, fontWeight: '500' },
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   infoText: { fontSize: fontSize.sm, color: colors.text.secondary },
-  checkoutItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.05)' },
-  checkoutItemIcon: { width: 48, height: 48, borderRadius: 8, overflow: 'hidden' },
-  checkoutItemName: { fontSize: fontSize.sm, fontWeight: '500', color: colors.text.primary },
+  checkoutItem: { flexDirection: 'row', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: 'rgba(46,122,217,0.08)' },
+  checkoutItemImgWrap: { width: 56, height: 56, borderRadius: 10, overflow: 'hidden', backgroundColor: '#F0F7FF' },
+  checkoutItemIcon: { width: 56, height: 56, borderRadius: 10, position: 'absolute', top: 0, left: 0 },
+  checkoutItemFallback: { width: 56, height: 56, alignItems: 'center', justifyContent: 'center' },
+  checkoutItemName: { fontSize: 14, fontWeight: '600', color: '#1E293B', flex: 1 },
+  checkoutItemTotal: { fontSize: 15, fontWeight: '600', color: '#2E7AD9' },
+  checkoutItemUnitPrice: { fontSize: 13, color: '#64748B', marginTop: 2 },
+  qtyControls: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F0F7FF', borderRadius: 8, paddingHorizontal: 4, paddingVertical: 2 },
+  qtyBtn: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center' },
+  qtyBtnText: { fontSize: 18, color: '#1E293B', fontWeight: '500' },
+  qtyText: { fontSize: 15, fontWeight: '600', color: '#1E293B', minWidth: 28, textAlign: 'center' },
   checkoutItemSize: { fontSize: fontSize.xs, color: colors.text.secondary },
   checkoutItemQty: { fontSize: fontSize.sm, color: colors.text.secondary },
   checkoutItemPrice: { fontSize: fontSize.sm, fontWeight: '600', color: colors.text.primary, minWidth: 60, textAlign: 'right' },
@@ -429,6 +528,17 @@ const styles = StyleSheet.create({
   totalValue: { fontSize: fontSize.md, fontWeight: '700', color: colors.primary },
   placeOrderBtn: { backgroundColor: colors.primary, borderRadius: 14, paddingVertical: 16, alignItems: 'center', marginTop: 8 },
   placeOrderBtnText: { fontSize: fontSize.sm, fontWeight: '700', color: '#FFF' },
+  checkoutFooter: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    padding: 24, paddingBottom: 28,
+    backgroundColor: '#F0F7FF',
+    borderTopWidth: 1, borderTopColor: 'rgba(46, 122, 217, 0.1)',
+  },
+  confirmBtn: {
+    backgroundColor: '#2E7AD9', borderRadius: 12,
+    paddingVertical: 16, alignItems: 'center',
+  },
+  confirmBtnText: { fontSize: 16, fontWeight: '600', color: '#FFFFFF' },
 
   // Confirm screen
   successCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#22C55E', alignItems: 'center', justifyContent: 'center', marginBottom: 12 },

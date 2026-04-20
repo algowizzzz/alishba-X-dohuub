@@ -5,158 +5,206 @@ import {
   StyleSheet,
   ScrollView,
   SafeAreaView,
-  Linking,
   TouchableOpacity,
+  Image,
+  Linking,
+  Platform,
+  StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, fontSize, borderRadius, borderWidth } from '../../src/constants/theme';
-import { ScreenHeader } from '../../src/components/composite';
+import { useRouter } from 'expo-router';
 
-const APP_VERSION = '1.0.0';
-const BUILD_NUMBER = '1';
+const PRIMARY = '#2E7AD9';
+const BACKGROUND = '#F0F7FF';
+const CARD = '#FFFFFF';
+const FOREGROUND = '#1A1A2E';
+const MUTED = '#6B7280';
+const SECONDARY_BG = '#E8F0FE';
 
-/**
- * About screen matching wireframe:
- * - App logo and name
- * - Version info
- * - Links to website, social media
- * - Legal links
- * - Copyright
- */
+const services = [
+  {
+    icon: 'sparkles-outline' as const,
+    title: 'Cleaning Services',
+    description: 'Professional home and office cleaning',
+    color: '#2E7AD9',
+  },
+  {
+    icon: 'construct-outline' as const,
+    title: 'Handyman Services',
+    description: 'Expert repairs and maintenance',
+    color: '#EAB308',
+  },
+  {
+    icon: 'cart-outline' as const,
+    title: 'Groceries & Food',
+    description: 'Fresh groceries and meals delivered',
+    color: '#F59E0B',
+  },
+  {
+    icon: 'cut-outline' as const,
+    title: 'Beauty on Demand',
+    description: 'Salon services at your location',
+    color: '#EC4899',
+  },
+  {
+    icon: 'home-outline' as const,
+    title: 'Rental Properties',
+    description: 'Find your perfect home',
+    color: '#10B981',
+  },
+  {
+    icon: 'heart-outline' as const,
+    title: 'Caregiving Services',
+    description: 'Ride assistance and companionship',
+    color: '#8B5CF6',
+  },
+];
+
+const whyChoose = [
+  'Verified and trusted service providers',
+  'Secure and seamless payment processing',
+  'Real-time order tracking and updates',
+  '24/7 AI-powered customer support',
+  'Flexible scheduling and instant booking',
+  'Transparent pricing with no hidden fees',
+];
+
 export default function AboutScreen() {
-  const handleOpenLink = (url: string) => {
-    Linking.openURL(url).catch(() => {
-      // Handle error silently
-    });
+  const router = useRouter();
+
+  const handleBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/profile');
+    }
   };
-
-  const links = [
-    {
-      id: 'website',
-      icon: 'globe-outline' as const,
-      label: 'Visit our Website',
-      url: 'https://dohuub.com',
-    },
-    {
-      id: 'twitter',
-      icon: 'logo-twitter' as const,
-      label: 'Follow us on Twitter',
-      url: 'https://twitter.com/dohuub',
-    },
-    {
-      id: 'instagram',
-      icon: 'logo-instagram' as const,
-      label: 'Follow us on Instagram',
-      url: 'https://instagram.com/dohuub',
-    },
-    {
-      id: 'facebook',
-      icon: 'logo-facebook' as const,
-      label: 'Like us on Facebook',
-      url: 'https://facebook.com/dohuub',
-    },
-  ];
-
-  const legalLinks = [
-    {
-      id: 'terms',
-      label: 'Terms of Service',
-      url: 'https://dohuub.com/terms',
-    },
-    {
-      id: 'privacy',
-      label: 'Privacy Policy',
-      url: 'https://dohuub.com/privacy',
-    },
-    {
-      id: 'licenses',
-      label: 'Open Source Licenses',
-      url: 'https://dohuub.com/licenses',
-    },
-  ];
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScreenHeader title="About" showBack />
+      <StatusBar barStyle="dark-content" backgroundColor={BACKGROUND} />
+
+      {/* Glassmorphic Header */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={handleBack} style={styles.backButton}>
+          <Ionicons name="chevron-back" size={24} color={FOREGROUND} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>About DoHuub</Text>
+        <View style={{ width: 40 }} />
+      </View>
 
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* App Info */}
-        <View style={styles.appInfo}>
-          <View style={styles.logoContainer}>
-            <Ionicons name="cube" size={64} color={colors.primary} />
+        {/* Logo */}
+        <View style={styles.logoSection}>
+          <Image
+            source={require('../../assets/icon.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
+        </View>
+
+        {/* Our Mission */}
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Our Mission</Text>
+          <Text style={styles.missionText}>
+            DoHuub is your all-in-one lifestyle super-app, designed to simplify your daily life by connecting you with trusted service providers. From cleaning and handyman services to beauty treatments and caregiving support, we bring infinite services right to your fingertips.
+          </Text>
+        </View>
+
+        {/* What We Offer */}
+        <View style={styles.sectionContainer}>
+          <Text style={styles.sectionTitle}>What We Offer</Text>
+          {services.map((service, index) => (
+            <View key={index} style={styles.serviceCard}>
+              <View style={[styles.serviceIconCircle, { backgroundColor: service.color + '18' }]}>
+                <Ionicons name={service.icon} size={22} color={service.color} />
+              </View>
+              <View style={styles.serviceTextContainer}>
+                <Text style={styles.serviceTitle}>{service.title}</Text>
+                <Text style={styles.serviceDescription}>{service.description}</Text>
+              </View>
+            </View>
+          ))}
+        </View>
+
+        {/* Why Choose DoHuub */}
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Why Choose DoHuub?</Text>
+          {whyChoose.map((item, index) => (
+            <View key={index} style={styles.bulletRow}>
+              <View style={styles.bulletDot} />
+              <Text style={styles.bulletText}>{item}</Text>
+            </View>
+          ))}
+        </View>
+
+        {/* Contact Us */}
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Contact Us</Text>
+          <View style={styles.contactItemsContainer}>
+            <TouchableOpacity
+              style={styles.contactItem}
+              onPress={() => Linking.openURL('mailto:support@dohuub.com').catch(() => {})}
+            >
+              <View style={styles.contactIconCircle}>
+                <Ionicons name="mail-outline" size={20} color={PRIMARY} />
+              </View>
+              <Text style={styles.contactText}>support@dohuub.com</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.contactItem}
+              onPress={() => Linking.openURL('tel:18003648821').catch(() => {})}
+            >
+              <View style={styles.contactIconCircle}>
+                <Ionicons name="call-outline" size={20} color={PRIMARY} />
+              </View>
+              <View>
+                <Text style={styles.contactText}>1-800-DOHUUB1</Text>
+                <Text style={styles.contactSubText}>(1-800-364-8821)</Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.contactItem}
+              onPress={() => Linking.openURL('https://www.dohuub.com').catch(() => {})}
+            >
+              <View style={styles.contactIconCircle}>
+                <Ionicons name="globe-outline" size={20} color={PRIMARY} />
+              </View>
+              <Text style={styles.contactText}>www.dohuub.com</Text>
+            </TouchableOpacity>
           </View>
-          <Text style={styles.appName}>DoHuub</Text>
-          <Text style={styles.tagline}>Infinite Services</Text>
-          <Text style={styles.version}>
-            Version {APP_VERSION} ({BUILD_NUMBER})
-          </Text>
         </View>
 
-        {/* Description */}
-        <View style={styles.section}>
-          <Text style={styles.description}>
-            DoHuub is your one-stop marketplace for all home and personal services. 
-            From cleaning to caregiving, we connect you with trusted professionals 
-            in your neighborhood.
-          </Text>
-        </View>
-
-        {/* Social Links */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Connect With Us</Text>
-          {links.map((link) => (
+        {/* Follow Us */}
+        <View style={styles.followSection}>
+          <Text style={styles.sectionTitle}>Follow Us</Text>
+          <View style={styles.socialRow}>
             <TouchableOpacity
-              key={link.id}
-              style={styles.linkItem}
-              onPress={() => handleOpenLink(link.url)}
+              style={styles.socialButton}
+              onPress={() => Linking.openURL('https://instagram.com/dohuub').catch(() => {})}
             >
-              <Ionicons name={link.icon} size={24} color={colors.text.secondary} />
-              <Text style={styles.linkText}>{link.label}</Text>
-              <Ionicons name="chevron-forward" size={20} color={colors.text.muted} />
+              <Ionicons name="logo-instagram" size={22} color={PRIMARY} />
             </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Legal Links */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Legal</Text>
-          {legalLinks.map((link) => (
             <TouchableOpacity
-              key={link.id}
-              style={styles.linkItem}
-              onPress={() => handleOpenLink(link.url)}
+              style={styles.socialButton}
+              onPress={() => Linking.openURL('https://tiktok.com/@dohuub').catch(() => {})}
             >
-              <Ionicons name="document-text-outline" size={24} color={colors.text.secondary} />
-              <Text style={styles.linkText}>{link.label}</Text>
-              <Ionicons name="chevron-forward" size={20} color={colors.text.muted} />
+              <Ionicons name="logo-tiktok" size={22} color={PRIMARY} />
             </TouchableOpacity>
-          ))}
+          </View>
         </View>
 
-        {/* Contact */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Contact</Text>
-          <TouchableOpacity
-            style={styles.linkItem}
-            onPress={() => handleOpenLink('mailto:support@dohuub.com')}
-          >
-            <Ionicons name="mail-outline" size={24} color={colors.text.secondary} />
-            <Text style={styles.linkText}>support@dohuub.com</Text>
-            <Ionicons name="chevron-forward" size={20} color={colors.text.muted} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Copyright */}
-        <View style={styles.copyright}>
-          <Text style={styles.copyrightText}>
-            © {new Date().getFullYear()} DoHuub Inc.
-          </Text>
-          <Text style={styles.copyrightText}>
-            All rights reserved.
+        {/* Credits */}
+        <View style={styles.credits}>
+          <Text style={styles.creditsText}>Made with love for our community</Text>
+          <Text style={[styles.creditsText, { opacity: 0.7 }]}>
+            {'\u00A9'} {new Date().getFullYear()} DoHuub, Inc. All rights reserved.
           </Text>
         </View>
       </ScrollView>
@@ -167,80 +215,193 @@ export default function AboutScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: BACKGROUND,
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 15,
+    elevation: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(46, 122, 217, 0.08)',
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: '600',
+    color: FOREGROUND,
+    textAlign: 'center',
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    padding: spacing.lg,
-    paddingBottom: spacing.xxl,
+    paddingHorizontal: 20,
+    paddingTop: 24,
+    paddingBottom: 40,
   },
-  appInfo: {
+  logoSection: {
     alignItems: 'center',
-    paddingVertical: spacing.xl,
+    marginBottom: 24,
   },
-  logoContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: borderRadius.xl,
-    backgroundColor: colors.secondary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: spacing.md,
+  logo: {
+    width: 160,
+    height: 160,
+    borderRadius: 20,
   },
-  appName: {
-    fontSize: fontSize.xxl,
-    fontWeight: '700',
-    color: colors.text.primary,
+  card: {
+    backgroundColor: CARD,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  tagline: {
-    fontSize: fontSize.md,
-    color: colors.text.secondary,
-    marginTop: spacing.xs,
-  },
-  version: {
-    fontSize: fontSize.sm,
-    color: colors.text.secondary,
-    marginTop: spacing.sm,
-  },
-  section: {
-    marginBottom: spacing.xl,
+  sectionContainer: {
+    marginBottom: 20,
   },
   sectionTitle: {
-    fontSize: fontSize.sm,
+    fontSize: 17,
     fontWeight: '600',
-    color: colors.text.secondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: spacing.md,
-  },
-  description: {
-    fontSize: fontSize.md,
-    color: colors.text.primary,
-    lineHeight: 24,
+    color: FOREGROUND,
+    marginBottom: 12,
     textAlign: 'center',
   },
-  linkItem: {
+  missionText: {
+    fontSize: 14,
+    color: MUTED,
+    lineHeight: 22,
+    textAlign: 'center',
+  },
+  serviceCard: {
+    backgroundColor: CARD,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 10,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing.md,
-    borderBottomWidth: borderWidth.thin,
-    borderBottomColor: colors.secondary,
-    gap: spacing.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
   },
-  linkText: {
-    flex: 1,
-    fontSize: fontSize.md,
-    color: colors.text.primary,
-  },
-  copyright: {
+  serviceIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: spacing.xl,
+    marginRight: 14,
   },
-  copyrightText: {
-    fontSize: fontSize.sm,
-    color: colors.text.secondary,
+  serviceTextContainer: {
+    flex: 1,
+  },
+  serviceTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: FOREGROUND,
+    marginBottom: 2,
+  },
+  serviceDescription: {
+    fontSize: 13,
+    color: MUTED,
+  },
+  bulletRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+    justifyContent: 'center',
+  },
+  bulletDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: PRIMARY,
+    marginRight: 12,
+  },
+  bulletText: {
+    fontSize: 14,
+    color: MUTED,
+  },
+  contactItemsContainer: {
+    gap: 16,
+  },
+  contactItem: {
+    alignItems: 'center',
+    gap: 8,
+  },
+  contactIconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: SECONDARY_BG,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  contactText: {
+    fontSize: 14,
+    color: FOREGROUND,
+    textAlign: 'center',
+  },
+  contactSubText: {
+    fontSize: 12,
+    color: MUTED,
+    textAlign: 'center',
+  },
+  followSection: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  socialRow: {
+    flexDirection: 'row',
+    gap: 16,
+    justifyContent: 'center',
+  },
+  socialButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: SECONDARY_BG,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  credits: {
+    alignItems: 'center',
+    paddingBottom: 16,
+  },
+  creditsText: {
+    fontSize: 13,
+    color: MUTED,
+    marginBottom: 4,
+    textAlign: 'center',
   },
 });
-

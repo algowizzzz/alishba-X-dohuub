@@ -1,25 +1,38 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  SafeAreaView, ActivityIndicator, Image,
+  SafeAreaView, ActivityIndicator, Image, Platform, StatusBar,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, fontSize, spacing, borderRadius } from '../../src/constants/theme';
 import { getVendorById, getReviewsByVendor } from '../../src/lib/queries';
 
+const cleaningLogos = [
+  require('../../assets/cleaning/logos/logo1.png'),
+  require('../../assets/cleaning/logos/logo2.png'),
+  require('../../assets/cleaning/logos/logo3.png'),
+];
+
 const MOCK_SERVICES = [
-  { id: 's1', title: 'Standard Cleaning', price: 80, rating: 4.8, desc: 'Regular home cleaning — dusting, vacuuming, mopping.' },
-  { id: 's2', title: 'Deep Cleaning', price: 150, rating: 4.9, desc: 'Full deep clean including appliances, baseboards, and cabinets.' },
-  { id: 's3', title: 'Move-In / Move-Out', price: 200, rating: 4.7, desc: 'Thorough cleaning for empty properties before or after a move.' },
+  { id: 1, name: 'Basic Cleaning', description: 'Essential cleaning for your home', price: 89, duration: '2-3 hours', rating: 4.8 },
+  { id: 2, name: 'Deep Cleaning', description: 'Thorough cleaning of every corner', price: 149, duration: '4-5 hours', rating: 4.9 },
+  { id: 3, name: 'Move In/Out Cleaning', description: 'Complete cleaning for moving', price: 199, duration: '5-6 hours', rating: 4.7 },
 ];
 
 const MOCK_REVIEWS = [
-  { id: 'r1', name: 'Emily R.', date: '2 days ago',  rating: 5, comment: 'Absolutely fantastic! The team was professional and thorough.',  photos: ['https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=200&h=200&fit=crop','https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=200&h=200&fit=crop'] },
-  { id: 'r2', name: 'David L.', date: '1 week ago',  rating: 5, comment: 'Very reliable and detail-oriented. Will book again!',          photos: ['https://images.unsplash.com/photo-1621905251918-48416bd8575a?w=200&h=200&fit=crop','https://images.unsplash.com/photo-1504148455328-c376907d081c?w=200&h=200&fit=crop','https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=200&h=200&fit=crop'] },
-  { id: 'r3', name: 'Carol B.', date: '2 weeks ago', rating: 4, comment: 'Good service overall. Arrived on time and did a great job.' },
+  { id: 'r1', name: 'Sarah M.', date: '3 days ago', rating: 5, comment: 'Excellent service! The team was professional, thorough, and my home has never looked better. Highly recommend!' },
+  { id: 'r2', name: 'Michael R.', date: '1 week ago', rating: 5, comment: "Very reliable and detail-oriented. They cleaned areas I didn't even think about. Great value for money." },
+  { id: 'r3', name: 'Jennifer K.', date: '2 weeks ago', rating: 4, comment: 'Good service overall. A bit pricey but the quality is there. Would use again.' },
 ];
 
+/**
+ * Vendor Profile — exact match to boss wireframe (CleaningVendorProfileScreen.tsx):
+ * - Centered vendor logo, name, badge, rating
+ * - About card
+ * - Service Information (Service Area + Operating Hours)
+ * - Services Offered list
+ * - Reviews & Ratings with summary + review cards
+ */
 export default function VendorProfileScreen() {
   const { id, name, category } = useLocalSearchParams<{ id: string; name: string; category: string }>();
   const [vendor, setVendor] = useState<any>(null);
@@ -32,199 +45,304 @@ export default function VendorProfileScreen() {
         const v = await getVendorById(id);
         setVendor(v);
         try { setReviews(await getReviewsByVendor(id)); } catch { setReviews([]); }
-      } catch {
-        setVendor(null);
-      } finally {
-        setLoading(false);
-      }
+      } catch { setVendor(null); }
+      finally { setLoading(false); }
     })();
   }, [id]);
 
   const displayName = vendor?.businessName || name || 'Provider';
   const displayRating = vendor?.rating ?? 4.9;
-  const displayReviews = vendor?.reviewCount ?? 97;
+  const displayReviews = vendor?.reviewCount ?? 342;
   const isPowered = vendor?.isMichelle ?? false;
   const displayReviewList = reviews.length > 0 ? reviews : MOCK_REVIEWS;
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={22} color={colors.text.primary} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Vendor Profile</Text>
-          <View style={{ width: 36 }} />
-        </View>
-        <View style={styles.centered}><ActivityIndicator size="large" color={colors.primary} /></View>
+      <SafeAreaView style={s.container}>
+        <Header />
+        <View style={s.centered}><ActivityIndicator size="large" color="#2E7AD9" /></View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={22} color={colors.text.primary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{displayName}</Text>
-        <View style={{ width: 36 }} />
-      </View>
+    <SafeAreaView style={s.container}>
+      <Header />
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={s.scroll}>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scroll}>
-        {/* Profile Header */}
-        <View style={styles.profileCard}>
-          <View style={styles.avatarBox}>
-            {vendor?.logo
-              ? <Image source={{ uri: vendor.logo }} style={styles.avatarImg} />
-              : <Ionicons name="sparkles" size={36} color={colors.primary} />}
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.vendorName}>{displayName}</Text>
-            {isPowered && (
-              <View style={styles.poweredBadge}>
-                <Text style={styles.poweredTxt}>Powered by DoHuub</Text>
-              </View>
-            )}
-            <View style={styles.ratingRow}>
-              <Ionicons name="star" size={15} color="#F59E0B" />
-              <Text style={styles.ratingVal}>{displayRating.toFixed(1)}</Text>
-              <Text style={styles.ratingCnt}>({displayReviews} reviews)</Text>
+        {/* Centered Vendor Header */}
+        <View style={s.vendorHeader}>
+          <Image
+            source={vendor?.logo ? { uri: vendor.logo } : cleaningLogos[parseInt(id, 10) % cleaningLogos.length || 0]}
+            style={s.vendorLogo}
+            resizeMode="cover"
+          />
+          <Text style={s.vendorName}>{displayName}</Text>
+          {isPowered && (
+            <View style={s.poweredBadge}>
+              <Text style={s.poweredText}>Powered by DoHuub</Text>
             </View>
+          )}
+          <View style={s.ratingRow}>
+            <Ionicons name="star" size={18} color="#FACC15" />
+            <Text style={s.ratingValue}>{displayRating.toFixed(1)}</Text>
           </View>
         </View>
-
-        {/* Stats Row */}
-        <View style={styles.statsRow}>
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{displayReviews}+</Text>
-            <Text style={styles.statLabel}>Reviews</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>{displayRating.toFixed(1)}</Text>
-            <Text style={styles.statLabel}>Rating</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>5+</Text>
-            <Text style={styles.statLabel}>Years Exp.</Text>
-          </View>
-        </View>
-
-        {/* Points Banner */}
-        {isPowered && (
-          <View style={styles.pointsBanner}>
-            <View style={styles.pointsIcon}>
-              <Ionicons name="gift" size={20} color="#F59E0B" />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.pointsTitle}>Earn points on every booking</Text>
-              <Text style={styles.pointsSub}>1 point per $1 spent • Points added after service completion</Text>
-            </View>
-          </View>
-        )}
 
         {/* About */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>About</Text>
-          <Text style={styles.aboutTxt}>
-            {vendor?.description || `${displayName} is a trusted service provider delivering high-quality results. With years of experience and a commitment to customer satisfaction, we go above and beyond on every job.`}
+        <View style={s.card}>
+          <Text style={s.cardTitle}>About</Text>
+          <Text style={s.cardText}>
+            {vendor?.description || 'Professional cleaning services with over 5 years of experience. We pride ourselves on attention to detail and customer satisfaction. Our trained staff uses eco-friendly products and follows strict quality standards.'}
           </Text>
         </View>
 
-        {/* Services */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Services Offered</Text>
-          {MOCK_SERVICES.map(s => (
-            <View key={s.id} style={styles.serviceRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.serviceName}>{s.title}</Text>
-                <Text style={styles.serviceDesc} numberOfLines={1}>{s.desc}</Text>
-                <View style={styles.ratingRow}>
-                  <Ionicons name="star" size={12} color="#F59E0B" />
-                  <Text style={styles.serviceRating}>{s.rating}</Text>
+        {/* Service Information */}
+        <View style={s.sectionGap}>
+          <Text style={s.sectionTitle}>Service Information</Text>
+
+          <View style={s.card}>
+            <View style={s.infoRow}>
+              <View style={s.infoIcon}>
+                <Ionicons name="location" size={20} color="#2E7AD9" />
+              </View>
+              <View>
+                <Text style={s.infoLabel}>Service Area</Text>
+                <Text style={s.infoValue}>Miami-Dade County & Surrounding Areas</Text>
+              </View>
+            </View>
+          </View>
+
+          <View style={s.card}>
+            <View style={s.infoRow}>
+              <View style={s.infoIcon}>
+                <Ionicons name="time" size={20} color="#2E7AD9" />
+              </View>
+              <Text style={s.infoLabel}>Operating Hours</Text>
+            </View>
+            <View style={s.hoursBlock}>
+              <View style={s.hoursRow}>
+                <Text style={s.hoursDay}>Monday - Friday</Text>
+                <Text style={s.hoursTime}>8:00 AM - 6:00 PM</Text>
+              </View>
+              <View style={s.hoursRow}>
+                <Text style={s.hoursDay}>Saturday</Text>
+                <Text style={s.hoursTime}>9:00 AM - 5:00 PM</Text>
+              </View>
+              <View style={s.hoursRow}>
+                <Text style={s.hoursDay}>Sunday</Text>
+                <Text style={s.hoursTime}>10:00 AM - 4:00 PM</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* Services Offered */}
+        <View style={s.sectionGap}>
+          <Text style={s.sectionTitle}>Services Offered</Text>
+          {MOCK_SERVICES.map((svc) => (
+            <TouchableOpacity key={svc.id} style={s.card} activeOpacity={0.7}>
+              <View style={s.serviceRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.serviceName}>{svc.name}</Text>
+                  <Text style={s.serviceDesc}>{svc.description}</Text>
+                  <View style={s.serviceMetaRow}>
+                    <View style={s.ratingSmall}>
+                      <Ionicons name="star" size={14} color="#FACC15" />
+                      <Text style={s.serviceRating}>{svc.rating}</Text>
+                    </View>
+                    <View style={s.ratingSmall}>
+                      <Ionicons name="time-outline" size={14} color="#64748B" />
+                      <Text style={s.serviceDuration}>{svc.duration}</Text>
+                    </View>
+                  </View>
+                </View>
+                <Text style={s.servicePrice}>${svc.price}</Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Reviews & Ratings */}
+        <View style={s.sectionGap}>
+          <View style={s.reviewsHeaderRow}>
+            <Text style={s.sectionTitle}>Reviews & Ratings</Text>
+            <TouchableOpacity style={s.viewAllBtn}>
+              <Text style={s.viewAllText}>View All</Text>
+              <Ionicons name="chevron-forward" size={14} color="#2E7AD9" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Rating Summary */}
+          <View style={s.card}>
+            <View style={s.ratingSummaryRow}>
+              <View style={s.ratingSummaryLeft}>
+                <Text style={s.ratingSummaryNumber}>{displayRating.toFixed(1)}</Text>
+                <View style={s.starsRow}>
+                  {[1,2,3,4,5].map(star => (
+                    <Ionicons key={star} name="star" size={14} color="#FACC15" />
+                  ))}
+                </View>
+                <Text style={s.ratingSummaryCount}>{displayReviews} reviews</Text>
+              </View>
+              <View style={s.ratingBars}>
+                {[5,4,3,2,1].map(rating => (
+                  <View key={rating} style={s.barRow}>
+                    <Text style={s.barLabel}>{rating}</Text>
+                    <View style={s.barTrack}>
+                      <View style={[s.barFill, { width: `${rating === 5 ? 75 : rating === 4 ? 20 : 5}%` }]} />
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </View>
+          </View>
+
+          {/* Review Cards */}
+          {displayReviewList.slice(0, 3).map((review: any, idx: number) => (
+            <View key={review.id || idx} style={s.card}>
+              <View style={s.reviewTopRow}>
+                <View style={s.reviewAvatar}>
+                  <Ionicons name="person" size={18} color="#64748B" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <View style={s.reviewNameRow}>
+                    <Text style={s.reviewName}>{review.name || review.userName || 'Customer'}</Text>
+                    <Text style={s.reviewDate}>{review.date || '1 week ago'}</Text>
+                  </View>
+                  <View style={s.starsRow}>
+                    {[1,2,3,4,5].map(star => (
+                      <Ionicons key={star} name="star" size={14} color={star <= (review.rating ?? 5) ? '#FACC15' : '#E5E7EB'} />
+                    ))}
+                  </View>
                 </View>
               </View>
-              <Text style={styles.servicePrice}>${s.price}</Text>
+              <Text style={s.reviewComment}>{review.comment}</Text>
             </View>
           ))}
         </View>
 
-        {/* Reviews */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Reviews</Text>
-          {displayReviewList.map((r: any) => (
-            <View key={r.id} style={styles.reviewCard}>
-              <View style={styles.reviewTop}>
-                <Text style={styles.reviewName}>{r.name || r.userName || 'Customer'}</Text>
-                <Text style={styles.reviewDate}>{r.date || '1 week ago'}</Text>
-              </View>
-              <View style={styles.starsRow}>
-                {[1,2,3,4,5].map(s => (
-                  <Ionicons key={s} name="star" size={13} color={s <= (r.rating ?? 5) ? '#FACC15' : '#E5E7EB'} />
-                ))}
-              </View>
-              <Text style={styles.reviewComment}>{r.comment}</Text>
-              {(r as any).photos && (r as any).photos.length > 0 && (
-                <View style={{ flexDirection: 'row', gap: 6, marginTop: 8 }}>
-                  {(r as any).photos.map((photo: string, i: number) => (
-                    <Image key={i} source={{ uri: photo }} style={{ width: 72, height: 72, borderRadius: 8, overflow: 'hidden' }} resizeMode="cover" />
-                  ))}
-                </View>
-              )}
-            </View>
-          ))}
-        </View>
+        <View style={{ height: 24 }} />
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+function Header() {
+  return (
+    <View style={s.header}>
+      <View style={s.headerInner}>
+        <TouchableOpacity style={s.backBtn} onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={20} color="#1E293B" />
+        </TouchableOpacity>
+        <Text style={s.headerTitle}>Vendor Profile</Text>
+      </View>
+    </View>
+  );
+}
+
+const s = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#F0F7FF' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+
   header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: spacing.md, paddingVertical: spacing.md,
-    backgroundColor: 'rgba(255,255,255,0.95)',
-    borderBottomWidth: 1, borderBottomColor: 'rgba(46,122,217,0.08)',
-    borderBottomLeftRadius: 24, borderBottomRightRadius: 24,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.06, shadowRadius: 15, elevation: 3,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 8 : 16,
+    paddingBottom: 24,
+    paddingHorizontal: 24,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 30,
+    elevation: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(46, 122, 217, 0.08)',
   },
-  backBtn: { padding: spacing.xs, width: 36 },
-  headerTitle: { flex: 1, fontSize: fontSize.md, fontWeight: '600', color: colors.text.primary, textAlign: 'center' },
-  scroll: { padding: spacing.lg, gap: 14, paddingBottom: 40 },
-  profileCard: { flexDirection: 'row', gap: 14, alignItems: 'center', backgroundColor: '#FFF', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: 'rgba(0,0,0,0.08)' },
-  avatarBox: { width: 72, height: 72, borderRadius: 36, backgroundColor: colors.secondary, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  avatarImg: { width: 72, height: 72, borderRadius: 36 },
-  vendorName: { fontSize: 18, fontWeight: '700', color: colors.text.primary, marginBottom: 4 },
-  poweredBadge: { alignSelf: 'flex-start', backgroundColor: colors.primary, paddingHorizontal: 10, paddingVertical: 3, borderRadius: 99, marginBottom: 6 },
-  poweredTxt: { fontSize: 11, color: '#FFF', fontWeight: '600' },
-  ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  ratingVal: { fontSize: fontSize.sm, fontWeight: '600', color: colors.text.primary },
-  ratingCnt: { fontSize: fontSize.sm, color: colors.text.secondary },
-  statsRow: { flexDirection: 'row', backgroundColor: '#FFF', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: 'rgba(0,0,0,0.08)', alignItems: 'center' },
-  statItem: { flex: 1, alignItems: 'center' },
-  statValue: { fontSize: 20, fontWeight: '700', color: colors.primary },
-  statLabel: { fontSize: fontSize.xs, color: colors.text.secondary, marginTop: 2 },
-  statDivider: { width: 1, height: 36, backgroundColor: 'rgba(0,0,0,0.08)' },
-  pointsBanner: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 12, backgroundColor: 'rgba(245,158,11,0.1)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.3)' },
-  pointsIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(245,158,11,0.2)', alignItems: 'center', justifyContent: 'center' },
-  pointsTitle: { fontSize: fontSize.sm, fontWeight: '600', color: '#B45309' },
-  pointsSub: { fontSize: fontSize.xs, color: '#D97706' },
-  section: { backgroundColor: '#FFF', borderRadius: 14, padding: 16, borderWidth: 1, borderColor: 'rgba(0,0,0,0.08)', gap: 10 },
-  sectionTitle: { fontSize: fontSize.sm, fontWeight: '700', color: colors.text.primary },
-  aboutTxt: { fontSize: fontSize.sm, color: colors.text.secondary, lineHeight: 20 },
-  serviceRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.06)' },
-  serviceName: { fontSize: fontSize.sm, fontWeight: '600', color: colors.text.primary, marginBottom: 2 },
-  serviceDesc: { fontSize: fontSize.xs, color: colors.text.secondary, marginBottom: 4 },
-  serviceRating: { fontSize: fontSize.xs, color: colors.text.secondary },
-  servicePrice: { fontSize: fontSize.md, fontWeight: '700', color: colors.primary },
-  reviewCard: { backgroundColor: '#F8FAFC', borderRadius: 10, padding: 12 },
-  reviewTop: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-  reviewName: { fontSize: fontSize.sm, fontWeight: '600', color: colors.text.primary },
-  reviewDate: { fontSize: fontSize.xs, color: colors.text.secondary },
-  starsRow: { flexDirection: 'row', gap: 2, marginBottom: 6 },
-  reviewComment: { fontSize: fontSize.sm, color: colors.text.secondary, lineHeight: 18 },
+  headerInner: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  backBtn: {
+    width: 40, height: 40, borderRadius: 12,
+    backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
+  },
+  headerTitle: { fontSize: 18, fontWeight: '600', color: '#1E293B' },
+
+  scroll: { padding: 24, gap: 16 },
+
+  // Centered vendor header
+  vendorHeader: { alignItems: 'center', paddingVertical: 8 },
+  vendorLogo: {
+    width: 96, height: 96, borderRadius: 48, marginBottom: 16,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12,
+  },
+  vendorName: { fontSize: 20, fontWeight: '700', color: '#1E293B', marginBottom: 8 },
+  poweredBadge: {
+    backgroundColor: '#2E7AD9', paddingHorizontal: 16, paddingVertical: 4,
+    borderRadius: 20, marginBottom: 12,
+  },
+  poweredText: { fontSize: 12, fontWeight: '600', color: '#FFFFFF' },
+  ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  ratingValue: { fontSize: 16, fontWeight: '600', color: '#1E293B' },
+
+  // White cards
+  card: {
+    backgroundColor: '#FFFFFF', borderRadius: 12, padding: 16,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
+  },
+  cardTitle: { fontSize: 15, fontWeight: '500', color: '#1E293B', marginBottom: 12 },
+  cardText: { fontSize: 14, color: '#64748B', lineHeight: 22 },
+
+  // Sections
+  sectionGap: { gap: 12 },
+  sectionTitle: { fontSize: 15, fontWeight: '500', color: '#1E293B' },
+
+  // Service Information
+  infoRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  infoIcon: {
+    width: 40, height: 40, borderRadius: 20, backgroundColor: '#E8F1FC',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  infoLabel: { fontSize: 15, fontWeight: '500', color: '#1E293B' },
+  infoValue: { fontSize: 13, color: '#64748B', marginTop: 2 },
+  hoursBlock: { marginTop: 12, gap: 8 },
+  hoursRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  hoursDay: { fontSize: 13, color: '#64748B' },
+  hoursTime: { fontSize: 13, fontWeight: '500', color: '#1E293B' },
+
+  // Services Offered
+  serviceRow: { flexDirection: 'row', alignItems: 'flex-start' },
+  serviceName: { fontSize: 15, fontWeight: '500', color: '#1E293B', marginBottom: 4 },
+  serviceDesc: { fontSize: 13, color: '#64748B', marginBottom: 8 },
+  serviceMetaRow: { flexDirection: 'row', gap: 16 },
+  ratingSmall: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  serviceRating: { fontSize: 13, fontWeight: '500', color: '#1E293B' },
+  serviceDuration: { fontSize: 13, color: '#64748B' },
+  servicePrice: { fontSize: 16, fontWeight: '600', color: '#2E7AD9', marginLeft: 16 },
+
+  // Reviews
+  reviewsHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  viewAllBtn: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  viewAllText: { fontSize: 14, color: '#2E7AD9', fontWeight: '500' },
+
+  ratingSummaryRow: { flexDirection: 'row', alignItems: 'center', gap: 24 },
+  ratingSummaryLeft: { alignItems: 'center' },
+  ratingSummaryNumber: { fontSize: 36, fontWeight: '700', color: '#1E293B', marginBottom: 4 },
+  starsRow: { flexDirection: 'row', gap: 2, marginBottom: 4 },
+  ratingSummaryCount: { fontSize: 13, color: '#64748B' },
+  ratingBars: { flex: 1, gap: 4 },
+  barRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  barLabel: { fontSize: 12, color: '#64748B', width: 12 },
+  barTrack: { flex: 1, height: 8, borderRadius: 4, backgroundColor: '#E8F1FC', overflow: 'hidden' },
+  barFill: { height: '100%', borderRadius: 4, backgroundColor: '#2E7AD9' },
+
+  reviewTopRow: { flexDirection: 'row', gap: 12, marginBottom: 8 },
+  reviewAvatar: {
+    width: 40, height: 40, borderRadius: 20, backgroundColor: '#E8F1FC',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  reviewNameRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  reviewName: { fontSize: 14, fontWeight: '500', color: '#1E293B' },
+  reviewDate: { fontSize: 12, color: '#64748B' },
+  reviewComment: { fontSize: 13, color: '#64748B', lineHeight: 20 },
 });

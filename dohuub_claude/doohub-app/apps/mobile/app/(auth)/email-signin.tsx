@@ -17,19 +17,20 @@ import { useAuthStore } from '../../src/store/authStore';
 import { spacing, fontSize, borderRadius } from '../../src/constants/theme';
 
 /**
- * Email Sign In screen matching blue gradient wireframe:
- * - Blue gradient background
- * - Back button with white arrow
- * - "Sign In" title in white
- * - "Enter your credentials to continue" subtitle in white
- * - Email field with white/semi-transparent background
- * - Password field with white/semi-transparent background
- * - "Forgot Password?" link in white
- * - "Sign In" button (white bg, blue text)
+ * Email Sign In screen — exact match to boss wireframe:
+ * - Light blue background (#F0F7FF)
+ * - ArrowLeft + "Back" in muted gray
+ * - "Sign In" title, "Enter your credentials to continue" subtitle
+ * - White input fields with subtle blue border
+ * - "Forgot Password?" in primary blue
+ * - Gradient Sign In button (#4CA6FA -> #1D4AAD)
+ * - "Don't have an account? Sign Up" at bottom
  */
 export default function EmailSignInScreen() {
   const [email, setEmail] = useState('demo@dohuub.com');
   const [password, setPassword] = useState('Abcd@1234!');
+  const [emailFocused, setEmailFocused] = useState(false);
+  const [passwordFocused, setPasswordFocused] = useState(false);
   const { login, isLoading } = useAuthStore();
 
   const handleSignIn = async () => {
@@ -54,20 +55,18 @@ export default function EmailSignInScreen() {
   };
 
   const handleForgotPassword = () => {
-    // TODO: Implement forgot password flow
     Alert.alert('Coming Soon', 'Password reset will be available soon!');
   };
 
   const isFormValid = email.trim().length > 0 && password.trim().length > 0;
 
   return (
-    <View
-      style={styles.container}
-    >
-      {/* Back Button */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+    <View style={styles.container}>
+      {/* Header */}
+      <View style={styles.headerSection}>
+        <TouchableOpacity style={styles.backButton} onPress={() => router.replace('/(auth)/signin')}>
+          <Ionicons name="arrow-back" size={20} color="#64748B" />
+          <Text style={styles.backText}>Back</Text>
         </TouchableOpacity>
       </View>
 
@@ -80,66 +79,86 @@ export default function EmailSignInScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <View style={styles.content}>
+          {/* Title */}
+          <View style={styles.titleSection}>
             <Text style={styles.title}>Sign In</Text>
             <Text style={styles.subtitle}>Enter your credentials to continue</Text>
+          </View>
 
-            <View style={styles.form}>
-              {/* Email Input */}
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Email Address</Text>
-                <View style={styles.inputContainer}>
-                  <Ionicons name="mail-outline" size={20} color="rgba(255,255,255,0.6)" style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="your.email@example.com"
-                    placeholderTextColor="rgba(255,255,255,0.5)"
-                    value={email}
-                    onChangeText={setEmail}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    autoComplete="email"
-                  />
-                </View>
+          {/* Form */}
+          <View style={styles.form}>
+            {/* Email Input */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Email Address</Text>
+              <View style={[
+                styles.inputContainer,
+                emailFocused && styles.inputContainerFocused
+              ]}>
+                <Ionicons name="mail-outline" size={20} color="#64748B" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="your.email@example.com"
+                  placeholderTextColor="#94A3B8"
+                  value={email}
+                  onChangeText={setEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoComplete="email"
+                  onFocus={() => setEmailFocused(true)}
+                  onBlur={() => setEmailFocused(false)}
+                />
               </View>
-
-              {/* Password Input */}
-              <View style={styles.inputGroup}>
-                <Text style={styles.label}>Password</Text>
-                <View style={styles.inputContainer}>
-                  <Ionicons name="lock-closed-outline" size={20} color="rgba(255,255,255,0.6)" style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Enter your password"
-                    placeholderTextColor="rgba(255,255,255,0.5)"
-                    value={password}
-                    onChangeText={setPassword}
-                    secureTextEntry
-                  />
-                </View>
-              </View>
-
-              {/* Forgot Password */}
-              <TouchableOpacity onPress={handleForgotPassword}>
-                <Text style={styles.forgotPassword}>Forgot Password?</Text>
-              </TouchableOpacity>
-
-              {/* Sign In Button - white bg + blue text */}
-              <TouchableOpacity
-                style={[styles.primaryButton, (!isFormValid || isLoading) && styles.primaryButtonDisabled]}
-                onPress={handleSignIn}
-                disabled={!isFormValid || isLoading}
-              >
-                {isLoading ? (
-                  <ActivityIndicator color="#1D4ADD" size="small" />
-                ) : (
-                  <Text style={styles.primaryButtonText}>Sign In</Text>
-                )}
-              </TouchableOpacity>
             </View>
+
+            {/* Password Input */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Password</Text>
+              <View style={[
+                styles.inputContainer,
+                passwordFocused && styles.inputContainerFocused
+              ]}>
+                <Ionicons name="lock-closed-outline" size={20} color="#64748B" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter your password"
+                  placeholderTextColor="#94A3B8"
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry
+                  onFocus={() => setPasswordFocused(true)}
+                  onBlur={() => setPasswordFocused(false)}
+                />
+              </View>
+            </View>
+
+            {/* Forgot Password */}
+            <TouchableOpacity onPress={handleForgotPassword}>
+              <Text style={styles.forgotPassword}>Forgot Password?</Text>
+            </TouchableOpacity>
+
+            {/* Sign In Button */}
+            <TouchableOpacity
+              style={[styles.signInButton, (!isFormValid || isLoading) && styles.signInButtonDisabled]}
+              onPress={handleSignIn}
+              disabled={!isFormValid || isLoading}
+            >
+              {isLoading ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <Text style={styles.signInButtonText}>Sign In</Text>
+              )}
+            </TouchableOpacity>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Sign Up Link - pinned to bottom */}
+      <View style={styles.signUpContainer}>
+        <Text style={styles.signUpText}>Don't have an account? </Text>
+        <TouchableOpacity onPress={() => router.replace('/(auth)/welcome')}>
+          <Text style={styles.signUpLink}>Sign Up</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -147,15 +166,23 @@ export default function EmailSignInScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#2E7AD9',
+    backgroundColor: '#F0F7FF',
   },
-  header: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
+  headerSection: {
+    paddingTop: 50,
+    paddingHorizontal: 24,
+    paddingBottom: 8,
   },
   backButton: {
-    padding: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 8,
+  },
+  backText: {
+    fontSize: 16,
+    color: '#64748B',
+    fontWeight: '400',
   },
   keyboardView: {
     flex: 1,
@@ -163,75 +190,91 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
   },
-  content: {
-    flex: 1,
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.md,
+  titleSection: {
+    paddingHorizontal: 32,
+    paddingTop: 32,
   },
   title: {
-    fontSize: fontSize.xxl,
-    fontWeight: '600',
-    color: '#FFFFFF',
-    marginBottom: spacing.sm,
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#1E293B',
+    marginBottom: 8,
   },
   subtitle: {
-    fontSize: fontSize.md,
-    color: 'rgba(255,255,255,0.85)',
-    marginBottom: spacing.xl,
+    fontSize: 16,
+    color: '#64748B',
+    marginBottom: 32,
   },
   form: {
-    gap: spacing.lg,
+    paddingHorizontal: 32,
+    gap: 24,
   },
-  inputGroup: {
-    marginBottom: 0,
-  },
+  inputGroup: {},
   label: {
-    fontSize: fontSize.md,
+    fontSize: 16,
     fontWeight: '500',
-    color: '#FFFFFF',
-    marginBottom: spacing.sm,
+    color: '#1E293B',
+    marginBottom: 8,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: '#FFFFFF',
     borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.3)',
-    borderRadius: borderRadius.lg,
+    borderColor: 'rgba(45, 122, 217, 0.15)',
+    borderRadius: 12,
+  },
+  inputContainerFocused: {
+    borderColor: '#2E7AD9',
   },
   inputIcon: {
-    paddingLeft: spacing.md,
+    paddingLeft: 16,
   },
   input: {
     flex: 1,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
-    fontSize: fontSize.md,
-    color: '#FFFFFF',
-    minHeight: 52,
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    fontSize: 16,
+    color: '#1E293B',
+    minHeight: 56,
   },
   forgotPassword: {
-    fontSize: fontSize.md,
-    fontWeight: '600',
-    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#2E7AD9',
     textDecorationLine: 'underline',
   },
-  primaryButton: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: borderRadius.lg,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
-    minHeight: 52,
+  signInButton: {
+    backgroundColor: '#2E7AD9',
+    borderRadius: 12,
+    paddingVertical: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: spacing.sm,
+    minHeight: 56,
   },
-  primaryButtonDisabled: {
-    opacity: 0.6,
+  signInButtonDisabled: {
+    opacity: 0.5,
   },
-  primaryButtonText: {
-    fontSize: fontSize.md,
+  signInButtonText: {
+    fontSize: 16,
     fontWeight: '600',
-    color: '#1D4ADD',
+    color: '#FFFFFF',
+  },
+  signUpContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingBottom: 32,
+    paddingTop: 16,
+  },
+  signUpText: {
+    fontSize: 14,
+    color: '#64748B',
+  },
+  signUpLink: {
+    fontSize: 14,
+    color: '#2E7AD9',
+    fontWeight: '500',
+    textDecorationLine: 'underline',
   },
 });

@@ -90,13 +90,13 @@ export default function GroceryDetailScreen() {
   const tax = subtotal * 0.08;
   const total = subtotal + deliveryFee + tax;
 
-  // ── CONFIRM ORDER ─────────────────────────────────────────────────────────
+  // ── CONFIRM ORDER — matching boss wireframe ─────────────────────────────
   if (step === 'confirm') {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>
           <TouchableOpacity style={styles.backBtn} onPress={() => setStep('checkout')}>
-            <Ionicons name="arrow-back" size={20} color={colors.text.primary} />
+            <Ionicons name="arrow-back" size={20} color="#1E293B" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Confirm Order</Text>
         </View>
@@ -104,45 +104,56 @@ export default function GroceryDetailScreen() {
         <ScrollView contentContainerStyle={{ padding: 24, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
           {/* Delivery Address */}
           <Text style={styles.sectionTitle}>Delivery Address</Text>
-          <View style={styles.card}>
-            <View style={styles.cardRow}>
-              <Ionicons name="location" size={20} color={colors.primary} />
-              <View style={{ flex: 1, marginLeft: 12 }}>
-                <Text style={styles.cardLabel}>{deliveryAddress?.label ?? 'Home'}</Text>
-                <Text style={styles.cardSub}>{deliveryAddress?.street ?? '123 Main Street, Apt 4B, New York, NY 10001'}</Text>
+          <View style={styles.confirmCard}>
+            <View style={styles.confirmCardRow}>
+              <View style={styles.confirmIconCircle}>
+                <Ionicons name="location" size={18} color="#2E7AD9" />
               </View>
-              <TouchableOpacity><Text style={styles.changeLink}>Change</Text></TouchableOpacity>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.confirmCardLabel}>{deliveryAddress?.label ?? 'Home'}</Text>
+                <Text style={styles.confirmCardSub}>{deliveryAddress?.street ?? '123 Main Street, Apt 4B, New York, NY 10001'}</Text>
+              </View>
             </View>
+            <TouchableOpacity style={styles.changeBtn}>
+              <Text style={styles.changeBtnText}>Change</Text>
+            </TouchableOpacity>
           </View>
 
           {/* Payment Method */}
           <Text style={[styles.sectionTitle, { marginTop: 20 }]}>Payment Method</Text>
-          <View style={styles.card}>
-            <View style={styles.cardRow}>
-              <View style={styles.cardIconBg}>
-                <Ionicons name="card" size={18} color={colors.primary} />
+          <View style={styles.confirmCard}>
+            <View style={styles.confirmCardRow}>
+              <View style={styles.confirmIconCircle}>
+                <Ionicons name="card" size={18} color="#2E7AD9" />
               </View>
-              <View style={{ flex: 1, marginLeft: 12 }}>
-                <Text style={styles.cardLabel}>Card •••• 9012</Text>
-                <Text style={styles.cardSub}>John Doe</Text>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.confirmCardLabel}>Credit Card</Text>
+                <Text style={styles.confirmCardSub}>•••• •••• •••• 9012</Text>
               </View>
-              <TouchableOpacity><Text style={styles.changeLink}>Change</Text></TouchableOpacity>
             </View>
+            <TouchableOpacity style={styles.changeBtn}>
+              <Text style={styles.changeBtnText}>Change</Text>
+            </TouchableOpacity>
           </View>
 
-          {/* Order Summary */}
+          {/* Order Summary — in white card */}
           <Text style={[styles.sectionTitle, { marginTop: 20 }]}>Order Summary</Text>
-          <View style={styles.card}>
-            <View style={styles.summaryRow}><Text style={styles.summaryLabel}>Vendor</Text><Text style={styles.summaryVal}>{vendorName}</Text></View>
-            <View style={styles.summaryRow}><Text style={styles.summaryLabel}>Items</Text><Text style={styles.summaryVal}>{getTotalItems()} item(s)</Text></View>
-            <View style={styles.divider} />
-            <View style={styles.priceRow}><Text style={styles.priceLabel}>Subtotal</Text><Text style={styles.priceVal}>${subtotal.toFixed(2)}</Text></View>
-            <View style={styles.priceRow}><Text style={styles.priceLabel}>Delivery Fee</Text><Text style={styles.priceVal}>${deliveryFee.toFixed(2)}</Text></View>
-            <View style={styles.priceRow}><Text style={styles.priceLabel}>Tax</Text><Text style={styles.priceVal}>${tax.toFixed(2)}</Text></View>
-            <View style={styles.divider} />
-            <View style={styles.priceRow}>
-              <Text style={styles.totalLabel}>Total</Text>
-              <Text style={styles.totalVal}>${total.toFixed(2)}</Text>
+          <View style={styles.orderSummaryCard}>
+            {cart.map(item => (
+              <View key={item.id} style={styles.osSummaryItem}>
+                <Text style={styles.osSummaryQty}>{item.quantity}x</Text>
+                <Text style={[styles.osSummaryName, { flex: 1 }]}>{item.name}</Text>
+                <Text style={styles.osSummaryPrice}>${(item.price * item.quantity).toFixed(2)}</Text>
+              </View>
+            ))}
+            <View style={styles.osDivider} />
+            <View style={styles.osRow}><Text style={styles.osLabel}>Subtotal</Text><Text style={styles.osVal}>${subtotal.toFixed(2)}</Text></View>
+            <View style={styles.osRow}><Text style={styles.osLabel}>Delivery Fee</Text><Text style={styles.osVal}>${deliveryFee.toFixed(2)}</Text></View>
+            <View style={styles.osRow}><Text style={styles.osLabel}>Tax</Text><Text style={styles.osVal}>${tax.toFixed(2)}</Text></View>
+            <View style={styles.osDivider} />
+            <View style={styles.osRow}>
+              <Text style={styles.osTotalLabel}>Total</Text>
+              <Text style={styles.osTotalVal}>${total.toFixed(2)}</Text>
             </View>
           </View>
 
@@ -159,15 +170,10 @@ export default function GroceryDetailScreen() {
               <Text style={styles.pointsAmount}>+{Math.floor(total)} pts</Text>
             </View>
           )}
-          {isPoweredByDoHuub && (
-            <TouchableOpacity style={{ alignItems: 'center', marginTop: 12 }} onPress={() => router.push('/rewards' as any)}>
-              <Text style={styles.viewRewardsLink}>View My Rewards</Text>
-            </TouchableOpacity>
-          )}
         </ScrollView>
 
         <View style={styles.footer}>
-          <TouchableOpacity style={[styles.actionBtn, { backgroundColor: colors.primary }]} onPress={() => router.replace('/(tabs)/bookings' as any)}>
+          <TouchableOpacity style={[styles.actionBtn, { backgroundColor: '#2E7AD9' }]} onPress={() => router.replace('/(tabs)/bookings' as any)}>
             <Text style={styles.actionBtnText}>Place Order • ${total.toFixed(2)}</Text>
           </TouchableOpacity>
         </View>
@@ -616,6 +622,41 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textDecorationLine: 'underline',
   },
+  // Confirm Order screen styles
+  confirmCard: {
+    backgroundColor: '#FFFFFF', borderRadius: 12, padding: 16,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+  },
+  confirmCardRow: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: 12 },
+  confirmIconCircle: {
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: '#E8F1FC', alignItems: 'center', justifyContent: 'center',
+  },
+  confirmCardLabel: { fontSize: 15, fontWeight: '500', color: '#1E293B' },
+  confirmCardSub: { fontSize: 13, color: '#64748B', marginTop: 2 },
+  changeBtn: {
+    paddingHorizontal: 12, paddingVertical: 6,
+    borderRadius: 8, borderWidth: 1, borderColor: 'rgba(46,122,217,0.2)',
+    backgroundColor: 'rgba(46,122,217,0.05)',
+  },
+  changeBtnText: { fontSize: 13, fontWeight: '500', color: '#2E7AD9' },
+  orderSummaryCard: {
+    backgroundColor: '#FFFFFF', borderRadius: 12, padding: 16,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
+  },
+  osSummaryItem: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  osSummaryQty: { fontSize: 14, fontWeight: '600', color: '#1E293B', width: 28 },
+  osSummaryName: { fontSize: 14, color: '#1E293B' },
+  osSummaryPrice: { fontSize: 14, fontWeight: '500', color: '#1E293B' },
+  osDivider: { height: 1, backgroundColor: 'rgba(46,122,217,0.1)', marginVertical: 12 },
+  osRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+  osLabel: { fontSize: 14, color: '#64748B' },
+  osVal: { fontSize: 14, color: '#1E293B' },
+  osTotalLabel: { fontSize: 15, fontWeight: '600', color: '#1E293B' },
+  osTotalVal: { fontSize: 15, fontWeight: '600', color: '#2E7AD9' },
   footer: {
     position: 'absolute',
     bottom: 0,

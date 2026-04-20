@@ -17,6 +17,7 @@ import { useRewardsStore } from '../../src/store/rewardsStore';
 import { colors, spacing, fontSize, borderRadius, borderWidth } from '../../src/constants/theme';
 import { MainHeader } from '../../src/components/composite';
 import { LocationModal } from '../../src/components/modals';
+import { NotificationsPanel } from '../../src/components/modals/NotificationsPanel';
 
 interface ServiceCategory {
   id: string;
@@ -25,36 +26,35 @@ interface ServiceCategory {
   route: string;
   available: boolean;
   restrictedForWork?: boolean;
-  bgColor: string;
 }
 
 const SERVICE_CATEGORIES: ServiceCategory[] = [
-  { id: 'cleaning', name: 'Cleaning Services', image: require('../../assets/cat-cleaning.png'), route: '/services/cleaning', available: true, bgColor: colors.category.cleaningLight },
-  { id: 'handyman', name: 'Handyman Services', image: require('../../assets/cat-handyman.png'), route: '/services/handyman', available: true, bgColor: colors.category.handymanLight },
-  { id: 'groceries', name: 'Groceries & Food', image: require('../../assets/cat-groceries.png'), route: '/services/groceries', available: true, bgColor: colors.category.groceriesLight },
-  { id: 'beauty', name: 'Beauty Services and Products', image: require('../../assets/cat-beauty.png'), route: '/services/beauty/choice', available: true, bgColor: colors.category.beautyLight },
-  { id: 'rentals', name: 'Rental Properties', image: require('../../assets/cat-rentals.png'), route: '/services/rentals', available: true, bgColor: colors.category.rentalsLight },
-  { id: 'caregiving', name: 'Caregiving Services', image: require('../../assets/cat-caregiving.png'), route: '/services/caregiving', available: true, restrictedForWork: true, bgColor: colors.category.caregivingLight },
+  { id: 'cleaning', name: 'Cleaning Services', image: require('../../assets/cat-cleaning.png'), route: '/services/cleaning', available: true },
+  { id: 'handyman', name: 'Handyman Services', image: require('../../assets/cat-handyman.png'), route: '/services/handyman', available: true },
+  { id: 'groceries', name: 'Groceries & Food', image: require('../../assets/cat-groceries.png'), route: '/services/groceries', available: true },
+  { id: 'beauty', name: 'Beauty Services and Products', image: require('../../assets/cat-beauty.png'), route: '/services/beauty/choice', available: true },
+  { id: 'rentals', name: 'Rental Properties', image: require('../../assets/cat-rentals.png'), route: '/services/rentals', available: true },
+  { id: 'caregiving', name: 'Caregiving Services', image: require('../../assets/cat-caregiving.png'), route: '/services/caregiving', available: true, restrictedForWork: true },
 ];
 
 /**
- * Home Dashboard matching wireframe exactly:
- * - Location selector header
- * - Notification bell + profile icons
- * - Location banner
- * - Search bar (links to AI chat)
- * - 2-column category grid with gray icons
- * - NO Featured Services section
- * - NO Quick Actions section
+ * Home Dashboard — exact match to boss wireframe (HomeDashboard.tsx):
+ * - Glassmorphic white header with rounded bottom corners
+ * - Location chip + bell + profile icons
+ * - Location banner with blue left border
+ * - Search bar
+ * - Rewards widget (amber gradient)
+ * - 2-column category grid with boss images
+ * - Light blue background (#F0F7FF)
  */
 export default function HomeScreen() {
   const { addresses, selectedAddressId, setSelectedAddress } = useAuthStore();
   const { wallet, fetchWallet, streak, fetchStreak } = useRewardsStore();
   const [refreshing, setRefreshing] = useState(false);
   const [showLocationModal, setShowLocationModal] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
   const [hasUnreadNotifications, setHasUnreadNotifications] = useState(true);
 
-  // Map authStore addresses to LocationModal format
   const modalAddresses = addresses.map((a) => ({
     id: a.id,
     type: a.type.toLowerCase() as 'home' | 'work' | 'doctor' | 'pharmacy' | 'other',
@@ -67,7 +67,7 @@ export default function HomeScreen() {
   const displayLabel = selectedAddress?.label || 'Home';
   const displayStreet = selectedAddress
     ? `${selectedAddress.street}, ${selectedAddress.city}, ${selectedAddress.state}`
-    : '123 Main Street, Apt 4B, New York, NY';
+    : '123, new york, nj';
 
   useEffect(() => {
     fetchWallet();
@@ -81,7 +81,6 @@ export default function HomeScreen() {
   }, []);
 
   const handleCategoryPress = (category: ServiceCategory) => {
-    // Check if caregiving is restricted for work address
     if (category.restrictedForWork && selectedAddress?.type === 'WORK') {
       return;
     }
@@ -97,12 +96,12 @@ export default function HomeScreen() {
   };
 
   const handleNotificationsPress = () => {
-    router.push('/notifications');
+    setShowNotifications(true);
   };
 
   return (
     <View style={styles.container}>
-      {/* Header */}
+      {/* Header with glassmorphism - matching boss */}
       <View style={styles.header}>
         <MainHeader
           locationLabel={displayLabel}
@@ -111,10 +110,12 @@ export default function HomeScreen() {
           hasUnreadNotifications={hasUnreadNotifications}
         />
 
-        {/* Location Banner */}
+        {/* Location Banner with blue left accent */}
         <View style={styles.locationBanner}>
-          <Ionicons name="location-outline" size={16} color={colors.primary} />
-          <Text style={styles.locationText} numberOfLines={1}>{displayStreet}</Text>
+          <View style={styles.locationBannerContent}>
+            <Ionicons name="location" size={16} color="#2E7AD9" />
+            <Text style={styles.locationBannerText} numberOfLines={1}>{displayStreet}</Text>
+          </View>
           <TouchableOpacity onPress={handleLocationPress}>
             <Text style={styles.changeText}>Change</Text>
           </TouchableOpacity>
@@ -126,13 +127,13 @@ export default function HomeScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         showsVerticalScrollIndicator={false}
       >
-        {/* Search Bar */}
+        {/* Search Bar - matching boss */}
         <TouchableOpacity style={styles.searchBar} onPress={handleSearchPress}>
-          <Ionicons name="search" size={20} color={colors.text.muted} />
+          <Ionicons name="search" size={20} color="#64748B" />
           <Text style={styles.searchPlaceholder}>What service do you need?</Text>
         </TouchableOpacity>
 
-        {/* Rewards Widget - always visible */}
+        {/* Rewards Widget - matching boss amber gradient style */}
         <TouchableOpacity
           style={styles.rewardsWidget}
           onPress={() => router.push('/rewards')}
@@ -147,7 +148,7 @@ export default function HomeScreen() {
           </View>
         </TouchableOpacity>
 
-        {/* Categories Grid */}
+        {/* Categories Grid - matching boss 2-column layout */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Available Services</Text>
           <View style={styles.categoriesGrid}>
@@ -162,13 +163,11 @@ export default function HomeScreen() {
                   onPress={() => handleCategoryPress(category)}
                   disabled={!isAvailable}
                 >
-                  <View style={[styles.categoryIcon, !isAvailable && styles.categoryIconDisabled]}>
-                    <Image
-                      source={category.image}
-                      style={[styles.categoryImage, !isAvailable && { opacity: 0.4 }]}
-                      resizeMode="contain"
-                    />
-                  </View>
+                  <Image
+                    source={category.image}
+                    style={[styles.categoryImage, !isAvailable && { opacity: 0.4 }]}
+                    resizeMode="contain"
+                  />
                   <Text style={[styles.categoryName, !isAvailable && styles.categoryNameDisabled]}>
                     {category.name}
                   </Text>
@@ -180,6 +179,12 @@ export default function HomeScreen() {
 
         <View style={{ height: 100 }} />
       </ScrollView>
+
+      {/* Notifications Panel - bottom sheet like boss */}
+      <NotificationsPanel
+        visible={showNotifications}
+        onClose={() => setShowNotifications(false)}
+      />
 
       {/* Location Selector Modal */}
       <LocationModal
@@ -197,63 +202,48 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#F0F7FF',
   },
   header: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 8 : 60,
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 30,
     elevation: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(46, 122, 217, 0.08)',
   },
   locationBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.md,
-    backgroundColor: colors.secondary,
-    borderRadius: borderRadius.lg,
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginHorizontal: 24,
+    marginBottom: 16,
+    backgroundColor: '#E3F0FF',
+    borderRadius: 12,
     borderLeftWidth: 3,
     borderLeftColor: '#2E7AD9',
   },
-  locationText: {
-    flex: 1,
-    fontSize: fontSize.sm,
-    color: colors.text.primary,
-  },
-  changeText: {
-    fontSize: fontSize.sm,
-    color: colors.primary,
-    textDecorationLine: 'underline',
-  },
-  locationBannerEmpty: {
+  locationBannerContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.md,
-    backgroundColor: '#FEF9C3',
-    borderWidth: borderWidth.default,
-    borderColor: '#FDE047',
-    borderRadius: borderRadius.lg,
-  },
-  locationTextEmpty: {
+    gap: 8,
     flex: 1,
-    fontSize: fontSize.sm,
-    color: '#A16207',
   },
-  changeTextEmpty: {
-    fontSize: fontSize.sm,
-    color: '#A16207',
+  locationBannerText: {
+    fontSize: 14,
+    color: '#1E293B',
+    flex: 1,
+  },
+  changeText: {
+    fontSize: 14,
+    color: '#2E7AD9',
     textDecorationLine: 'underline',
   },
   content: {
@@ -262,103 +252,99 @@ const styles = StyleSheet.create({
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    marginHorizontal: spacing.lg,
-    marginVertical: spacing.md,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
-    borderWidth: borderWidth.default,
-    borderColor: colors.border.light,
-    borderRadius: borderRadius.lg,
-    backgroundColor: colors.surface,
+    gap: 12,
+    marginHorizontal: 24,
+    marginVertical: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(46, 122, 217, 0.1)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   searchPlaceholder: {
-    fontSize: fontSize.md,
-    color: colors.text.muted,
-  },
-  section: {
-    paddingHorizontal: spacing.lg,
-  },
-  sectionTitle: {
-    fontSize: fontSize.md,
-    color: colors.text.primary,
-    marginBottom: spacing.md,
-  },
-  categoriesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.md,
-  },
-  categoryCard: {
-    width: '47%',
-    padding: spacing.lg,
-    borderWidth: borderWidth.default,
-    borderColor: colors.border.light,
-    borderRadius: borderRadius.lg,
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-  },
-  categoryCardDisabled: {
-    borderColor: 'rgba(46, 122, 217, 0.1)',
-    backgroundColor: 'rgba(46, 122, 217, 0.03)',
-    opacity: 0.6,
-  },
-  categoryIcon: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: 'transparent',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-  },
-  categoryIconDisabled: {
-    opacity: 0.4,
-  },
-  categoryImage: {
-    width: 72,
-    height: 72,
-  },
-  categoryName: {
-    fontSize: fontSize.sm,
-    fontWeight: '500',
-    color: colors.text.primary,
-    textAlign: 'center',
-  },
-  categoryNameDisabled: {
-    color: colors.text.muted,
+    fontSize: 16,
+    color: '#64748B',
   },
   rewardsWidget: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.md,
-    paddingVertical: spacing.sm + 2,
-    paddingHorizontal: spacing.md,
+    marginHorizontal: 24,
+    marginBottom: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     borderWidth: 1,
     borderColor: '#FDE68A',
-    borderRadius: borderRadius.lg,
+    borderRadius: 12,
     backgroundColor: '#FFFBEB',
   },
   rewardsLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    gap: 8,
   },
   rewardsPoints: {
-    fontSize: fontSize.md,
+    fontSize: 16,
     fontWeight: '600',
-    color: '#92400E',
+    color: '#1E293B',
   },
   rewardsRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    gap: 8,
   },
   streakText: {
-    fontSize: fontSize.md,
+    fontSize: 16,
     fontWeight: '600',
-    color: '#92400E',
+    color: '#1E293B',
+  },
+  section: {
+    paddingHorizontal: 24,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    color: '#1E293B',
+    marginBottom: 16,
+  },
+  categoriesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 16,
+  },
+  categoryCard: {
+    width: '47%',
+    padding: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  categoryCardDisabled: {
+    backgroundColor: '#E8F1FC',
+    opacity: 0.6,
+  },
+  categoryImage: {
+    width: 64,
+    height: 64,
+    marginBottom: 12,
+  },
+  categoryName: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#1E293B',
+    textAlign: 'center',
+  },
+  categoryNameDisabled: {
+    color: '#64748B',
   },
 });

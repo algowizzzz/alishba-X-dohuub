@@ -1,94 +1,138 @@
 import React from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, Image } from 'react-native';
+import {
+  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  Image, Platform, StatusBar, RefreshControl,
+} from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, fontSize, spacing, borderRadius } from '../../../src/constants/theme';
+import { useState } from 'react';
 
-const YELLOW = '#EAB308';
+const handymanImg = require('../../../assets/cat-handyman.png');
 
 const VENDORS = [
-  { id: '1', name: 'DoHuub Official',     tagline: 'Trusted, verified handyman services across all categories.',          rating: 4.9, reviews: 1247, isPowered: true,  image: 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=200&h=200&fit=crop' },
-  { id: '2', name: 'The Handyman Hub',    tagline: 'One-stop solution for all home repair needs with 15+ years experience.', rating: 4.9, reviews: 401,  isPowered: false, image: 'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=200&h=200&fit=crop' },
-  { id: '3', name: 'Home Repair Masters', tagline: 'Specializes in general repairs, painting, and furniture assembly.',     rating: 4.8, reviews: 256,  isPowered: false, image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=200&h=200&fit=crop' },
-  { id: '4', name: 'Quick Fix Services',  tagline: 'Fast and efficient solutions for appliance repairs and installations.',  rating: 4.7, reviews: 189,  isPowered: false, image: 'https://images.unsplash.com/photo-1504328345606-18bbc8c9d7d1?w=200&h=200&fit=crop' },
+  { id: '1', name: 'DoHuub Official',     tagline: 'Trusted, verified handyman services across all categories.',            rating: 4.9, reviews: 1247, isPowered: true,  startingPrice: 65 },
+  { id: '2', name: 'The Handyman Hub',    tagline: 'One-stop solution for all home repair needs with 15+ years experience.', rating: 4.9, reviews: 401,  isPowered: false, startingPrice: 70 },
+  { id: '3', name: 'Home Repair Masters', tagline: 'Specializes in general repairs, painting, and furniture assembly.',      rating: 4.8, reviews: 256,  isPowered: false, startingPrice: 55 },
+  { id: '4', name: 'Quick Fix Services',  tagline: 'Fast and efficient solutions for appliance repairs and installations.',   rating: 4.7, reviews: 189,  isPowered: false, startingPrice: 60 },
 ];
 
+/**
+ * Handyman Services — matching boss wireframe (HandymanVendorsListScreen.tsx):
+ * - Glassmorphic header with back button in white card
+ * - Vendor cards with handyman image, left blue border
+ * - "Powered by DoHuub" badge
+ * - Star rating + review count
+ */
 export default function HandymanServicesScreen() {
-  const goToDetail = (item: typeof VENDORS[0]) => {
-    router.push({ pathname: '/services/handyman/[id]', params: { id: item.id } } as any);
-  };
+  const [refreshing, setRefreshing] = useState(false);
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={22} color={colors.text.primary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Handyman Services</Text>
-        <View style={{ width: 36 }} />
+    <View style={s.container}>
+      {/* Header — glassmorphic */}
+      <View style={s.header}>
+        <View style={s.headerInner}>
+          <TouchableOpacity style={s.backBtn} onPress={() => {
+            if (router.canGoBack()) router.back();
+            else router.replace('/(tabs)');
+          }}>
+            <Ionicons name="arrow-back" size={20} color="#1E293B" />
+          </TouchableOpacity>
+          <Text style={s.headerTitle}>Handyman Services</Text>
+        </View>
       </View>
 
-      <FlatList
-        data={VENDORS}
-        keyExtractor={i => i.id}
-        contentContainerStyle={styles.list}
+      <ScrollView
+        style={s.list}
+        contentContainerStyle={s.listContent}
         showsVerticalScrollIndicator={false}
-        renderItem={({ item }) => (
-          <TouchableOpacity style={styles.card} onPress={() => goToDetail(item)} activeOpacity={0.8}>
-            <Image source={{ uri: item.image }} style={styles.iconBox} resizeMode="cover" />
-            <View style={styles.info}>
-              <View style={styles.nameRow}>
-                <Text style={styles.name}>{item.name}</Text>
-                {item.isPowered && (
-                  <View style={styles.poweredBadge}>
-                    <Text style={styles.poweredTxt}>Powered by DoHuub</Text>
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => setRefreshing(false)} />}
+      >
+        {VENDORS.map((vendor, index) => (
+          <TouchableOpacity
+            key={vendor.id}
+            style={s.vendorCard}
+            onPress={() => router.push({ pathname: '/services/handyman/[id]', params: { id: vendor.id } } as any)}
+            activeOpacity={0.7}
+          >
+            <View style={s.cardRow}>
+              {/* Vendor Image — handyman icon */}
+              <Image source={handymanImg} style={s.vendorLogo} resizeMode="contain" />
+
+              {/* Vendor Info */}
+              <View style={s.vendorInfo}>
+                <View style={s.nameRow}>
+                  <Text style={s.vendorName} numberOfLines={1}>{vendor.name}</Text>
+                  {vendor.isPowered && (
+                    <View style={s.dohuubBadge}>
+                      <Text style={s.dohuubBadgeText}>Powered by DoHuub</Text>
+                    </View>
+                  )}
+                </View>
+
+                <View style={s.ratingRow}>
+                  <View style={s.ratingInner}>
+                    <Ionicons name="star" size={14} color="#FACC15" />
+                    <Text style={s.ratingText}>{vendor.rating}</Text>
                   </View>
-                )}
-              </View>
-              <Text style={styles.tagline} numberOfLines={2}>{item.tagline}</Text>
-              <View style={styles.ratingRow}>
-                <Ionicons name="star" size={14} color="#F59E0B" />
-                <Text style={styles.ratingVal}>{item.rating}</Text>
-                <Text style={styles.ratingCnt}>({item.reviews})</Text>
+                  <Text style={s.reviewCount}>({vendor.reviews})</Text>
+                </View>
+
+                <Text style={s.tagline} numberOfLines={1}>{vendor.tagline}</Text>
               </View>
             </View>
           </TouchableOpacity>
-        )}
-      />
-    </SafeAreaView>
+        ))}
+
+        <View style={{ height: 100 }} />
+      </ScrollView>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+const s = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#F0F7FF' },
   header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg, paddingVertical: spacing.md,
-    backgroundColor: 'rgba(255,255,255,0.95)',
-    borderBottomWidth: 1, borderBottomColor: 'rgba(46,122,217,0.08)',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 8 : 60,
+    paddingBottom: 24, paddingHorizontal: 24,
     borderBottomLeftRadius: 24, borderBottomRightRadius: 24,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.06, shadowRadius: 15, elevation: 3,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06, shadowRadius: 30, elevation: 4,
+    borderBottomWidth: 1, borderBottomColor: 'rgba(46, 122, 217, 0.08)',
   },
-  backBtn: { padding: spacing.xs, width: 36 },
-  headerTitle: { flex: 1, fontSize: fontSize.md, fontWeight: '600', color: colors.text.primary, textAlign: 'center' },
-  list: { padding: spacing.lg, gap: 12, paddingBottom: 32 },
-  card: {
-    flexDirection: 'row', alignItems: 'flex-start', gap: 14,
-    backgroundColor: '#FFF', borderRadius: 14, padding: 16,
-    borderWidth: 1, borderColor: 'rgba(0,0,0,0.07)',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 1,
+  headerInner: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  backBtn: {
+    width: 40, height: 40, borderRadius: 12,
+    backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
   },
-  iconBox: {
-    width: 72, height: 72, borderRadius: 12,
-    overflow: 'hidden', flexShrink: 0,
+  headerTitle: { fontSize: 18, fontWeight: '600', color: '#1E293B' },
+  list: { flex: 1 },
+  listContent: { padding: 24, gap: 16 },
+  vendorCard: {
+    backgroundColor: '#FFFFFF', borderRadius: 12, padding: 16,
+    borderWidth: 1, borderColor: 'rgba(46, 122, 217, 0.15)',
+    borderLeftWidth: 3, borderLeftColor: '#2E7AD9',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
   },
-  info: { flex: 1 },
-  nameRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginBottom: 4 },
-  name: { fontSize: fontSize.md, fontWeight: '600', color: colors.text.primary },
-  poweredBadge: { backgroundColor: colors.primary, paddingHorizontal: 10, paddingVertical: 3, borderRadius: 99 },
-  poweredTxt: { fontSize: 10, color: '#FFF', fontWeight: '600' },
-  tagline: { fontSize: fontSize.sm, color: colors.text.secondary, lineHeight: 18, marginBottom: 8 },
-  ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  ratingVal: { fontSize: fontSize.sm, fontWeight: '600', color: colors.text.primary },
-  ratingCnt: { fontSize: fontSize.sm, color: colors.text.secondary },
+  cardRow: { flexDirection: 'row', gap: 16 },
+  vendorLogo: { width: 64, height: 64, borderRadius: 32 },
+  vendorInfo: { flex: 1, minWidth: 0 },
+  nameRow: {
+    flexDirection: 'row', alignItems: 'flex-start',
+    justifyContent: 'space-between', gap: 8, marginBottom: 4,
+  },
+  vendorName: { fontSize: 16, fontWeight: '600', color: '#1E293B', flexShrink: 1 },
+  dohuubBadge: {
+    backgroundColor: '#2E7AD9', paddingHorizontal: 8,
+    paddingVertical: 4, borderRadius: 12, flexShrink: 0,
+  },
+  dohuubBadgeText: { fontSize: 10, fontWeight: '600', color: '#FFFFFF' },
+  ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
+  ratingInner: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  ratingText: { fontSize: 14, fontWeight: '500', color: '#1E293B' },
+  reviewCount: { fontSize: 14, color: '#64748B' },
+  tagline: { fontSize: 14, color: '#64748B' },
 });

@@ -9,29 +9,26 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, fontSize, borderRadius, borderWidth } from '../../src/constants/theme';
-import { ScreenHeader } from '../../src/components/composite';
-import { EmptyState } from '../../src/components/ui';
+import { router } from 'expo-router';
 import { useRewardsStore } from '../../src/store/rewardsStore';
 
 /**
- * Points History Screen
- * - Filter tabs: All | EARNED | REDEEMED | EXPIRED
- * - Summary stats grid (total earned/redeemed/expired)
- * - Transactions grouped by month
- * - Each item: type icon, description, badge + date, +/- points
- * - Points Redemption Info footer
- * - Pull-to-refresh
+ * Points History Screen — matches boss wireframe (PointsHistoryScreen.tsx)
+ *
+ * Layout order (top-to-bottom):
+ *  1. Glassmorphic header with back pill + "Points History"
+ *  2. Summary stats grid (Total Earned / Redeemed / Expired)
+ *  3. Filter tabs: All | Earned | Redeemed | Expired (horizontal pills)
+ *  4. Transactions grouped by month — each item is a card with shadow
+ *  5. Points Redemption Info footer card
  */
 
-const FILTER_TABS = ['All', 'EARNED', 'REDEEMED', 'EXPIRED'];
-
-const FILTER_LABELS: Record<string, string> = {
-  All: 'All',
-  EARNED: 'Earned',
-  REDEEMED: 'Redeemed',
-  EXPIRED: 'Expired',
-};
+const FILTER_TABS: { key: string; label: string }[] = [
+  { key: 'All', label: 'All' },
+  { key: 'EARNED', label: 'Earned' },
+  { key: 'REDEEMED', label: 'Redeemed' },
+  { key: 'EXPIRED', label: 'Expired' },
+];
 
 const TRANSACTION_LABELS: Record<string, string> = {
   EARNED: 'Earned',
@@ -42,26 +39,51 @@ const TRANSACTION_LABELS: Record<string, string> = {
 };
 
 const TRANSACTION_ICONS: Record<string, { name: keyof typeof Ionicons.glyphMap; color: string }> = {
-  EARNED: { name: 'star', color: colors.status.success },
-  REDEEMED: { name: 'cart', color: colors.status.error },
-  EXPIRED: { name: 'time', color: colors.text.muted },
-  REFERRAL: { name: 'gift', color: colors.primary },
-  BONUS: { name: 'flame', color: '#F59E0B' },
+  EARNED: { name: 'trending-up', color: 'rgb(34, 197, 94)' },
+  REDEEMED: { name: 'trending-down', color: '#2E7AD9' },
+  EXPIRED: { name: 'time', color: '#EF4444' },
+  REFERRAL: { name: 'people', color: 'rgb(147, 51, 234)' },
+  BONUS: { name: 'gift', color: 'rgb(245, 158, 11)' },
 };
 
-const getBadgeColors = (type: string) => {
+const getTransactionColor = (type: string) => {
+  switch (type) {
+    case 'EARNED':
+    case 'REFERRAL':
+    case 'BONUS':
+      return 'rgb(22, 163, 74)';
+    case 'REDEEMED':
+      return '#2E7AD9';
+    case 'EXPIRED':
+      return '#EF4444';
+    default:
+      return '#64748B';
+  }
+};
+
+const getBadgeStyle = (type: string) => {
   switch (type) {
     case 'EARNED':
     case 'REFERRAL':
     case 'BONUS':
       return { bg: 'rgba(34, 197, 94, 0.1)', text: 'rgb(22, 163, 74)' };
     case 'REDEEMED':
-      return { bg: 'rgba(46, 122, 217, 0.1)', text: colors.primary };
+      return { bg: 'rgba(46, 122, 217, 0.1)', text: '#2E7AD9' };
     case 'EXPIRED':
-      return { bg: 'rgba(239, 68, 68, 0.1)', text: colors.status.error };
+      return { bg: 'rgba(239, 68, 68, 0.1)', text: '#EF4444' };
     default:
-      return { bg: 'rgba(34, 197, 94, 0.1)', text: 'rgb(22, 163, 74)' };
+      return { bg: '#E8F1FC', text: '#64748B' };
   }
+};
+
+const formatDate = (dateString: string) => {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
 };
 
 interface TransactionSection {
@@ -119,7 +141,6 @@ export default function PointsHistoryScreen() {
     transactions.forEach((tx) => {
       const date = new Date(tx.createdAt);
       const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-      const label = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
       if (!groups[key]) {
         groups[key] = [];
@@ -138,7 +159,10 @@ export default function PointsHistoryScreen() {
 
   // Flatten grouped data for FlatList with section headers
   const flatData = useMemo(() => {
-    const items: Array<{ type: 'header'; title: string; id: string } | { type: 'transaction'; data: TransactionSection['data'][0]; id: string }> = [];
+    const items: Array<
+      | { type: 'header'; title: string; id: string }
+      | { type: 'transaction'; data: TransactionSection['data'][0]; id: string }
+    > = [];
 
     groupedTransactions.forEach((section) => {
       items.push({ type: 'header', title: section.title, id: `header-${section.title}` });
@@ -152,52 +176,49 @@ export default function PointsHistoryScreen() {
 
   const renderListHeader = () => (
     <View style={styles.headerContent}>
-      {/* Filter Tabs */}
-      <View style={styles.filterTabs}>
-        {FILTER_TABS.map((tab) => (
-          <TouchableOpacity
-            key={tab}
-            style={[
-              styles.filterTab,
-              activeFilter === tab && styles.filterTabActive,
-            ]}
-            onPress={() => handleFilterChange(tab)}
-          >
-            <Text
-              style={[
-                styles.filterTabText,
-                activeFilter === tab && styles.filterTabTextActive,
-              ]}
-            >
-              {FILTER_LABELS[tab]}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* Summary Stats Grid */}
+      {/* Summary Stats — above filter tabs per boss wireframe */}
       <View style={styles.statsGrid}>
         <View style={styles.statCard}>
-          <Ionicons name="trending-up" size={20} color={colors.status.success} />
           <Text style={[styles.statValue, { color: 'rgb(22, 163, 74)' }]}>
             +{summaryStats.earned.toLocaleString()}
           </Text>
           <Text style={styles.statLabel}>Total Earned</Text>
         </View>
         <View style={styles.statCard}>
-          <Ionicons name="cart-outline" size={20} color={colors.primary} />
-          <Text style={[styles.statValue, { color: colors.primary }]}>
+          <Text style={[styles.statValue, { color: '#2E7AD9' }]}>
             -{summaryStats.redeemed.toLocaleString()}
           </Text>
           <Text style={styles.statLabel}>Total Redeemed</Text>
         </View>
         <View style={styles.statCard}>
-          <Ionicons name="time-outline" size={20} color={colors.status.error} />
-          <Text style={[styles.statValue, { color: colors.status.error }]}>
+          <Text style={[styles.statValue, { color: '#EF4444' }]}>
             -{summaryStats.expired.toLocaleString()}
           </Text>
           <Text style={styles.statLabel}>Total Expired</Text>
         </View>
+      </View>
+
+      {/* Filter Tabs */}
+      <View style={styles.filterTabs}>
+        {FILTER_TABS.map((tab) => (
+          <TouchableOpacity
+            key={tab.key}
+            style={[
+              styles.filterTab,
+              activeFilter === tab.key && styles.filterTabActive,
+            ]}
+            onPress={() => handleFilterChange(tab.key)}
+          >
+            <Text
+              style={[
+                styles.filterTabText,
+                activeFilter === tab.key && styles.filterTabTextActive,
+              ]}
+            >
+              {tab.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
     </View>
   );
@@ -225,62 +246,70 @@ export default function PointsHistoryScreen() {
 
     const tx = item.data;
     const iconConfig = TRANSACTION_ICONS[tx.type] || TRANSACTION_ICONS.EARNED;
-    const isPositive = tx.type === 'EARNED' || tx.type === 'REFERRAL' || tx.type === 'BONUS';
-    const badgeColors = getBadgeColors(tx.type);
-    const badgeLabel = TRANSACTION_LABELS[tx.type] || 'Earned';
+    const badgeStyle = getBadgeStyle(tx.type);
+    const badgeLabel = TRANSACTION_LABELS[tx.type] || 'Transaction';
+    const pointsColor = getTransactionColor(tx.type);
 
     return (
-      <View style={styles.transactionItem}>
-        <View style={[styles.txIconContainer, { backgroundColor: iconConfig.color + '15' }]}>
-          <Ionicons name={iconConfig.name} size={18} color={iconConfig.color} />
+      <View style={styles.transactionCard}>
+        {/* Icon circle */}
+        <View style={[styles.txIconCircle, { backgroundColor: '#F0F7FF' }]}>
+          <Ionicons name={iconConfig.name} size={20} color={iconConfig.color} />
         </View>
-        <View style={styles.txInfo}>
-          <Text style={styles.txDescription} numberOfLines={1}>
-            {tx.description}
-          </Text>
-          <View style={styles.txBadgeDateRow}>
-            <View style={[styles.txBadge, { backgroundColor: badgeColors.bg }]}>
-              <Text style={[styles.txBadgeText, { color: badgeColors.text }]}>
+
+        {/* Content */}
+        <View style={styles.txContent}>
+          {/* Top row: description + points */}
+          <View style={styles.txTopRow}>
+            <Text style={styles.txDescription} numberOfLines={1}>
+              {tx.description}
+            </Text>
+            <Text style={[styles.txPoints, { color: pointsColor }]}>
+              {tx.amount > 0 ? '+' : ''}{tx.amount} pts
+            </Text>
+          </View>
+
+          {/* Bottom row: badge + dot + date */}
+          <View style={styles.txBottomRow}>
+            <View style={[styles.txBadge, { backgroundColor: badgeStyle.bg }]}>
+              <Text style={[styles.txBadgeText, { color: badgeStyle.text }]}>
                 {badgeLabel}
               </Text>
             </View>
-            <Text style={styles.txBadgeDot}>{'\u2022'}</Text>
-            <Text style={styles.txDate}>
-              {new Date(tx.createdAt).toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric',
-              })}
-            </Text>
+            <Text style={styles.txDot}>{'\u2022'}</Text>
+            <Text style={styles.txDate}>{formatDate(tx.createdAt)}</Text>
           </View>
         </View>
-        <Text
-          style={[
-            styles.txPoints,
-            { color: isPositive ? colors.status.success : colors.status.error },
-          ]}
-        >
-          {isPositive ? '+' : '-'}{Math.abs(tx.amount).toLocaleString()}
-        </Text>
       </View>
     );
   };
 
   const renderEmpty = () => (
-    <EmptyState
-      icon="receipt-outline"
-      title="No transactions found"
-      message={
-        activeFilter === 'All'
-          ? 'Your points history will appear here once you start earning.'
-          : `No ${FILTER_LABELS[activeFilter].toLowerCase()} transactions found.`
-      }
-    />
+    <View style={styles.emptyState}>
+      <View style={styles.emptyIconCircle}>
+        <Ionicons name="gift" size={32} color="#64748B" />
+      </View>
+      <Text style={styles.emptyTitle}>No transactions found</Text>
+      <Text style={styles.emptySubtitle}>
+        {activeFilter === 'All'
+          ? 'Start earning points on Powered by DoHuub services!'
+          : `No ${FILTER_TABS.find((t) => t.key === activeFilter)?.label.toLowerCase()} transactions yet`}
+      </Text>
+    </View>
   );
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScreenHeader title="Points History" showBack />
+      {/* Glassmorphic Header */}
+      <View style={styles.glassHeader}>
+        <TouchableOpacity
+          style={styles.backPill}
+          onPress={() => router.back()}
+        >
+          <Ionicons name="arrow-back" size={20} color="#1E293B" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Points History</Text>
+      </View>
 
       <FlatList
         data={flatData}
@@ -302,107 +331,173 @@ export default function PointsHistoryScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#F0F7FF',
   },
+
+  // Glassmorphic Header
+  glassHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 15,
+    elevation: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(46, 122, 217, 0.08)',
+    gap: 16,
+  },
+  backPill: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#ffffff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1E293B',
+  },
+
   headerContent: {
-    marginBottom: spacing.sm,
+    marginBottom: 8,
+  },
+
+  // Summary Stats Grid — above filters per wireframe
+  statsGrid: {
+    flexDirection: 'row',
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: 8,
+    gap: 12,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    gap: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  statValue: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#64748B',
   },
 
   // Filter Tabs
   filterTabs: {
     flexDirection: 'row',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    gap: spacing.sm,
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    gap: 8,
   },
   filterTab: {
     flex: 1,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.sm,
-    borderRadius: borderRadius.full,
-    backgroundColor: colors.muted,
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    borderRadius: 20,
+    backgroundColor: '#E8F1FC',
     alignItems: 'center',
   },
   filterTabActive: {
-    backgroundColor: colors.primary,
+    backgroundColor: '#2E7AD9',
+    shadowColor: 'rgba(46, 122, 217, 0.3)',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 12,
+    elevation: 4,
   },
   filterTabText: {
-    fontSize: fontSize.sm,
-    color: colors.text.secondary,
+    fontSize: 14,
+    color: '#64748B',
     fontWeight: '500',
   },
   filterTabTextActive: {
-    color: colors.text.inverse,
-  },
-
-  // Stats Grid
-  statsGrid: {
-    flexDirection: 'row',
-    paddingHorizontal: spacing.lg,
-    gap: spacing.sm,
-    marginBottom: spacing.md,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    borderWidth: borderWidth.default,
-    borderColor: colors.border.light,
-    padding: spacing.md,
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  statValue: {
-    fontSize: fontSize.lg,
-    fontWeight: '700',
-  },
-  statLabel: {
-    fontSize: fontSize.xs,
-    color: colors.text.secondary,
+    color: '#ffffff',
   },
 
   // Month Headers
   monthHeader: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    backgroundColor: colors.muted,
+    paddingHorizontal: 24,
+    paddingVertical: 8,
+    marginBottom: 12,
   },
   monthTitle: {
-    fontSize: fontSize.sm,
+    fontSize: 14,
     fontWeight: '600',
-    color: colors.text.secondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    color: '#64748B',
   },
 
-  // Transaction Items
-  transactionItem: {
+  // Transaction Cards — individual cards with shadow per wireframe
+  transactionCard: {
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    gap: spacing.md,
-    borderBottomWidth: borderWidth.thin,
-    borderBottomColor: colors.border.light,
-    backgroundColor: colors.surface,
+    alignItems: 'flex-start',
+    marginHorizontal: 24,
+    marginBottom: 12,
+    padding: 16,
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+    gap: 16,
   },
-  txIconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  txIconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
   },
-  txInfo: {
+  txContent: {
     flex: 1,
   },
-  txDescription: {
-    fontSize: fontSize.sm,
-    fontWeight: '500',
-    color: colors.text.primary,
+  txTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: 8,
     marginBottom: 4,
   },
-  txBadgeDateRow: {
+  txDescription: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#1E293B',
+  },
+  txPoints: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  txBottomRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
@@ -410,54 +505,87 @@ const styles = StyleSheet.create({
   txBadge: {
     paddingHorizontal: 8,
     paddingVertical: 2,
-    borderRadius: borderRadius.full,
+    borderRadius: 4,
   },
   txBadgeText: {
-    fontSize: 11,
-    fontWeight: '600',
+    fontSize: 12,
+    fontWeight: '500',
   },
-  txBadgeDot: {
-    fontSize: fontSize.xs,
-    color: colors.text.muted,
+  txDot: {
+    fontSize: 12,
+    color: '#64748B',
   },
   txDate: {
-    fontSize: fontSize.xs,
-    color: colors.text.muted,
-  },
-  txPoints: {
-    fontSize: fontSize.md,
-    fontWeight: '700',
+    fontSize: 14,
+    color: '#64748B',
   },
 
   // Redemption Info
   redemptionInfoCard: {
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.lg,
-    marginBottom: spacing.md,
-    padding: spacing.md,
+    marginHorizontal: 24,
+    marginTop: 16,
+    marginBottom: 16,
+    padding: 16,
+    borderRadius: 12,
     backgroundColor: 'rgba(245, 158, 11, 0.1)',
-    borderRadius: borderRadius.lg,
-    borderWidth: borderWidth.thin,
+    borderWidth: 1,
     borderColor: 'rgba(245, 158, 11, 0.2)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
   redemptionInfoTitle: {
-    fontSize: fontSize.sm,
-    fontWeight: '700',
+    fontSize: 15,
+    fontWeight: '600',
     color: 'rgb(180, 83, 9)',
-    marginBottom: spacing.sm,
+    marginBottom: 8,
   },
   redemptionInfoList: {
-    gap: 6,
+    gap: 4,
   },
   redemptionInfoItem: {
-    fontSize: fontSize.xs,
+    fontSize: 14,
     color: 'rgb(146, 64, 14)',
-    lineHeight: 18,
+    lineHeight: 20,
+  },
+
+  // Empty State
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 48,
+  },
+  emptyIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#ffffff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#1E293B',
+    marginBottom: 4,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: '#64748B',
+    textAlign: 'center',
+    paddingHorizontal: 32,
   },
 
   // List
   listContent: {
-    paddingBottom: spacing.xxl,
+    paddingBottom: 32,
     flexGrow: 1,
   },
 });

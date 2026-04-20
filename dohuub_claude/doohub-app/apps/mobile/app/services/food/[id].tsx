@@ -147,50 +147,56 @@ export default function FoodMenuScreen() {
   const tax = subtotal * 0.08;
   const total = subtotal + deliveryFee + tax;
 
-  // ── CONFIRM ORDER ─────────────────────────────────────────────────────────
+  // ── CONFIRM ORDER — matching boss wireframe ─────────────────────────────
   if (step === 'confirm') {
     return (
       <SafeAreaView style={styles.container}>
+        {/* Header — no vendor name */}
         <View style={styles.header}>
           <TouchableOpacity style={styles.backBtn} onPress={() => setStep('checkout')}>
-            <Ionicons name="arrow-back" size={20} color={colors.text.primary} />
+            <Ionicons name="arrow-back" size={20} color="#1E293B" />
           </TouchableOpacity>
-          <View>
-            <Text style={styles.headerTitle}>Confirm Order</Text>
-            <Text style={styles.headerSubtitle}>{vendorName}</Text>
-          </View>
+          <Text style={styles.headerTitle}>Confirm Order</Text>
         </View>
 
         <ScrollView style={styles.content} contentContainerStyle={{ padding: 24, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
           {/* Delivery Address */}
           <Text style={styles.sectionTitle}>Delivery Address</Text>
-          <View style={styles.card}>
-            <View style={styles.cardRow}>
-              <Ionicons name="location" size={20} color={colors.primary} />
-              <View style={{ flex: 1, marginLeft: 12 }}>
-                <Text style={styles.cardLabel}>{deliveryAddress?.label ?? 'Home'}</Text>
-                <Text style={styles.cardSub}>{deliveryAddress?.street ?? '123 Main Street, Miami, FL'}</Text>
+          <View style={styles.confirmCard}>
+            <View style={styles.confirmCardRow}>
+              <View style={styles.confirmIconCircle}>
+                <Ionicons name="location" size={18} color="#2E7AD9" />
               </View>
-              <TouchableOpacity><Text style={styles.changeLink}>Change</Text></TouchableOpacity>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.confirmCardLabel}>{deliveryAddress?.label ?? 'Home'}</Text>
+                <Text style={styles.confirmCardSub}>{deliveryAddress?.street ?? '123 Main Street, Miami, FL'}</Text>
+              </View>
             </View>
+            <TouchableOpacity style={styles.changeBtn}>
+              <Text style={styles.changeBtnText}>Change</Text>
+            </TouchableOpacity>
           </View>
 
           {/* Payment Method */}
           <Text style={[styles.sectionTitle, { marginTop: 20 }]}>Payment Method</Text>
-          <View style={styles.card}>
-            <View style={styles.cardRow}>
-              <Ionicons name="card" size={20} color={colors.primary} />
-              <View style={{ flex: 1, marginLeft: 12 }}>
-                <Text style={styles.cardLabel}>Credit Card</Text>
-                <Text style={styles.cardSub}>•••• •••• •••• 4242</Text>
+          <View style={styles.confirmCard}>
+            <View style={styles.confirmCardRow}>
+              <View style={styles.confirmIconCircle}>
+                <Ionicons name="card" size={18} color="#2E7AD9" />
               </View>
-              <TouchableOpacity><Text style={styles.changeLink}>Change</Text></TouchableOpacity>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.confirmCardLabel}>Credit Card</Text>
+                <Text style={styles.confirmCardSub}>•••• •••• •••• 4242</Text>
+              </View>
             </View>
+            <TouchableOpacity style={styles.changeBtn}>
+              <Text style={styles.changeBtnText}>Change</Text>
+            </TouchableOpacity>
           </View>
 
-          {/* Order Summary */}
+          {/* Order Summary — in white card */}
           <Text style={[styles.sectionTitle, { marginTop: 20 }]}>Order Summary</Text>
-          <View style={styles.card}>
+          <View style={styles.orderSummaryCard}>
             {cart.map(item => (
               <View key={item.id} style={styles.summaryItem}>
                 <Text style={styles.summaryQty}>{item.quantity}x</Text>
@@ -198,14 +204,14 @@ export default function FoodMenuScreen() {
                 <Text style={styles.summaryPrice}>${(item.price * item.quantity).toFixed(2)}</Text>
               </View>
             ))}
-            <View style={styles.divider} />
-            <View style={styles.priceRow}><Text style={styles.priceLabel}>Subtotal</Text><Text style={styles.priceVal}>${subtotal.toFixed(2)}</Text></View>
-            <View style={styles.priceRow}><Text style={styles.priceLabel}>Delivery Fee</Text><Text style={styles.priceVal}>${deliveryFee.toFixed(2)}</Text></View>
-            <View style={styles.priceRow}><Text style={styles.priceLabel}>Tax</Text><Text style={styles.priceVal}>${tax.toFixed(2)}</Text></View>
-            <View style={styles.divider} />
-            <View style={styles.priceRow}>
-              <Text style={styles.totalLabel}>Total</Text>
-              <Text style={styles.totalVal}>${total.toFixed(2)}</Text>
+            <View style={styles.summaryDivider} />
+            <View style={styles.summaryRow}><Text style={styles.summaryLabel}>Subtotal</Text><Text style={styles.summaryVal}>${subtotal.toFixed(2)}</Text></View>
+            <View style={styles.summaryRow}><Text style={styles.summaryLabel}>Delivery Fee</Text><Text style={styles.summaryVal}>${deliveryFee.toFixed(2)}</Text></View>
+            <View style={styles.summaryRow}><Text style={styles.summaryLabel}>Tax</Text><Text style={styles.summaryVal}>${tax.toFixed(2)}</Text></View>
+            <View style={styles.summaryDivider} />
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryTotalLabel}>Total</Text>
+              <Text style={styles.summaryTotalVal}>${total.toFixed(2)}</Text>
             </View>
           </View>
 
@@ -216,12 +222,10 @@ export default function FoodMenuScreen() {
                 <Ionicons name="gift" size={20} color="#F59E0B" />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.pointsTitle}>You'll earn {Math.floor(total)} points</Text>
+                <Text style={styles.pointsTitle}>Points you'll earn</Text>
                 <Text style={styles.pointsSub}>1 point per $1 spent • Added after delivery</Text>
               </View>
-              <TouchableOpacity onPress={() => router.push('/rewards' as any)}>
-                <Text style={styles.changeLink}>View My Rewards</Text>
-              </TouchableOpacity>
+              <Text style={{ fontSize: 18, fontWeight: '700', color: '#F59E0B' }}>+{Math.floor(total)} pts</Text>
             </View>
           )}
         </ScrollView>
@@ -570,6 +574,39 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   placeOrderText: { color: '#FFFFFF', fontSize: fontSize.md, fontWeight: '600' },
+
+  // Confirm Order screen styles
+  confirmCard: {
+    backgroundColor: '#FFFFFF', borderRadius: 12, padding: 16,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+  },
+  confirmCardRow: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: 12 },
+  confirmIconCircle: {
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: '#E8F1FC', alignItems: 'center', justifyContent: 'center',
+  },
+  confirmCardLabel: { fontSize: 15, fontWeight: '500', color: '#1E293B' },
+  confirmCardSub: { fontSize: 13, color: '#64748B', marginTop: 2 },
+  changeBtn: {
+    paddingHorizontal: 12, paddingVertical: 6,
+    borderRadius: 8, borderWidth: 1, borderColor: 'rgba(46,122,217,0.2)',
+    backgroundColor: 'rgba(46,122,217,0.05)',
+  },
+  changeBtnText: { fontSize: 13, fontWeight: '500', color: '#2E7AD9' },
+  orderSummaryCard: {
+    backgroundColor: '#FFFFFF', borderRadius: 12, padding: 16,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
+  },
+  summaryDivider: { height: 1, backgroundColor: 'rgba(46,122,217,0.1)', marginVertical: 12 },
+  summaryRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+  summaryLabel: { fontSize: 14, color: '#64748B' },
+  summaryVal: { fontSize: 14, color: '#1E293B' },
+  summaryTotalLabel: { fontSize: 15, fontWeight: '600', color: '#1E293B' },
+  summaryTotalVal: { fontSize: 15, fontWeight: '600', color: '#2E7AD9' },
+
   menuCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,

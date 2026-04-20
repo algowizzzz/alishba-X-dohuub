@@ -148,15 +148,6 @@ export default function GroceryProfileScreen() {
           ))}
         </View>
       </ScrollView>
-
-      <View style={styles.footer}>
-        <TouchableOpacity
-          style={styles.shopBtn}
-          onPress={() => router.push({ pathname: '/services/grocery/[id]', params: { id: params.id, name: vendorName, isPoweredByDoHuub: String(isPoweredByDoHuub) } } as any)}
-        >
-          <Text style={styles.shopBtnText}>Shop Now</Text>
-        </TouchableOpacity>
-      </View>
     </SafeAreaView>
   );
 }
@@ -208,7 +199,7 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   storeName: { fontSize: 20, fontWeight: '700', color: '#1A1A2E', marginBottom: 8 },
-  dohuubBadge: { backgroundColor: '#10B981', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 99, marginBottom: 6 },
+  dohuubBadge: { backgroundColor: '#2E7AD9', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 99, marginBottom: 6 },
   dohuubBadgeText: { fontSize: 12, color: '#FFFFFF', fontWeight: '600' },
   storeType: { fontSize: 14, color: '#6B7280', marginBottom: 6 },
   ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 6 },

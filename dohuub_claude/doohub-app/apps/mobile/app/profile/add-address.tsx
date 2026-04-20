@@ -10,14 +10,13 @@ import {
   KeyboardAvoidingView,
   Platform,
   TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, fontSize, borderRadius, borderWidth } from '../../src/constants/theme';
-import { ScreenHeader } from '../../src/components/composite';
-import { Button } from '../../src/components/ui';
 import { supabase } from '../../src/lib/supabase';
 import { useAuthStore } from '../../src/store/authStore';
+import { LinearGradient } from 'expo-linear-gradient';
 
 type AddressType = 'Home' | 'Work' | 'Other';
 
@@ -32,6 +31,7 @@ export default function AddAddressScreen() {
   const isEditing = edit === 'true';
 
   const [addressType, setAddressType] = useState<AddressType>((type as AddressType) || 'Home');
+  const [label, setLabel] = useState((type as AddressType) || 'Home');
   const [country, setCountry] = useState('United States');
   const [street, setStreet] = useState('');
   const [city, setCity] = useState('');
@@ -39,8 +39,9 @@ export default function AddAddressScreen() {
   const [zipCode, setZipCode] = useState('');
   const [deliveryInstructions, setDeliveryInstructions] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [focusedField, setFocusedField] = useState<string | null>(null);
 
-  const isFormValid = street.trim() && city.trim() && state.trim() && zipCode.trim();
+  const isFormValid = street.trim() && city.trim() && state.trim() && zipCode.trim() && country.trim();
 
   const handleSave = async () => {
     if (!isFormValid) {
@@ -57,7 +58,7 @@ export default function AddAddressScreen() {
           id: `addr-${Date.now()}`,
           userId,
           type: addressType.toUpperCase(),
-          label: addressType,
+          label: addressType === 'Other' ? label : addressType,
           street,
           city,
           state,
@@ -70,7 +71,6 @@ export default function AddAddressScreen() {
         if (error) throw error;
       }
 
-      // Navigate back regardless (works in dev without auth too)
       if (router.canGoBack()) {
         router.back();
       } else {
@@ -83,9 +83,26 @@ export default function AddAddressScreen() {
     }
   };
 
+  const getInputStyle = (field: string) => [
+    styles.input,
+    focusedField === field && styles.inputFocused,
+  ];
+
   return (
     <SafeAreaView style={styles.container}>
-      <ScreenHeader title={isEditing ? 'Edit Address' : 'Add Address'} showBack />
+      {/* Glassmorphic Header */}
+      <View style={styles.header}>
+        <View style={styles.headerContent}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="arrow-back" size={24} color="#1E293B" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>{isEditing ? 'Edit Address' : 'Add Address'}</Text>
+        </View>
+      </View>
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -97,35 +114,60 @@ export default function AddAddressScreen() {
           showsVerticalScrollIndicator={false}
         >
           {/* Address Type */}
-          <Text style={styles.sectionTitle}>Address Type</Text>
+          <Text style={styles.sectionLabel}>Address Type</Text>
           <View style={styles.typeSelector}>
-            {ADDRESS_TYPES.map(({ type: t, icon }) => (
-              <TouchableOpacity
-                key={t}
-                style={[styles.typeOption, addressType === t && styles.typeOptionActive]}
-                onPress={() => setAddressType(t)}
-              >
-                <Ionicons
-                  name={icon}
-                  size={20}
-                  color={addressType === t ? '#FFFFFF' : colors.text.secondary}
-                />
-                <Text style={[styles.typeText, addressType === t && styles.typeTextActive]}>
-                  {t}
-                </Text>
-              </TouchableOpacity>
-            ))}
+            {ADDRESS_TYPES.map(({ type: t, icon }) => {
+              const isActive = addressType === t;
+              return (
+                <TouchableOpacity
+                  key={t}
+                  style={[styles.typeOption, isActive && styles.typeOptionActive]}
+                  onPress={() => {
+                    setAddressType(t);
+                    if (label === addressType) setLabel(t);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons
+                    name={icon}
+                    size={24}
+                    color={isActive ? '#2E7AD9' : '#64748B'}
+                  />
+                  <Text style={[styles.typeText, isActive && styles.typeTextActive]}>
+                    {t}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
+
+          {/* Custom Label (only for Other) */}
+          {addressType === 'Other' && (
+            <View style={styles.fieldGroup}>
+              <Text style={styles.fieldLabel}>Label</Text>
+              <TextInput
+                style={getInputStyle('label')}
+                value={label}
+                onChangeText={setLabel}
+                placeholder="e.g., Mom's House, Gym"
+                placeholderTextColor="#94A3B8"
+                onFocus={() => setFocusedField('label')}
+                onBlur={() => setFocusedField(null)}
+              />
+            </View>
+          )}
 
           {/* Country */}
           <View style={styles.fieldGroup}>
             <Text style={styles.fieldLabel}>Country</Text>
             <TextInput
-              style={styles.input}
+              style={getInputStyle('country')}
               value={country}
               onChangeText={setCountry}
               placeholder="United States"
-              placeholderTextColor={colors.text.muted}
+              placeholderTextColor="#94A3B8"
+              onFocus={() => setFocusedField('country')}
+              onBlur={() => setFocusedField(null)}
             />
           </View>
 
@@ -133,12 +175,14 @@ export default function AddAddressScreen() {
           <View style={styles.fieldGroup}>
             <Text style={styles.fieldLabel}>Street Address</Text>
             <TextInput
-              style={styles.input}
+              style={getInputStyle('street')}
               value={street}
               onChangeText={setStreet}
               placeholder="123 Main Street, Apt 4B"
-              placeholderTextColor={colors.text.muted}
+              placeholderTextColor="#94A3B8"
               autoCapitalize="words"
+              onFocus={() => setFocusedField('street')}
+              onBlur={() => setFocusedField(null)}
             />
           </View>
 
@@ -146,12 +190,14 @@ export default function AddAddressScreen() {
           <View style={styles.fieldGroup}>
             <Text style={styles.fieldLabel}>City</Text>
             <TextInput
-              style={styles.input}
+              style={getInputStyle('city')}
               value={city}
               onChangeText={setCity}
               placeholder="New York"
-              placeholderTextColor={colors.text.muted}
+              placeholderTextColor="#94A3B8"
               autoCapitalize="words"
+              onFocus={() => setFocusedField('city')}
+              onBlur={() => setFocusedField(null)}
             />
           </View>
 
@@ -160,25 +206,29 @@ export default function AddAddressScreen() {
             <View style={[styles.fieldGroup, { flex: 1 }]}>
               <Text style={styles.fieldLabel}>State</Text>
               <TextInput
-                style={styles.input}
+                style={getInputStyle('state')}
                 value={state}
                 onChangeText={setState}
                 placeholder="NY"
-                placeholderTextColor={colors.text.muted}
+                placeholderTextColor="#94A3B8"
                 autoCapitalize="characters"
                 maxLength={2}
+                onFocus={() => setFocusedField('state')}
+                onBlur={() => setFocusedField(null)}
               />
             </View>
             <View style={[styles.fieldGroup, { flex: 1 }]}>
               <Text style={styles.fieldLabel}>Zip Code</Text>
               <TextInput
-                style={styles.input}
+                style={getInputStyle('zipCode')}
                 value={zipCode}
                 onChangeText={setZipCode}
                 placeholder="10001"
-                placeholderTextColor={colors.text.muted}
+                placeholderTextColor="#94A3B8"
                 keyboardType="number-pad"
                 maxLength={10}
+                onFocus={() => setFocusedField('zipCode')}
+                onBlur={() => setFocusedField(null)}
               />
             </View>
           </View>
@@ -187,26 +237,47 @@ export default function AddAddressScreen() {
           <View style={styles.fieldGroup}>
             <Text style={styles.fieldLabel}>Delivery Instructions (Optional)</Text>
             <TextInput
-              style={[styles.input, styles.textArea]}
+              style={[...getInputStyle('instructions'), styles.textArea]}
               value={deliveryInstructions}
               onChangeText={setDeliveryInstructions}
               placeholder="e.g., Ring doorbell twice, Leave at door"
-              placeholderTextColor={colors.text.muted}
+              placeholderTextColor="#94A3B8"
               multiline
               numberOfLines={3}
               textAlignVertical="top"
+              onFocus={() => setFocusedField('instructions')}
+              onBlur={() => setFocusedField(null)}
             />
           </View>
         </ScrollView>
 
+        {/* Save Button */}
         <View style={styles.ctaContainer}>
-          <Button
-            title="Save Address"
+          <TouchableOpacity
             onPress={handleSave}
-            loading={isSaving}
-            fullWidth
-            disabled={!isFormValid}
-          />
+            disabled={!isFormValid || isSaving}
+            activeOpacity={0.8}
+            style={styles.saveButtonWrapper}
+          >
+            {isFormValid ? (
+              <LinearGradient
+                colors={['#2E7AD9', '#1E6AC9']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={[styles.saveButton, isSaving && { opacity: 0.7 }]}
+              >
+                {isSaving ? (
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                ) : (
+                  <Text style={styles.saveButtonText}>Save Address</Text>
+                )}
+              </LinearGradient>
+            ) : (
+              <View style={[styles.saveButton, styles.saveButtonDisabled]}>
+                <Text style={styles.saveButtonTextDisabled}>Save Address</Text>
+              </View>
+            )}
+          </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -216,80 +287,175 @@ export default function AddAddressScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#F0F7FF',
   },
+
+  // Glassmorphic Header
+  header: {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    paddingTop: Platform.OS === 'ios' ? 0 : 16,
+    paddingBottom: 24,
+    paddingHorizontal: 24,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(46, 122, 217, 0.08)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 15,
+    elevation: 8,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1E293B',
+  },
+
   keyboardView: {
     flex: 1,
   },
   scrollContent: {
-    padding: spacing.lg,
-    paddingBottom: spacing.xxl,
+    padding: 24,
+    paddingBottom: 32,
   },
-  sectionTitle: {
-    fontSize: 13,
-    fontWeight: '400',
-    color: colors.text.primary,
-    marginBottom: spacing.sm,
+
+  // Address Type Selector
+  sectionLabel: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#1E293B',
+    marginBottom: 12,
   },
   typeSelector: {
     flexDirection: 'row',
-    gap: spacing.sm,
-    marginBottom: spacing.xl,
+    gap: 12,
+    marginBottom: 24,
   },
   typeOption: {
-    flexDirection: 'row',
+    flex: 1,
+    paddingVertical: 16,
     alignItems: 'center',
-    gap: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderWidth: borderWidth.default,
-    borderColor: colors.border.default,
-    borderRadius: borderRadius.lg,
-    backgroundColor: colors.surface,
+    gap: 8,
+    borderWidth: 2,
+    borderColor: 'rgba(46, 122, 217, 0.15)',
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
   },
   typeOptionActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    backgroundColor: '#E8F1FC',
+    borderColor: '#2E7AD9',
+    shadowColor: '#2E7AD9',
+    shadowOpacity: 0.12,
   },
   typeText: {
-    fontSize: 13,
-    fontWeight: '400',
-    color: colors.text.primary,
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#64748B',
   },
   typeTextActive: {
-    color: '#FFFFFF',
+    color: '#2E7AD9',
+    fontWeight: '600',
   },
+
+  // Form Fields
   fieldGroup: {
-    marginBottom: spacing.md,
+    marginBottom: 20,
   },
   fieldLabel: {
-    fontSize: 12,
-    fontWeight: '400',
-    color: colors.text.secondary,
-    marginBottom: 6,
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#1E293B',
+    marginBottom: 8,
   },
   input: {
-    borderWidth: borderWidth.default,
-    borderColor: colors.border.default,
-    borderRadius: borderRadius.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 10,
-    fontSize: 14,
-    color: colors.text.primary,
+    borderWidth: 2,
+    borderColor: 'rgba(46, 122, 217, 0.15)',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 15,
+    color: '#1E293B',
     backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  inputFocused: {
+    borderColor: '#2E7AD9',
+    shadowColor: '#2E7AD9',
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
   },
   textArea: {
-    height: 80,
-    paddingTop: 10,
+    height: 88,
+    paddingTop: 14,
   },
   row: {
     flexDirection: 'row',
-    gap: spacing.md,
+    gap: 16,
   },
+
+  // CTA
   ctaContainer: {
-    padding: spacing.lg,
-    backgroundColor: '#FFFFFF',
-    borderTopWidth: borderWidth.thin,
+    padding: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderTopWidth: 1,
     borderTopColor: 'rgba(46, 122, 217, 0.1)',
+  },
+  saveButtonWrapper: {
+    width: '100%',
+  },
+  saveButton: {
+    width: '100%',
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#2E7AD9',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  saveButtonDisabled: {
+    backgroundColor: '#CBD5E1',
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  saveButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  saveButtonTextDisabled: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#94A3B8',
   },
 });

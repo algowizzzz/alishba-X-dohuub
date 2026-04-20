@@ -9,35 +9,34 @@ import {
   SafeAreaView,
   KeyboardAvoidingView,
   Platform,
+  TextInput,
+  ActivityIndicator,
+  Image,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../src/store/authStore';
-import { colors, spacing, fontSize, borderRadius, borderWidth } from '../../src/constants/theme';
-import { ScreenHeader } from '../../src/components/composite';
-import { Button, Input } from '../../src/components/ui';
+import { LinearGradient } from 'expo-linear-gradient';
 
-/**
- * Edit Profile screen matching wireframe:
- * - Profile photo with edit option
- * - Name field
- * - Email field (read-only)
- * - Phone field
- * - Save button
- */
 export default function EditProfileScreen() {
   const { user, updateProfile, isLoading } = useAuthStore();
-  const [firstName, setFirstName] = useState(user?.profile?.firstName || '');
-  const [lastName, setLastName] = useState(user?.profile?.lastName || '');
+  const [fullName, setFullName] = useState(
+    [user?.profile?.firstName, user?.profile?.lastName].filter(Boolean).join(' ') || ''
+  );
   const [phone, setPhone] = useState(user?.profile?.phone || '');
+  const [focusedField, setFocusedField] = useState<string | null>(null);
 
   const handlePhotoPress = () => {
     Alert.alert('Coming Soon', 'Photo upload will be available soon!');
   };
 
   const handleSave = async () => {
-    if (!firstName.trim()) {
-      Alert.alert('Error', 'Please enter your first name');
+    const nameParts = fullName.trim().split(/\s+/);
+    const firstName = nameParts[0] || '';
+    const lastName = nameParts.slice(1).join(' ') || '';
+
+    if (!firstName) {
+      Alert.alert('Error', 'Please enter your name');
       return;
     }
 
@@ -52,7 +51,15 @@ export default function EditProfileScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScreenHeader title="Edit Profile" showBack />
+      {/* Glassmorphic Header */}
+      <View style={styles.header}>
+        <View style={styles.headerContent}>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={20} color="#1E293B" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Edit Profile</Text>
+        </View>
+      </View>
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -63,58 +70,88 @@ export default function EditProfileScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          {/* Profile Photo */}
-          <TouchableOpacity style={styles.photoContainer} onPress={handlePhotoPress}>
-            <View style={styles.photoCircle}>
-              <Ionicons name="person" size={48} color={colors.text.muted} />
+          {/* Profile Avatar */}
+          <View style={styles.avatarSection}>
+            <View style={styles.avatarWrapper}>
+              <View style={styles.avatarCircle}>
+                <Ionicons name="person" size={56} color="#64748B" />
+              </View>
+              <TouchableOpacity style={styles.cameraButton} onPress={handlePhotoPress}>
+                <LinearGradient
+                  colors={['#2E7AD9', '#1E6AC9']}
+                  style={styles.cameraGradient}
+                >
+                  <Ionicons name="camera" size={20} color="#FFFFFF" />
+                </LinearGradient>
+              </TouchableOpacity>
             </View>
-            <View style={styles.photoEditBadge}>
-              <Ionicons name="camera" size={16} color={colors.text.inverse} />
-            </View>
-          </TouchableOpacity>
+          </View>
 
           {/* Form Fields */}
           <View style={styles.form}>
-            <Input
-              label="First Name"
-              placeholder="Enter your first name"
-              value={firstName}
-              onChangeText={setFirstName}
-              autoCapitalize="words"
-            />
+            {/* Full Name */}
+            <View style={styles.fieldContainer}>
+              <Text style={styles.label}>Full Name</Text>
+              <TextInput
+                style={[
+                  styles.input,
+                  focusedField === 'name' && styles.inputFocused,
+                ]}
+                value={fullName}
+                onChangeText={setFullName}
+                onFocus={() => setFocusedField('name')}
+                onBlur={() => setFocusedField(null)}
+                placeholder="Enter your full name"
+                placeholderTextColor="#94A3B8"
+                autoCapitalize="words"
+              />
+            </View>
 
-            <Input
-              label="Last Name"
-              placeholder="Enter your last name"
-              value={lastName}
-              onChangeText={setLastName}
-              autoCapitalize="words"
-            />
+            {/* Phone Number */}
+            <View style={styles.fieldContainer}>
+              <Text style={styles.label}>Phone Number</Text>
+              <TextInput
+                style={[
+                  styles.input,
+                  focusedField === 'phone' && styles.inputFocused,
+                ]}
+                value={phone}
+                onChangeText={setPhone}
+                onFocus={() => setFocusedField('phone')}
+                onBlur={() => setFocusedField(null)}
+                placeholder="(555) 123-4567"
+                placeholderTextColor="#94A3B8"
+                keyboardType="phone-pad"
+              />
+            </View>
 
-            <Input
-              label="Email"
-              value={user?.email || ''}
-              editable={false}
-              containerStyle={styles.disabledInput}
-            />
-
-            <Input
-              label="Phone Number"
-              placeholder="Enter your phone number"
-              value={phone}
-              onChangeText={setPhone}
-              keyboardType="phone-pad"
-            />
+            {/* Email (disabled) */}
+            <View style={styles.fieldContainer}>
+              <Text style={styles.label}>Email</Text>
+              <TextInput
+                style={[styles.input, styles.inputDisabled]}
+                value={user?.email || ''}
+                editable={false}
+              />
+              <Text style={styles.emailHint}>Email cannot be changed</Text>
+            </View>
           </View>
         </ScrollView>
 
-        <View style={styles.ctaContainer}>
-          <Button
-            title="Save Changes"
+        {/* Footer with Save Button */}
+        <View style={styles.footer}>
+          <TouchableOpacity
+            style={styles.saveButton}
             onPress={handleSave}
-            loading={isLoading}
-            fullWidth
-          />
+            disabled={isLoading}
+            activeOpacity={0.85}
+          >
+            {isLoading ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.saveButtonText}>Save Changes</Text>
+            )}
+          </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -124,51 +161,148 @@ export default function EditProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#F0F7FF',
+  },
+  header: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 24,
+    paddingVertical: 20,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(46, 122, 217, 0.08)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 15,
+    elevation: 4,
+    zIndex: 50,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1E293B',
   },
   keyboardView: {
     flex: 1,
   },
   scrollContent: {
-    padding: spacing.lg,
-    paddingBottom: spacing.xxl,
+    paddingHorizontal: 24,
+    paddingTop: 32,
+    paddingBottom: 24,
   },
-  photoContainer: {
-    alignSelf: 'center',
-    marginBottom: spacing.xl,
-    marginTop: spacing.lg,
+  avatarSection: {
+    alignItems: 'center',
+    marginBottom: 32,
   },
-  photoCircle: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+  avatarWrapper: {
+    position: 'relative',
+  },
+  avatarCircle: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
     backgroundColor: 'rgba(46, 122, 217, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 3,
+    borderColor: '#2E7AD9',
   },
-  photoEditBadge: {
+  cameraButton: {
     position: 'absolute',
     bottom: 0,
     right: 0,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.primary,
-    borderWidth: borderWidth.default,
-    borderColor: colors.background,
+  },
+  cameraGradient: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#2E7AD9',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
   },
   form: {
-    gap: spacing.xs,
+    gap: 20,
   },
-  disabledInput: {
-    opacity: 0.6,
+  fieldContainer: {
+    // each field block
   },
-  ctaContainer: {
-    padding: spacing.lg,
-    borderTopWidth: borderWidth.thin,
+  label: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#1E293B',
+    marginBottom: 8,
+  },
+  input: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: 'rgba(46, 122, 217, 0.15)',
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+    color: '#1E293B',
+  },
+  inputFocused: {
+    borderColor: '#2E7AD9',
+    shadowColor: '#2E7AD9',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  inputDisabled: {
+    backgroundColor: '#F1F5F9',
+    color: '#64748B',
+  },
+  emailHint: {
+    marginTop: 6,
+    fontSize: 13,
+    color: '#64748B',
+  },
+  footer: {
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    borderTopWidth: 1,
     borderTopColor: 'rgba(46, 122, 217, 0.1)',
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+  },
+  saveButton: {
+    backgroundColor: '#2E7AD9',
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#2E7AD9',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 5,
+  },
+  saveButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
-

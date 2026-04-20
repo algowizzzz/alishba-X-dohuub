@@ -17,6 +17,12 @@ import { colors, spacing, fontSize, borderRadius, borderWidth } from '../../../.
 import { getCleaningListings, getVendorById } from '../../../../src/lib/queries';
 import { useAuthStore } from '../../../../src/store/authStore';
 
+const cleaningLogos = [
+  require('../../../../assets/cleaning/logos/logo1.png'),
+  require('../../../../assets/cleaning/logos/logo2.png'),
+  require('../../../../assets/cleaning/logos/logo3.png'),
+];
+
 const TIME_SLOTS = [
   '8:00 AM', '9:00 AM', '10:00 AM', '11:00 AM',
   '12:00 PM', '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM',
@@ -104,24 +110,25 @@ export default function BookingScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
+      {/* Header — glassmorphic matching boss */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Book Service</Text>
-        <View style={styles.backBtn} />
+        <View style={styles.headerInner}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+            <Ionicons name="arrow-back" size={20} color="#1E293B" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Book Service</Text>
+        </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
 
-        {/* Service Card */}
+        {/* Service Card — with real logo image */}
         <View style={styles.serviceCard}>
-          <View style={styles.serviceLogoCircle}>
-            {vendor?.logo
-              ? <Image source={{ uri: vendor.logo }} style={styles.serviceLogoImg} />
-              : <Ionicons name="sparkles" size={24} color={colors.primary} />}
-          </View>
+          <Image
+            source={vendor?.logo ? { uri: vendor.logo } : cleaningLogos[parseInt(id, 10) % cleaningLogos.length || 0]}
+            style={styles.serviceLogoImg}
+            resizeMode="cover"
+          />
           <View style={styles.serviceInfo}>
             <Text style={styles.serviceName}>{listing?.title || 'Cleaning Service'}</Text>
             <Text style={styles.vendorName}>{vendor?.businessName || 'Service Provider'}</Text>
@@ -242,6 +249,33 @@ export default function BookingScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Redeem Points */}
+        <View style={styles.section}>
+          <View style={styles.redeemCard}>
+            <View style={styles.redeemRow}>
+              <View style={styles.redeemIconBox}>
+                <Ionicons name="gift" size={20} color="#F59E0B" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.redeemTitle}>Redeem Points</Text>
+                <Text style={styles.redeemSub}>Use your points for a discount</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* Points Preview Banner */}
+        <View style={styles.pointsPreview}>
+          <View style={styles.pointsPreviewRow}>
+            <View style={styles.pointsPreviewLeft}>
+              <Ionicons name="gift" size={20} color="#F59E0B" />
+              <Text style={styles.pointsPreviewLabel}>Points you'll earn</Text>
+            </View>
+            <Text style={styles.pointsPreviewValue}>+{listing?.basePrice || 0} pts</Text>
+          </View>
+          <Text style={styles.pointsPreviewSub}>1 point per $1 spent • Added after service completion</Text>
+        </View>
+
         {/* Price Summary */}
         <View style={styles.priceSummary}>
           <View style={styles.priceRow}>
@@ -271,65 +305,70 @@ export default function BookingScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1, backgroundColor: '#F0F7FF' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
   header: {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    paddingTop: 16,
+    paddingBottom: 24,
+    paddingHorizontal: 24,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 30,
+    elevation: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(46, 122, 217, 0.08)',
+  },
+  headerInner: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 8,
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.sm,
-    backgroundColor: colors.background,
-    borderBottomWidth: borderWidth.thin,
-    borderBottomColor: 'rgba(46,122,217,0.08)',
+    gap: 16,
   },
-  backBtn: { padding: spacing.xs, width: 36 },
+  backBtn: {
+    width: 40, height: 40, borderRadius: 12,
+    backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
+  },
   headerTitle: {
-    flex: 1,
-    fontSize: fontSize.lg,
+    fontSize: 18,
     fontWeight: '600',
-    color: colors.text.primary,
-    textAlign: 'center',
+    color: '#1E293B',
   },
 
-  scrollContent: { padding: spacing.lg },
+  scrollContent: { padding: 24 },
 
   // Service card
   serviceCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    borderWidth: borderWidth.thin,
-    borderColor: 'rgba(46,122,217,0.1)',
-    padding: spacing.md,
-    marginBottom: spacing.xl,
+    gap: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  serviceLogoCircle: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: colors.secondary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden',
-  },
-  serviceLogoImg: { width: 52, height: 52, borderRadius: 26 },
+  serviceLogoImg: { width: 64, height: 64, borderRadius: 12 },
   serviceInfo: { flex: 1 },
-  serviceName: { fontSize: fontSize.md, fontWeight: '700', color: colors.text.primary, marginBottom: 2 },
-  vendorName: { fontSize: fontSize.sm, color: colors.text.secondary, marginBottom: 4 },
-  servicePrice: { fontSize: fontSize.sm, fontWeight: '600', color: colors.primary },
+  serviceName: { fontSize: 15, fontWeight: '600', color: '#1E293B', marginBottom: 4 },
+  vendorName: { fontSize: 13, color: '#64748B', marginBottom: 4 },
+  servicePrice: { fontSize: 15, fontWeight: '600', color: '#2E7AD9' },
 
   // Sections
-  section: { marginBottom: spacing.xl },
+  section: { marginBottom: 16 },
   sectionTitle: {
-    fontSize: fontSize.md,
-    fontWeight: '600',
-    color: colors.text.primary,
-    marginBottom: spacing.sm,
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#1E293B',
+    marginBottom: 8,
   },
 
   // Picker rows
@@ -337,25 +376,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    borderWidth: borderWidth.thin,
-    borderColor: 'rgba(46,122,217,0.1)',
-    padding: spacing.md,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(46, 122, 217, 0.15)',
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  pickerLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flex: 1 },
+  pickerLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
   pickerIconBox: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.secondary,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#E8F1FC',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  pickerText: { fontSize: fontSize.md, color: colors.text.muted },
-  pickerTextSelected: { fontSize: fontSize.md, color: colors.text.primary, fontWeight: '500' },
-  addressLabel: { fontSize: fontSize.md, fontWeight: '500', color: colors.text.primary },
-  addressSub: { fontSize: fontSize.sm, color: colors.text.secondary, marginTop: 1 },
+  pickerText: { fontSize: 15, color: '#64748B' },
+  pickerTextSelected: { fontSize: 15, color: '#1E293B', fontWeight: '500' },
+  addressLabel: { fontSize: 15, fontWeight: '500', color: '#1E293B' },
+  addressSub: { fontSize: 13, color: '#64748B', marginTop: 1 },
 
   // Date dropdown
   dateDropdown: {
@@ -417,42 +461,80 @@ const styles = StyleSheet.create({
 
   // Price summary
   priceSummary: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    borderWidth: borderWidth.thin,
-    borderColor: 'rgba(46,122,217,0.08)',
-    padding: spacing.md,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  priceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.xs },
-  priceSummaryLabel: { fontSize: fontSize.md, color: colors.text.secondary },
-  priceSummaryValue: { fontSize: fontSize.md, fontWeight: '600', color: colors.text.primary },
-  priceNote: { fontSize: fontSize.xs, color: colors.text.muted, marginTop: 2 },
+  priceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  priceSummaryLabel: { fontSize: 14, color: '#64748B' },
+  priceSummaryValue: { fontSize: 15, fontWeight: '500', color: '#1E293B' },
+  priceNote: { fontSize: 12, color: '#64748B', marginTop: 4 },
+
+  // Redeem Points
+  redeemCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  redeemRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  redeemIconBox: {
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  redeemTitle: { fontSize: 15, fontWeight: '600', color: '#B45309' },
+  redeemSub: { fontSize: 12, color: '#D97706', marginTop: 2 },
+
+  // Points Preview
+  pointsPreview: {
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.3)',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+  },
+  pointsPreviewRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  pointsPreviewLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  pointsPreviewLabel: { fontSize: 14, fontWeight: '500', color: '#B45309' },
+  pointsPreviewValue: { fontSize: 18, fontWeight: '700', color: '#F59E0B' },
+  pointsPreviewSub: { fontSize: 12, color: '#B45309', marginTop: 4 },
 
   // CTA
   ctaContainer: {
     position: 'absolute',
     bottom: 0, left: 0, right: 0,
-    padding: spacing.lg,
+    padding: 24,
     paddingBottom: 28,
-    backgroundColor: colors.background,
-    borderTopWidth: borderWidth.thin,
-    borderTopColor: 'rgba(46,122,217,0.1)',
+    backgroundColor: '#F0F7FF',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(46, 122, 217, 0.1)',
   },
   confirmBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: borderRadius.lg,
-    paddingVertical: spacing.md,
+    backgroundColor: '#2E7AD9',
+    borderRadius: 12,
+    paddingVertical: 16,
     alignItems: 'center',
   },
   confirmBtnDisabled: {
-    backgroundColor: 'rgba(46,122,217,0.2)',
+    backgroundColor: '#E8F1FC',
   },
   confirmBtnText: {
-    fontSize: fontSize.md,
+    fontSize: 16,
     fontWeight: '600',
     color: '#FFFFFF',
   },
   confirmBtnTextDisabled: {
-    color: 'rgba(46,122,217,0.5)',
+    color: '#94A3B8',
   },
 });

@@ -16,6 +16,13 @@ import { Button, Rating, ImageCarousel, PoweredByDoHuubBadge } from '../../../sr
 import { getVendorById, getCleaningListings, getReviewsByVendor } from '../../../src/lib/queries';
 import { getServiceImages } from '../../../src/constants/serviceImages';
 
+// Boss cleaning logos for vendor display
+const cleaningLogos = [
+  require('../../../assets/cleaning/logos/logo1.png'),
+  require('../../../assets/cleaning/logos/logo2.png'),
+  require('../../../assets/cleaning/logos/logo3.png'),
+];
+
 const MOCK_VENDORS: Record<string, any> = {
   '1': { id: '1', businessName: 'Sparkle Clean Co.',    rating: 4.9, reviewCount: 312, isMichelle: true,  description: 'Top-rated cleaning service with certified professionals. We deliver spotless results every time.' },
   '2': { id: '2', businessName: 'ProClean Services',    rating: 4.8, reviewCount: 198, isMichelle: true,  description: 'Professional cleaning for homes and offices. Eco-friendly products and reliable staff.' },
@@ -81,31 +88,40 @@ function VendorPage({ vendorId }: { vendorId: string }) {
     <SafeAreaView style={styles.container}>
       <Header title={vendor.businessName} />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {/* Vendor Header Card */}
-        <View style={styles.vendorCard}>
-          <View style={styles.vendorLogoCircle}>
-            {vendor.logo
-              ? <Image source={{ uri: vendor.logo }} style={styles.vendorLogo} />
-              : <Ionicons name="sparkles" size={28} color={colors.primary} />}
-          </View>
-          <View style={styles.vendorCardInfo}>
-            <Text style={styles.vendorName}>{vendor.businessName}</Text>
-            {vendor.isMichelle && <PoweredByDoHuubBadge />}
-            <View style={styles.ratingRow}>
-              <Ionicons name="star" size={14} color="#F59E0B" />
-              <Text style={styles.ratingText}>
-                {(vendor.rating ?? 4.9).toFixed(1)} ({vendor.reviewCount ?? 0} reviews)
-              </Text>
+        {/* Vendor Summary — white card matching boss */}
+        <View style={styles.vendorSummaryCard}>
+          <View style={styles.vendorCardRow}>
+            <View style={styles.vendorLogoCircle}>
+              <Image
+                source={vendor.logo ? { uri: vendor.logo } : cleaningLogos[parseInt(vendorId, 10) % cleaningLogos.length || 0]}
+                style={styles.vendorLogo}
+                resizeMode="cover"
+              />
+            </View>
+            <View style={styles.vendorCardInfo}>
+              <View style={styles.vendorNameRow}>
+                <Text style={styles.vendorName}>{vendor.businessName}</Text>
+                {vendor.isMichelle && (
+                  <View style={styles.dohuubBadge}>
+                    <Text style={styles.dohuubBadgeText}>Powered by DoHuub</Text>
+                  </View>
+                )}
+              </View>
+              <View style={styles.ratingRow}>
+                <Ionicons name="star" size={14} color="#FACC15" />
+                <Text style={styles.ratingValue}>{(vendor.rating ?? 4.9).toFixed(1)}</Text>
+                <Text style={styles.reviewCountText}>({vendor.reviewCount ?? 0} reviews)</Text>
+              </View>
             </View>
           </View>
-        </View>
 
-        <TouchableOpacity
-          style={styles.viewProfileBtn}
-          onPress={() => router.push({ pathname: '/vendor/[id]', params: { id: vendorId, name: vendor?.businessName, category: 'cleaning' } } as any)}
-        >
-          <Text style={styles.viewProfileText}>View Vendor Profile</Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.viewProfileBtn}
+            onPress={() => router.push({ pathname: '/vendor/[id]', params: { id: vendorId, name: vendor?.businessName, category: 'cleaning' } } as any)}
+          >
+            <Text style={styles.viewProfileText}>View Vendor Profile</Text>
+          </TouchableOpacity>
+        </View>
 
         <PointsBanner />
 
@@ -337,15 +353,22 @@ function ServiceDetailPage({ vendorId, listingId }: { vendorId: string; listingI
   );
 }
 
-// ─── Shared Header ────────────────────────────────────────────────────────────
+// ─── Shared Header — matching boss glassmorphic style ─────────────────────────
 function Header({ title }: { title: string }) {
   return (
     <View style={styles.header}>
-      <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-        <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
-      </TouchableOpacity>
-      <Text style={styles.headerTitle} numberOfLines={1}>{title}</Text>
-      <View style={styles.backBtn} />
+      <View style={styles.headerInner}>
+        <TouchableOpacity onPress={() => {
+          if (router.canGoBack()) {
+            router.back();
+          } else {
+            router.replace('/(tabs)/services/cleaning');
+          }
+        }} style={styles.backBtn}>
+          <Ionicons name="arrow-back" size={20} color="#1E293B" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle} numberOfLines={1}>{title}</Text>
+      </View>
     </View>
   );
 }
@@ -361,119 +384,174 @@ export default function CleaningDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1, backgroundColor: '#F0F7FF' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   errorText: { fontSize: fontSize.md, color: colors.text.secondary },
   scrollContent: { paddingBottom: 24 },
 
   header: {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    paddingTop: 16,
+    paddingBottom: 24,
+    paddingHorizontal: 24,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 30,
+    elevation: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(46, 122, 217, 0.08)',
+  },
+  headerInner: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 8,
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.sm,
-    backgroundColor: colors.background,
-    borderBottomWidth: borderWidth.thin,
-    borderBottomColor: 'rgba(46,122,217,0.08)',
+    gap: 16,
   },
-  backBtn: { padding: spacing.xs, width: 36 },
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+  },
   headerTitle: {
     flex: 1,
-    fontSize: fontSize.md,
+    fontSize: 18,
     fontWeight: '600',
-    color: colors.text.primary,
-    textAlign: 'center',
+    color: '#1E293B',
   },
 
-  // Vendor page
-  vendorCard: {
+  // Vendor summary white card — matching boss
+  vendorSummaryCard: {
+    marginHorizontal: 24,
+    marginTop: 24,
+    marginBottom: 16,
+    padding: 20,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(46, 122, 217, 0.1)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  vendorCardRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
-    margin: spacing.lg,
-    padding: spacing.md,
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    borderWidth: borderWidth.thin,
-    borderColor: 'rgba(46,122,217,0.08)',
+    gap: 16,
+    marginBottom: 16,
   },
   vendorLogoCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: colors.secondary,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#E3F0FF',
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 4,
   },
-  vendorLogo: { width: 60, height: 60, borderRadius: 30 },
-  vendorCardInfo: { flex: 1, gap: 4 },
-  vendorName: { fontSize: fontSize.lg, fontWeight: '700', color: colors.text.primary },
+  vendorLogo: { width: 80, height: 80, borderRadius: 40 },
+  vendorCardInfo: { flex: 1, gap: 6 },
+  vendorNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  vendorName: { fontSize: 18, fontWeight: '700', color: '#1E293B' },
+  dohuubBadge: {
+    backgroundColor: '#2E7AD9',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  dohuubBadgeText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  ratingValue: { fontSize: 14, fontWeight: '500', color: '#1E293B' },
+  reviewCountText: { fontSize: 14, color: '#64748B' },
   ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
   ratingText: { fontSize: fontSize.sm, color: colors.text.secondary },
 
   viewProfileBtn: {
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.md,
-    paddingVertical: spacing.sm,
-    borderWidth: borderWidth.default,
-    borderColor: colors.border.default,
-    borderRadius: borderRadius.lg,
+    paddingVertical: 12,
+    borderWidth: 2,
+    borderColor: 'rgba(46, 122, 217, 0.15)',
+    borderRadius: 12,
     alignItems: 'center',
-    backgroundColor: colors.surface,
+    backgroundColor: '#FFFFFF',
   },
-  viewProfileText: { fontSize: fontSize.sm, fontWeight: '500', color: colors.text.primary },
+  viewProfileText: { fontSize: 15, fontWeight: '500', color: '#1E293B' },
 
   section: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderTopWidth: borderWidth.thin,
-    borderTopColor: 'rgba(46,122,217,0.08)',
+    paddingHorizontal: 24,
+    paddingVertical: 16,
   },
-  sectionTitle: { fontSize: fontSize.lg, fontWeight: '600', color: colors.text.primary, marginBottom: spacing.md },
+  sectionTitle: { fontSize: 16, fontWeight: '600', color: '#1E293B', marginBottom: 16 },
 
-  // Services grid
+  // Services grid — matching boss 2-col with image cards
   servicesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: spacing.md,
+    gap: 16,
   },
   serviceCard: {
     width: '47%',
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
     overflow: 'hidden',
-    borderWidth: borderWidth.thin,
-    borderColor: 'rgba(46,122,217,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(46, 122, 217, 0.15)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  serviceCardImage: { width: '100%', height: 110, backgroundColor: colors.secondary },
-  serviceCardInfo: { padding: spacing.sm, gap: 3 },
-  serviceCardName: { fontSize: fontSize.sm, fontWeight: '600', color: colors.text.primary },
-  serviceCardRating: { fontSize: 12, color: colors.text.secondary },
-  serviceCardDesc: { fontSize: 11, color: colors.text.muted, lineHeight: 16 },
-  serviceCardPrice: { fontSize: fontSize.sm, fontWeight: '700', color: colors.primary, marginTop: 2 },
+  serviceCardImage: { width: '100%', height: 96, backgroundColor: '#E3F0FF' },
+  serviceCardInfo: { padding: 12, gap: 4 },
+  serviceCardName: { fontSize: 14, fontWeight: '500', color: '#1E293B' },
+  serviceCardRating: { fontSize: 12, color: '#1E293B' },
+  serviceCardDesc: { fontSize: 12, color: '#64748B', lineHeight: 16 },
+  serviceCardPrice: { fontSize: 14, fontWeight: '600', color: '#2E7AD9', marginTop: 4 },
 
   // Points Banner
   pointsBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.md,
-    padding: spacing.md,
-    borderRadius: borderRadius.lg,
-    backgroundColor: 'rgba(245,158,11,0.08)',
+    marginHorizontal: 24,
+    marginBottom: 24,
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
     borderWidth: 1,
-    borderColor: 'rgba(245,158,11,0.25)',
-    gap: spacing.md,
+    borderColor: 'rgba(245, 158, 11, 0.3)',
+    gap: 12,
   },
   pointsIcon: {
-    width: 36, height: 36, borderRadius: 18,
-    backgroundColor: 'rgba(245,158,11,0.15)',
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: 'rgba(245, 158, 11, 0.2)',
     justifyContent: 'center', alignItems: 'center',
   },
-  pointsTitle: { fontSize: fontSize.sm, fontWeight: '600', color: 'rgb(180,83,9)' },
-  pointsSub: { fontSize: 11, color: 'rgb(180,83,9)', opacity: 0.85, marginTop: 2 },
+  pointsTitle: { fontSize: 14, fontWeight: '600', color: 'rgb(180, 83, 9)' },
+  pointsSub: { fontSize: 12, color: 'rgb(217, 119, 6)', marginTop: 2 },
 
   // Service detail
   detailTitleSection: { padding: spacing.lg, gap: spacing.xs },
@@ -568,10 +646,10 @@ const styles = StyleSheet.create({
 
   cta: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
-    padding: spacing.lg,
+    padding: 24,
     paddingBottom: 28,
-    backgroundColor: colors.background,
-    borderTopWidth: borderWidth.thin,
-    borderTopColor: 'rgba(46,122,217,0.1)',
+    backgroundColor: '#F0F7FF',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(46, 122, 217, 0.1)',
   },
 });

@@ -26,10 +26,10 @@ const MOCK_VENDORS: Record<string, any> = {
 };
 
 const MOCK_LISTINGS = [
-  { id: 'l1', title: 'Plumbing Repair',       basePrice: 85,  priceUnit: 'per_job', rating: 4.8, description: 'Fix leaks, unclog drains, and replace fixtures.',         images: [] },
-  { id: 'l2', title: 'Electrical Work',        basePrice: 120, priceUnit: 'per_job', rating: 4.9, description: 'Outlet installation, wiring, panel upgrades.',            images: [] },
-  { id: 'l3', title: 'Furniture Assembly',     basePrice: 60,  priceUnit: 'per_job', rating: 4.7, description: 'IKEA and flat-pack furniture assembled quickly.',          images: [] },
-  { id: 'l4', title: 'TV & Appliance Install', basePrice: 75,  priceUnit: 'per_job', rating: 4.8, description: 'TV mounting, washing machine and dishwasher installation.', images: [] },
+  { id: 'l1', title: 'Plumbing Repair',       basePrice: 85,  priceUnit: 'per_job', rating: 4.8, duration: '1-2 hours', description: 'Fix leaks, unclog drains, and replace fixtures.',         images: [], whatsIncluded: ['Professional-grade tools and equipment', 'Experienced and licensed professionals', 'Quality parts and materials included', 'Clean-up after job completion'] },
+  { id: 'l2', title: 'Electrical Work',        basePrice: 120, priceUnit: 'per_job', rating: 4.9, duration: '1-3 hours', description: 'Outlet installation, wiring, panel upgrades.',            images: [], whatsIncluded: ['Licensed electrician', 'Safety inspection included', 'Quality wiring materials', 'Clean-up after job completion'] },
+  { id: 'l3', title: 'Furniture Assembly',     basePrice: 60,  priceUnit: 'per_job', rating: 4.7, duration: '1-2 hours', description: 'IKEA and flat-pack furniture assembled quickly.',          images: [], whatsIncluded: ['Professional assembly tools', 'Experienced assemblers', 'Hardware inspection', 'Clean-up after completion'] },
+  { id: 'l4', title: 'TV & Appliance Install', basePrice: 75,  priceUnit: 'per_job', rating: 4.8, duration: '1 hour', description: 'TV mounting, washing machine and dishwasher installation.', images: [], whatsIncluded: ['Wall bracket included', 'Cable management', 'Safety secured mounting', 'Clean-up after installation'] },
 ];
 
 const PointsBanner = () => (
@@ -83,31 +83,33 @@ function VendorPage({ vendorId }: { vendorId: string }) {
     <SafeAreaView style={styles.container}>
       <Header title={vendor.businessName} />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {/* Vendor Header Card */}
+        {/* Vendor Header Card — with View Profile inside */}
         <View style={styles.vendorCard}>
-          <View style={styles.vendorLogoCircle}>
-            {vendor.logo
-              ? <Image source={{ uri: vendor.logo }} style={styles.vendorLogo} />
-              : <Ionicons name="construct-outline" size={28} color={ACCENT} />}
-          </View>
-          <View style={styles.vendorCardInfo}>
-            <Text style={styles.vendorName}>{vendor.businessName}</Text>
-            {vendor.isMichelle && <PoweredByDoHuubBadge />}
-            <View style={styles.ratingRow}>
-              <Ionicons name="star" size={14} color="#F59E0B" />
-              <Text style={styles.ratingText}>
-                {(vendor.rating ?? 4.9).toFixed(1)} ({vendor.reviewCount ?? 0} reviews)
-              </Text>
+          <View style={styles.vendorCardRow}>
+            <View style={styles.vendorLogoCircle}>
+              {vendor.logo
+                ? <Image source={{ uri: vendor.logo }} style={styles.vendorLogo} />
+                : <Ionicons name="construct-outline" size={28} color={ACCENT} />}
+            </View>
+            <View style={styles.vendorCardInfo}>
+              <Text style={styles.vendorName}>{vendor.businessName}</Text>
+              {vendor.isMichelle && <PoweredByDoHuubBadge />}
+              <View style={styles.ratingRow}>
+                <Ionicons name="star" size={14} color="#F59E0B" />
+                <Text style={styles.ratingText}>
+                  {(vendor.rating ?? 4.9).toFixed(1)} ({vendor.reviewCount ?? 0} reviews)
+                </Text>
+              </View>
             </View>
           </View>
-        </View>
 
-        <TouchableOpacity
-          style={styles.viewProfileBtn}
-          onPress={() => router.push({ pathname: '/vendor/[id]', params: { id: vendorId, name: vendor?.businessName, category: 'handyman' } } as any)}
-        >
-          <Text style={styles.viewProfileText}>View Vendor Profile</Text>
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.viewProfileBtn}
+            onPress={() => router.push({ pathname: '/vendor/[id]', params: { id: vendorId, name: vendor?.businessName, category: 'handyman' } } as any)}
+          >
+            <Text style={styles.viewProfileText}>View Vendor Profile</Text>
+          </TouchableOpacity>
+        </View>
 
         <PointsBanner />
 
@@ -234,17 +236,26 @@ function ServiceDetailPage({ vendorId, listingId }: { vendorId: string; listingI
 
         <PointsBanner />
 
-        {/* Pricing */}
+        {/* Pricing & Duration */}
         <View style={styles.section}>
           <View style={styles.pricingRow}>
             <View style={styles.pricingLeft}>
-              <Ionicons name="cash-outline" size={18} color={colors.primary} />
+              <Ionicons name="cash-outline" size={18} color="#2E7AD9" />
               <Text style={styles.pricingLabel}>Pricing</Text>
             </View>
             <Text style={styles.pricingValue}>
-              ${listing.hourlyRate || listing.basePrice}/{listing.priceUnit?.replace('per_', '') || 'hr'}
+              ${listing.hourlyRate || listing.basePrice}/{listing.priceUnit?.replace('per_', '') || 'job'}
             </Text>
           </View>
+          {(listing.duration) && (
+            <View style={[styles.pricingRow, { marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(46, 122, 217, 0.08)' }]}>
+              <View style={styles.pricingLeft}>
+                <Ionicons name="time-outline" size={18} color="#2E7AD9" />
+                <Text style={styles.pricingLabel}>Duration</Text>
+              </View>
+              <Text style={styles.pricingValue}>{listing.duration}</Text>
+            </View>
+          )}
         </View>
 
         {/* What's Included */}
@@ -294,20 +305,28 @@ function ServiceDetailPage({ vendorId, listingId }: { vendorId: string; listingI
             </View>
           )) : (
             [
-              { id: 'm1', name: 'Mike T.', date: '3 days ago', rating: 5, comment: 'Fixed everything quickly and professionally. Highly recommend!' },
-              { id: 'm2', name: 'Lisa K.', date: '2 weeks ago', rating: 5, comment: 'Great work, very reliable and affordable.' },
+              { id: 'm1', name: 'Mike T.', date: '1 day ago', rating: 5, comment: 'Fixed everything quickly and professionally. The electrician was knowledgeable and completed the job ahead of schedule.' },
+              { id: 'm2', name: 'Lisa K.', date: '1 week ago', rating: 5, comment: 'Great work, very reliable and affordable. Cleaned up everything after the job was done.' },
+              { id: 'm3', name: 'Carlos R.', date: '2 weeks ago', rating: 4, comment: 'Good service overall. Arrived on time and did quality work.' },
             ].map((mock) => (
               <View key={mock.id} style={styles.reviewCard}>
-                <View style={styles.reviewTopRow}>
-                  <Text style={styles.reviewerName}>{mock.name}</Text>
-                  <Text style={styles.reviewDate}>{mock.date}</Text>
+                <View style={styles.reviewCardInner}>
+                  <View style={styles.reviewAvatar}>
+                    <Ionicons name="person" size={16} color="#64748B" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <View style={styles.reviewTopRow}>
+                      <Text style={styles.reviewerName}>{mock.name}</Text>
+                      <Text style={styles.reviewDate}>{mock.date}</Text>
+                    </View>
+                    <View style={styles.starsRow}>
+                      {[1,2,3,4,5].map((s) => (
+                        <Ionicons key={s} name="star" size={14} color={s <= mock.rating ? '#FACC15' : '#E5E7EB'} />
+                      ))}
+                    </View>
+                    <Text style={styles.reviewComment}>{mock.comment}</Text>
+                  </View>
                 </View>
-                <View style={styles.starsRow}>
-                  {[1,2,3,4,5].map((s) => (
-                    <Ionicons key={s} name="star" size={14} color={s <= mock.rating ? '#FACC15' : '#E5E7EB'} />
-                  ))}
-                </View>
-                <Text style={styles.reviewComment}>{mock.comment}</Text>
               </View>
             ))
           )}
@@ -328,15 +347,19 @@ function ServiceDetailPage({ vendorId, listingId }: { vendorId: string; listingI
   );
 }
 
-// ─── Shared Header ────────────────────────────────────────────────────────────
+// ─── Shared Header — matching boss glassmorphic style ─────────────────────────
 function Header({ title }: { title: string }) {
   return (
     <View style={styles.header}>
-      <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-        <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
-      </TouchableOpacity>
-      <Text style={styles.headerTitle} numberOfLines={1}>{title}</Text>
-      <View style={styles.backBtn} />
+      <View style={styles.headerInner}>
+        <TouchableOpacity onPress={() => {
+          if (router.canGoBack()) router.back();
+          else router.replace('/(tabs)/services/handyman');
+        }} style={styles.backBtn}>
+          <Ionicons name="arrow-back" size={20} color="#1E293B" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle} numberOfLines={1}>{title}</Text>
+      </View>
     </View>
   );
 }
@@ -352,207 +375,161 @@ export default function HandymanDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1, backgroundColor: '#F0F7FF' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  errorText: { fontSize: fontSize.md, color: colors.text.secondary },
+  errorText: { fontSize: 16, color: '#64748B' },
   scrollContent: { paddingBottom: 24 },
 
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 8,
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.sm,
-    backgroundColor: colors.background,
-    borderBottomWidth: borderWidth.thin,
-    borderBottomColor: 'rgba(46,122,217,0.08)',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    paddingTop: 16, paddingBottom: 24, paddingHorizontal: 24,
+    borderBottomLeftRadius: 24, borderBottomRightRadius: 24,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06, shadowRadius: 30, elevation: 4,
+    borderBottomWidth: 1, borderBottomColor: 'rgba(46, 122, 217, 0.08)',
   },
-  backBtn: { padding: spacing.xs, width: 36 },
-  headerTitle: {
-    flex: 1,
-    fontSize: fontSize.md,
-    fontWeight: '600',
-    color: colors.text.primary,
-    textAlign: 'center',
+  headerInner: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  backBtn: {
+    width: 40, height: 40, borderRadius: 12,
+    backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
   },
+  headerTitle: { flex: 1, fontSize: 18, fontWeight: '600', color: '#1E293B' },
 
-  // Vendor page
+  // Vendor summary white card
   vendorCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    margin: spacing.lg,
-    padding: spacing.md,
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    borderWidth: borderWidth.thin,
-    borderColor: 'rgba(234,179,8,0.15)',
+    marginHorizontal: 24, marginTop: 24, marginBottom: 16,
+    padding: 20, backgroundColor: '#FFFFFF', borderRadius: 16,
+    borderWidth: 1, borderColor: 'rgba(46, 122, 217, 0.1)',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
+  },
+  vendorCardRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 16,
+    marginBottom: 16,
   },
   vendorLogoCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: 'rgba(234,179,8,0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    width: 80, height: 80, borderRadius: 40,
+    backgroundColor: '#E3F0FF', justifyContent: 'center', alignItems: 'center',
     overflow: 'hidden',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1, shadowRadius: 12, elevation: 4,
   },
-  vendorLogo: { width: 60, height: 60, borderRadius: 30 },
-  vendorCardInfo: { flex: 1, gap: 4 },
-  vendorName: { fontSize: fontSize.lg, fontWeight: '700', color: colors.text.primary },
+  vendorLogo: { width: 80, height: 80, borderRadius: 40 },
+  vendorCardInfo: { flex: 1, gap: 6 },
+  vendorName: { fontSize: 18, fontWeight: '700', color: '#1E293B' },
   ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
-  ratingText: { fontSize: fontSize.sm, color: colors.text.secondary },
+  ratingText: { fontSize: 14, color: '#64748B' },
 
   viewProfileBtn: {
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.md,
-    paddingVertical: spacing.sm,
-    borderWidth: borderWidth.default,
-    borderColor: colors.border.default,
-    borderRadius: borderRadius.lg,
-    alignItems: 'center',
-    backgroundColor: colors.surface,
+    paddingVertical: 12,
+    borderWidth: 2, borderColor: 'rgba(46, 122, 217, 0.15)',
+    borderRadius: 12, alignItems: 'center', backgroundColor: '#FFFFFF',
   },
-  viewProfileText: { fontSize: fontSize.sm, fontWeight: '500', color: colors.text.primary },
+  viewProfileText: { fontSize: 15, fontWeight: '500', color: '#1E293B' },
 
-  section: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderTopWidth: borderWidth.thin,
-    borderTopColor: 'rgba(46,122,217,0.08)',
-  },
-  sectionTitle: { fontSize: fontSize.lg, fontWeight: '600', color: colors.text.primary, marginBottom: spacing.md },
+  section: { paddingHorizontal: 24, paddingVertical: 16 },
+  sectionTitle: { fontSize: 16, fontWeight: '600', color: '#1E293B', marginBottom: 16 },
 
   // Services grid
-  servicesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.md,
-  },
+  servicesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 16 },
   serviceCard: {
-    width: '47%',
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    overflow: 'hidden',
-    borderWidth: borderWidth.thin,
-    borderColor: 'rgba(234,179,8,0.12)',
+    width: '47%', backgroundColor: '#FFFFFF', borderRadius: 12,
+    overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(46, 122, 217, 0.15)',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
   },
-  serviceCardImage: { width: '100%', height: 110, backgroundColor: 'rgba(234,179,8,0.08)' },
-  serviceCardInfo: { padding: spacing.sm, gap: 3 },
-  serviceCardName: { fontSize: fontSize.sm, fontWeight: '600', color: colors.text.primary },
-  serviceCardRating: { fontSize: 12, color: colors.text.secondary },
-  serviceCardDesc: { fontSize: 11, color: colors.text.muted, lineHeight: 16 },
-  serviceCardPrice: { fontSize: fontSize.sm, fontWeight: '700', color: ACCENT, marginTop: 2 },
+  serviceCardImage: { width: '100%', height: 96, backgroundColor: '#E3F0FF' },
+  serviceCardInfo: { padding: 12, gap: 4 },
+  serviceCardName: { fontSize: 14, fontWeight: '500', color: '#1E293B' },
+  serviceCardRating: { fontSize: 12, color: '#1E293B' },
+  serviceCardDesc: { fontSize: 12, color: '#64748B', lineHeight: 16 },
+  serviceCardPrice: { fontSize: 14, fontWeight: '600', color: '#2E7AD9', marginTop: 4 },
 
   // Points Banner
   pointsBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.md,
-    padding: spacing.md,
-    borderRadius: borderRadius.lg,
-    backgroundColor: 'rgba(245,158,11,0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(245,158,11,0.25)',
-    gap: spacing.md,
+    flexDirection: 'row', alignItems: 'center',
+    marginHorizontal: 24, marginBottom: 24, padding: 16,
+    borderRadius: 12, backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    borderWidth: 1, borderColor: 'rgba(245, 158, 11, 0.3)', gap: 12,
   },
   pointsIcon: {
-    width: 36, height: 36, borderRadius: 18,
-    backgroundColor: 'rgba(245,158,11,0.15)',
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: 'rgba(245, 158, 11, 0.2)',
     justifyContent: 'center', alignItems: 'center',
   },
-  pointsTitle: { fontSize: fontSize.sm, fontWeight: '600', color: 'rgb(180,83,9)' },
-  pointsSub: { fontSize: 11, color: 'rgb(180,83,9)', opacity: 0.85, marginTop: 2 },
+  pointsTitle: { fontSize: 14, fontWeight: '600', color: 'rgb(180, 83, 9)' },
+  pointsSub: { fontSize: 12, color: 'rgb(217, 119, 6)', marginTop: 2 },
 
   // Service detail
-  detailTitleSection: { padding: spacing.lg, gap: spacing.xs },
-  detailTitle: { fontSize: fontSize.xxl, fontWeight: '700', color: colors.text.primary },
-  detailDesc: { fontSize: fontSize.sm, color: colors.text.secondary, lineHeight: 20, marginTop: 4 },
+  detailTitleSection: { padding: 24, gap: 4 },
+  detailTitle: { fontSize: 24, fontWeight: '700', color: '#1E293B' },
+  detailDesc: { fontSize: 14, color: '#64748B', lineHeight: 20, marginTop: 4 },
 
   vendorCardSmall: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.md,
-    padding: spacing.md,
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    borderWidth: borderWidth.thin,
-    borderColor: 'rgba(234,179,8,0.12)',
+    flexDirection: 'row', alignItems: 'center', gap: 16,
+    marginHorizontal: 24, marginBottom: 16, padding: 16,
+    backgroundColor: '#FFFFFF', borderRadius: 12,
+    borderWidth: 1, borderColor: 'rgba(46, 122, 217, 0.1)',
   },
   vendorLogoSmall: {
     width: 44, height: 44, borderRadius: 22,
-    backgroundColor: 'rgba(234,179,8,0.1)',
-    justifyContent: 'center', alignItems: 'center',
+    backgroundColor: '#E3F0FF', justifyContent: 'center', alignItems: 'center',
     overflow: 'hidden',
   },
   vendorLogoSmallImg: { width: 44, height: 44, borderRadius: 22 },
-  vendorNameSmall: { fontSize: fontSize.sm, fontWeight: '600', color: colors.text.primary },
-  vendorRatingSmall: { fontSize: 11, color: colors.text.secondary },
+  vendorNameSmall: { fontSize: 14, fontWeight: '600', color: '#1E293B' },
+  vendorRatingSmall: { fontSize: 11, color: '#64748B' },
 
   pricingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.xs,
+    flexDirection: 'row', alignItems: 'center',
+    justifyContent: 'space-between', paddingVertical: 4,
   },
-  pricingLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  pricingLabel: { fontSize: fontSize.md, color: colors.text.primary, fontWeight: '500' },
-  pricingValue: { fontSize: fontSize.lg, fontWeight: '700', color: ACCENT },
+  pricingLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  pricingLabel: { fontSize: 16, color: '#1E293B', fontWeight: '500' },
+  pricingValue: { fontSize: 18, fontWeight: '700', color: '#2E7AD9' },
 
-  sectionFlat: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.xs,
-  },
+  sectionFlat: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 4 },
   includedCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    borderWidth: borderWidth.thin,
-    borderColor: 'rgba(34,197,94,0.15)',
-    padding: spacing.md,
-    marginBottom: spacing.sm,
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    backgroundColor: '#FFFFFF', borderRadius: 12,
+    borderWidth: 1, borderColor: 'rgba(34, 197, 94, 0.15)',
+    padding: 16, marginBottom: 8,
   },
-  includedText: { flex: 1, fontSize: fontSize.sm, color: colors.text.secondary },
+  includedText: { flex: 1, fontSize: 14, color: '#64748B' },
   reviewsHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.md,
+    flexDirection: 'row', justifyContent: 'space-between',
+    alignItems: 'center', marginBottom: 16,
   },
   viewAllBtn: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  viewAllText: { fontSize: fontSize.sm, color: colors.primary, fontWeight: '500' },
+  viewAllText: { fontSize: 14, color: '#2E7AD9', fontWeight: '500' },
   reviewCard: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    borderWidth: borderWidth.thin,
-    borderColor: 'rgba(46,122,217,0.08)',
-    padding: spacing.md,
-    marginBottom: spacing.sm,
+    backgroundColor: '#FFFFFF', borderRadius: 12,
+    borderWidth: 1, borderColor: 'rgba(46, 122, 217, 0.1)',
+    padding: 16, marginBottom: 8,
+  },
+  reviewCardInner: {
+    flexDirection: 'row', gap: 12,
+  },
+  reviewAvatar: {
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: '#E8F1FC', alignItems: 'center',
+    justifyContent: 'center', marginTop: 2,
   },
   reviewTopRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
+    flexDirection: 'row', justifyContent: 'space-between',
+    alignItems: 'center', marginBottom: 4,
   },
-  reviewerName: { fontSize: fontSize.sm, fontWeight: '600', color: colors.text.primary },
-  reviewDate: { fontSize: 12, color: colors.text.muted },
-  starsRow: { flexDirection: 'row', gap: 2, marginBottom: spacing.sm },
-  reviewComment: { fontSize: fontSize.sm, color: colors.text.secondary, lineHeight: 20 },
+  reviewerName: { fontSize: 14, fontWeight: '600', color: '#1E293B' },
+  reviewDate: { fontSize: 12, color: '#94A3B8' },
+  starsRow: { flexDirection: 'row', gap: 2, marginBottom: 8 },
+  reviewComment: { fontSize: 14, color: '#64748B', lineHeight: 20 },
 
   cta: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
-    padding: spacing.lg,
-    paddingBottom: 28,
-    backgroundColor: colors.background,
-    borderTopWidth: borderWidth.thin,
-    borderTopColor: 'rgba(46,122,217,0.1)',
+    padding: 24, paddingBottom: 28,
+    backgroundColor: '#F0F7FF',
+    borderTopWidth: 1, borderTopColor: 'rgba(46, 122, 217, 0.1)',
   },
 });

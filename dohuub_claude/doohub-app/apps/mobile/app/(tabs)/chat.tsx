@@ -14,7 +14,18 @@ import {
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Rect, Circle, Path, Line } from 'react-native-svg';
-import { colors, spacing, fontSize, borderRadius } from '../../src/constants/theme';
+// Boss wireframe colors - hardcoded
+const colors = {
+  background: '#F0F7FF',
+  primary: '#2E7AD9',
+  text: { primary: '#1E293B', secondary: '#64748B', muted: '#94A3B8', inverse: '#FFFFFF' },
+  surface: '#FFFFFF',
+  secondary: '#E8F1FC',
+  border: { light: 'rgba(46, 122, 217, 0.1)' },
+};
+const spacing = { xs: 4, sm: 8, md: 16, lg: 24, xl: 32, xxl: 48 };
+const fontSize = { xs: 12, sm: 14, md: 16, lg: 18, xl: 20, xxl: 24 };
+const borderRadius = { sm: 4, md: 8, lg: 12, xl: 16, full: 9999 };
 
 function BotIcon({ size = 48, color = '#2E7AD9' }: { size?: number; color?: string }) {
   const s = size;
@@ -539,7 +550,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: colors.border.default,
+    backgroundColor: colors.border.light,
   },
   bubbleContent: {
     maxWidth: '75%',
@@ -632,7 +643,7 @@ const styles = StyleSheet.create({
   viewAllButton: {
     paddingVertical: spacing.md,
     borderWidth: 2,
-    borderColor: colors.border.default,
+    borderColor: colors.border.light,
     borderRadius: borderRadius.lg,
     alignItems: 'center',
   },
@@ -654,7 +665,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     backgroundColor: colors.background,
     borderWidth: 2,
-    borderColor: colors.border.default,
+    borderColor: colors.border.light,
     borderRadius: borderRadius.full,
   },
   categoryChipText: {
@@ -689,10 +700,11 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    gap: spacing.sm,
-    backgroundColor: 'transparent',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 8,
+    backgroundColor: '#F0F7FF',
+    marginBottom: 80,
   },
   input: {
     flex: 1,

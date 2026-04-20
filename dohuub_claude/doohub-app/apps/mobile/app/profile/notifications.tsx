@@ -1,93 +1,99 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Switch, SafeAreaView } from 'react-native';
-import { colors, spacing, fontSize, borderRadius, borderWidth } from '../../src/constants/theme';
-import { ScreenHeader } from '../../src/components/composite';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Platform,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import { SafeAreaView } from 'react-native';
 
 interface NotificationSetting {
-  id: string;
+  key: string;
   label: string;
   description: string;
   enabled: boolean;
 }
 
-/**
- * Notification Settings screen matching wireframe:
- * - Toggle switches for different notification types
- */
 export default function NotificationsScreen() {
+  const router = useRouter();
+  // SafeAreaView handles insets
+
   const [settings, setSettings] = useState<NotificationSetting[]>([
-    {
-      id: 'booking',
-      label: 'Booking Updates',
-      description: 'Receive updates about your bookings',
-      enabled: true,
-    },
-    {
-      id: 'promotions',
-      label: 'Promotions & Offers',
-      description: 'Get notified about special deals and discounts',
-      enabled: true,
-    },
-    {
-      id: 'reminders',
-      label: 'Service Reminders',
-      description: 'Reminders before your scheduled services',
-      enabled: true,
-    },
-    {
-      id: 'reviews',
-      label: 'Review Requests',
-      description: 'Receive requests to review completed services',
-      enabled: true,
-    },
-    {
-      id: 'newsletter',
-      label: 'Newsletter',
-      description: 'Weekly updates and tips',
-      enabled: false,
-    },
+    { key: 'pushNotifications', label: 'Push Notifications', description: 'Enable all notifications', enabled: true },
+    { key: 'bookingUpdates', label: 'Booking Updates', description: 'Status changes and reminders', enabled: true },
+    { key: 'promotions', label: 'Promotional Offers', description: 'Discounts and special deals', enabled: false },
+    { key: 'aiAssistant', label: 'AI Assistant Messages', description: 'Responses and suggestions', enabled: true },
+    { key: 'payments', label: 'Payment Confirmations', description: 'Receipts and transaction alerts', enabled: true },
   ]);
 
-  const toggleSetting = (id: string) => {
-    setSettings(
-      settings.map((s) => (s.id === id ? { ...s, enabled: !s.enabled } : s))
+  const toggleSetting = (key: string) => {
+    setSettings((prev) =>
+      prev.map((s) => (s.key === key ? { ...s, enabled: !s.enabled } : s))
     );
+  };
+
+  const handleBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/profile');
+    }
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScreenHeader title="Notifications" showBack />
+      {/* Glassmorphic Header */}
+      <View style={[styles.header, { paddingTop: 12 }]}>
+        <View style={styles.headerContent}>
+          <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+            <Ionicons name="arrow-back" size={22} color="#1E293B" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Notifications</Text>
+          <View style={{ width: 40 }} />
+        </View>
+      </View>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Text style={styles.sectionTitle}>Notification Preferences</Text>
-
-        <View style={styles.settingsCard}>
-          {settings.map((setting, index) => (
-            <View
-              key={setting.id}
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+        {settings.map((item) => (
+          <View key={item.key} style={styles.settingCard}>
+            <View style={styles.settingInfo}>
+              <Text style={styles.settingLabel}>{item.label}</Text>
+              <Text style={styles.settingDescription}>{item.description}</Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => toggleSetting(item.key)}
+              activeOpacity={0.8}
               style={[
-                styles.settingRow,
-                index < settings.length - 1 && styles.settingRowBorder,
+                styles.toggle,
+                { backgroundColor: item.enabled ? '#2E7AD9' : '#E8F1FC' },
               ]}
             >
-              <View style={styles.settingInfo}>
-                <Text style={styles.settingLabel}>{setting.label}</Text>
-                <Text style={styles.settingDescription}>{setting.description}</Text>
-              </View>
-              <Switch
-                value={setting.enabled}
-                onValueChange={() => toggleSetting(setting.id)}
-                trackColor={{ false: colors.border.default, true: colors.text.secondary }}
-                thumbColor={setting.enabled ? colors.primary : colors.secondary}
+              <View
+                style={[
+                  styles.toggleCircle,
+                  {
+                    transform: [{ translateX: item.enabled ? 20 : 2 }],
+                  },
+                ]}
               />
-            </View>
-          ))}
-        </View>
-
-        <Text style={styles.note}>
-          You can always change these settings later. Some notifications may be required for service updates.
-        </Text>
+            </TouchableOpacity>
+          </View>
+        ))}
       </ScrollView>
+
+      {/* Save Settings Button */}
+      <View style={[styles.footer, { paddingBottom: 16 }]}>
+        <TouchableOpacity style={styles.saveButton} activeOpacity={0.85}>
+          <Text style={styles.saveButtonText}>Save Settings</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
@@ -95,54 +101,131 @@ export default function NotificationsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#F0F7FF',
   },
-  content: {
-    padding: spacing.lg,
+  header: {
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    paddingBottom: 16,
+    paddingHorizontal: 20,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.06,
+        shadowRadius: 15,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
   },
-  sectionTitle: {
-    fontSize: fontSize.sm,
-    fontWeight: '600',
-    color: colors.text.secondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: spacing.sm,
-  },
-  settingsCard: {
-    borderWidth: borderWidth.default,
-    borderColor: colors.border.default,
-    borderRadius: borderRadius.lg,
-    overflow: 'hidden',
-  },
-  settingRow: {
+  headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: spacing.md,
-    backgroundColor: colors.background,
+    justifyContent: 'space-between',
   },
-  settingRowBorder: {
-    borderBottomWidth: borderWidth.thin,
-    borderBottomColor: 'rgba(46, 122, 217, 0.1)',
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 3,
+      },
+    }),
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1E293B',
+  },
+  content: {
+    padding: 20,
+    gap: 4,
+  },
+  settingCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    marginBottom: 4,
   },
   settingInfo: {
     flex: 1,
-    marginRight: spacing.md,
+    marginRight: 12,
   },
   settingLabel: {
-    fontSize: fontSize.md,
+    fontSize: 15,
     fontWeight: '500',
-    color: colors.text.primary,
-    marginBottom: spacing.xs,
+    color: '#1E293B',
+    marginBottom: 4,
   },
   settingDescription: {
-    fontSize: fontSize.sm,
-    color: colors.text.secondary,
+    fontSize: 13,
+    color: '#64748B',
   },
-  note: {
-    fontSize: fontSize.sm,
-    color: colors.text.secondary,
-    marginTop: spacing.lg,
-    lineHeight: 20,
+  toggle: {
+    width: 48,
+    height: 26,
+    borderRadius: 13,
+    justifyContent: 'center',
+  },
+  toggleCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#FFFFFF',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.15,
+        shadowRadius: 3,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
+  },
+  footer: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(46, 122, 217, 0.1)',
+  },
+  saveButton: {
+    backgroundColor: '#2E7AD9',
+    paddingVertical: 16,
+    borderRadius: 16,
+    alignItems: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#2E7AD9',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+      },
+      android: {
+        elevation: 6,
+      },
+    }),
+  },
+  saveButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 });
-

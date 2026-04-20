@@ -12,49 +12,26 @@ import {
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, fontSize, borderRadius, borderWidth } from '../../src/constants/theme';
-import { ScreenHeader } from '../../src/components/composite';
+import { router } from 'expo-router';
 import { useRewardsStore } from '../../src/store/rewardsStore';
 import { useAuthStore } from '../../src/store/authStore';
 
 /**
- * Referral Screen
- * - Hero section with gift icon
- * - Referral code display with copy button
- * - Share & Copy Link buttons (purple theme)
- * - "How it Works" 3-step guide (purple theme)
- * - Stats: total referrals, pending, points earned (colored cards)
- * - Referral history list with initial avatars & status badges
- * - Pull-to-refresh
+ * Referral Screen — matches boss wireframe (ReferralScreen.tsx)
+ *
+ * Layout (top-to-bottom):
+ *  1. Glassmorphic header with back pill + "Refer a Friend"
+ *  2. Hero: purple gradient icon circle + "Share & Earn Points" + subtitle
+ *  3. Referral Code card: code display (foreground color) + copy btn + Share/Copy Link buttons
+ *  4. "How it Works" purple tinted card with 3 steps (icon circles, no step numbers)
+ *  5. Stats grid: Total Referrals | Pending | Points Earned
+ *  6. Referral History list
  */
 
-const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
-  PENDING: { label: 'Pending', bg: '#FEF3C7', text: '#92400E' },
-  SIGNED_UP: { label: 'Signed Up', bg: colors.status.infoLight, text: colors.status.info },
-  COMPLETED: { label: 'Completed', bg: colors.status.successLight, text: colors.status.success },
-  EXPIRED: { label: 'Expired', bg: colors.secondary, text: colors.text.muted },
+const formatDate = (dateString: string) => {
+  const date = new Date(dateString);
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 };
-
-const HOW_IT_WORKS = [
-  {
-    step: 1,
-    icon: 'share-social' as keyof typeof Ionicons.glyphMap,
-    title: 'Share your code',
-    description: 'Send your unique referral code to friends and family.',
-  },
-  {
-    step: 2,
-    icon: 'person-add' as keyof typeof Ionicons.glyphMap,
-    title: 'Friend signs up & books',
-    description: 'Your friend creates an account and completes their first booking.',
-  },
-  {
-    step: 3,
-    icon: 'gift' as keyof typeof Ionicons.glyphMap,
-    title: 'You get 60 pts',
-    description: 'They get 35 pts',
-  },
-];
 
 export default function ReferralScreen() {
   const { user } = useAuthStore();
@@ -86,18 +63,19 @@ export default function ReferralScreen() {
 
   const handleCopyLink = async () => {
     await Clipboard.setStringAsync(`https://dohuub.com/refer/${referralCode}`);
-    Alert.alert('Copied!', 'Referral link copied to clipboard.');
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   const handleShare = async () => {
     try {
       await Share.share({
-        message: `Join DoHuub and get 500 bonus points! Use my referral code: ${referralCode}\n\nDownload the app and sign up to get started.`,
-        title: 'Join DoHuub',
+        message: `Join DoHuub and get 35 bonus points! Use my referral code: ${referralCode}\n\nhttps://dohuub.com/refer/${referralCode}`,
+        title: 'Join DoHuub!',
       });
     } catch (error: any) {
       if (error.message !== 'User did not share') {
-        Alert.alert('Error', 'Unable to share. Please try again.');
+        handleCopyLink();
       }
     }
   };
@@ -113,7 +91,16 @@ export default function ReferralScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScreenHeader title="Refer a Friend" showBack />
+      {/* Glassmorphic Header */}
+      <View style={styles.glassHeader}>
+        <TouchableOpacity
+          style={styles.backPill}
+          onPress={() => router.back()}
+        >
+          <Ionicons name="arrow-back" size={20} color="#1E293B" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Refer a Friend</Text>
+      </View>
 
       <ScrollView
         style={styles.scrollView}
@@ -139,26 +126,23 @@ export default function ReferralScreen() {
           <Text style={styles.codeLabel}>Your Referral Code</Text>
           <View style={styles.codeRow}>
             <Text style={styles.codeText}>{referralCode}</Text>
-            <TouchableOpacity style={styles.copyButton} onPress={handleCopyCode}>
+            <TouchableOpacity style={styles.copyIconButton} onPress={handleCopyCode}>
               <Ionicons
-                name={copied ? 'checkmark' : 'copy-outline'}
+                name={copied ? 'checkmark-circle' : 'copy-outline'}
                 size={20}
-                color={copied ? colors.status.success : colors.primary}
+                color={copied ? '#10B981' : '#64748B'}
               />
-              <Text style={[styles.copyText, copied && { color: colors.status.success }]}>
-                {copied ? 'Copied!' : 'Copy'}
-              </Text>
             </TouchableOpacity>
           </View>
 
           {/* Share & Copy Link Buttons */}
           <View style={styles.buttonsRow}>
             <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
-              <Ionicons name="share-social" size={20} color={colors.text.inverse} />
+              <Ionicons name="share-social" size={20} color="#ffffff" />
               <Text style={styles.shareButtonText}>Share Link</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.copyLinkButton} onPress={handleCopyLink}>
-              <Ionicons name="copy-outline" size={20} color={colors.text.primary} />
+              <Ionicons name="copy-outline" size={20} color="#1E293B" />
               <Text style={styles.copyLinkButtonText}>Copy Link</Text>
             </TouchableOpacity>
           </View>
@@ -167,44 +151,58 @@ export default function ReferralScreen() {
         {/* How It Works */}
         <View style={styles.howItWorks}>
           <Text style={styles.howItWorksTitle}>How it Works</Text>
-          {HOW_IT_WORKS.map((step, index) => (
-            <View key={step.step} style={styles.stepItem}>
-              <View style={styles.stepLeft}>
-                <View style={styles.stepNumber}>
-                  <Text style={styles.stepNumberText}>{step.step}</Text>
-                </View>
-                {index < HOW_IT_WORKS.length - 1 && <View style={styles.stepConnector} />}
-              </View>
-              <View style={styles.stepContent}>
-                <View style={styles.stepIconContainer}>
-                  <Ionicons name={step.icon} size={20} color="rgb(126, 34, 206)" />
-                </View>
-                <View style={styles.stepTextGroup}>
-                  <Text style={styles.stepTitle}>{step.title}</Text>
-                  <Text style={styles.stepDescription}>{step.description}</Text>
-                </View>
-              </View>
+
+          {/* Step 1 */}
+          <View style={styles.stepItem}>
+            <View style={styles.stepIconCircle}>
+              <Ionicons name="people" size={16} color="rgb(126, 34, 206)" />
             </View>
-          ))}
+            <View style={styles.stepTextGroup}>
+              <Text style={styles.stepTitle}>Share your code</Text>
+              <Text style={styles.stepDescription}>Send your unique code to friends</Text>
+            </View>
+          </View>
+
+          {/* Step 2 */}
+          <View style={styles.stepItem}>
+            <View style={styles.stepIconCircle}>
+              <Ionicons name="checkmark-circle" size={16} color="rgb(126, 34, 206)" />
+            </View>
+            <View style={styles.stepTextGroup}>
+              <Text style={styles.stepTitle}>They sign up & order</Text>
+              <Text style={styles.stepDescription}>Friend joins and completes their first order</Text>
+            </View>
+          </View>
+
+          {/* Step 3 */}
+          <View style={styles.stepItem}>
+            <View style={styles.stepIconCircle}>
+              <Ionicons name="gift" size={16} color="rgb(126, 34, 206)" />
+            </View>
+            <View style={styles.stepTextGroup}>
+              <Text style={styles.stepTitle}>You both get rewarded!</Text>
+              <Text style={styles.stepDescription}>
+                <Text style={styles.stepBold}>You get 60 pts</Text>
+                {' \u2022 '}
+                <Text style={styles.stepBold}>They get 35 pts</Text>
+              </Text>
+            </View>
+          </View>
         </View>
 
         {/* Referral Stats */}
         <View style={styles.statsRow}>
-          <View style={[styles.statCard, styles.statCardTotal]}>
-            <Text style={styles.statValue}>{totalReferrals}</Text>
-            <Text style={styles.statLabel}>Total Referrals</Text>
+          <View style={[styles.statCard, { backgroundColor: '#E0EDFF' }]}>
+            <Text style={[styles.statValue, { color: '#1E293B' }]}>{totalReferrals}</Text>
+            <Text style={[styles.statLabel, { color: '#64748B' }]}>Total Referrals</Text>
           </View>
-          <View style={[styles.statCard, styles.statCardPending]}>
-            <Text style={[styles.statValue, { color: 'rgb(217, 119, 6)' }]}>
-              {pendingReferrals}
-            </Text>
-            <Text style={styles.statLabel}>Pending</Text>
+          <View style={[styles.statCard, { backgroundColor: 'rgba(245, 158, 11, 0.1)' }]}>
+            <Text style={[styles.statValue, { color: 'rgb(217, 119, 6)' }]}>{pendingReferrals}</Text>
+            <Text style={[styles.statLabel, { color: 'rgb(217, 119, 6)' }]}>Pending</Text>
           </View>
-          <View style={[styles.statCard, styles.statCardPoints]}>
-            <Text style={[styles.statValue, { color: 'rgb(22, 163, 74)' }]}>
-              {pointsFromReferrals.toLocaleString()}
-            </Text>
-            <Text style={styles.statLabel}>Points Earned</Text>
+          <View style={[styles.statCard, { backgroundColor: 'rgba(34, 197, 94, 0.1)' }]}>
+            <Text style={[styles.statValue, { color: 'rgb(22, 163, 74)' }]}>{pointsFromReferrals.toLocaleString()}</Text>
+            <Text style={[styles.statLabel, { color: 'rgb(22, 163, 74)' }]}>Points Earned</Text>
           </View>
         </View>
 
@@ -214,59 +212,52 @@ export default function ReferralScreen() {
 
           {referrals.length > 0 ? (
             referrals.map((referral) => {
-              const statusConfig = STATUS_CONFIG[referral.status] || STATUS_CONFIG.PENDING;
               const displayName = referral.refereeUserId || referral.referralCode || '?';
               const initial = displayName[0].toUpperCase();
+              const isCompleted = referral.status === 'COMPLETED';
 
               return (
                 <View key={referral.id} style={styles.referralItem}>
-                  <View style={styles.referralIconContainer}>
+                  {/* Avatar */}
+                  <View style={styles.referralAvatar}>
                     <Text style={styles.referralInitial}>{initial}</Text>
                   </View>
+
+                  {/* Info */}
                   <View style={styles.referralInfo}>
-                    <Text style={styles.referralEmail} numberOfLines={1}>
+                    <Text style={styles.referralName} numberOfLines={1}>
                       {referral.referralCode}
                     </Text>
                     <Text style={styles.referralDate}>
-                      {new Date(referral.createdAt).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric',
-                      })}
+                      {formatDate(referral.createdAt)}
                     </Text>
                   </View>
-                  <View style={styles.referralRight}>
-                    <View
-                      style={[
-                        styles.statusBadge,
-                        { backgroundColor: statusConfig.bg },
-                      ]}
-                    >
-                      <Text style={[styles.statusText, { color: statusConfig.text }]}>
-                        {statusConfig.label}
-                      </Text>
+
+                  {/* Status — matches wireframe: check+points or clock+pending */}
+                  {isCompleted ? (
+                    <View style={styles.statusCompleted}>
+                      <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+                      <Text style={styles.completedPoints}>+{referral.pointsEarned} pts</Text>
                     </View>
-                    {referral.pointsEarned > 0 && (
-                      <Text style={styles.referralPoints}>
-                        +{referral.pointsEarned}
-                      </Text>
-                    )}
-                  </View>
+                  ) : (
+                    <View style={styles.statusPending}>
+                      <Ionicons name="time" size={16} color="rgb(245, 158, 11)" />
+                      <Text style={styles.pendingText}>Pending</Text>
+                    </View>
+                  )}
                 </View>
               );
             })
           ) : (
             <View style={styles.emptyState}>
-              <Ionicons name="people-outline" size={40} color={colors.text.muted} />
+              <Ionicons name="people-outline" size={48} color="#9ca3af" style={{ opacity: 0.5 }} />
               <Text style={styles.emptyTitle}>No referrals yet</Text>
-              <Text style={styles.emptySubtitle}>
-                Share your code and start earning bonus points!
-              </Text>
+              <Text style={styles.emptySubtitle}>Share your code to start earning!</Text>
             </View>
           )}
         </View>
 
-        <View style={{ height: spacing.xxl }} />
+        <View style={{ height: 32 }} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -275,85 +266,133 @@ export default function ReferralScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#F0F7FF',
   },
+
+  // Glassmorphic Header
+  glassHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 15,
+    elevation: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(46, 122, 217, 0.08)',
+    gap: 16,
+  },
+  backPill: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#ffffff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1E293B',
+  },
+
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    padding: spacing.lg,
+    padding: 24,
   },
 
   // Hero Section
   heroSection: {
     alignItems: 'center',
-    marginBottom: spacing.lg,
+    marginBottom: 32,
   },
   heroIconCircle: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: 'rgba(147, 51, 234, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: spacing.md,
+    marginBottom: 16,
+    shadowColor: 'rgb(147, 51, 234)',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 4,
+    // Gradient approximation
+    backgroundColor: 'rgba(147, 51, 234, 0.2)',
   },
   heroTitle: {
-    fontSize: fontSize.xxl,
+    fontSize: 24,
     fontWeight: '700',
-    color: colors.text.primary,
-    marginBottom: spacing.xs,
+    color: '#1E293B',
+    marginBottom: 8,
   },
   heroSubtitle: {
-    fontSize: fontSize.sm,
-    color: colors.text.secondary,
+    fontSize: 15,
+    color: '#64748B',
     textAlign: 'center',
   },
 
   // Code Card
   codeCard: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.xl,
-    borderWidth: borderWidth.default,
-    borderColor: colors.border.light,
-    padding: spacing.lg,
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 24,
     alignItems: 'center',
+    marginBottom: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
   },
   codeLabel: {
-    fontSize: fontSize.sm,
-    color: colors.text.secondary,
-    marginBottom: spacing.md,
+    fontSize: 14,
+    color: '#64748B',
+    marginBottom: 8,
   },
   codeRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
-    marginBottom: spacing.lg,
+    gap: 12,
+    marginBottom: 16,
   },
   codeText: {
-    fontSize: fontSize.xxxl,
+    fontSize: 24,
     fontWeight: '700',
-    color: colors.primary,
+    color: '#1E293B',
     letterSpacing: 3,
   },
-  copyButton: {
-    flexDirection: 'row',
+  copyIconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    backgroundColor: '#F0F7FF',
+    borderWidth: 1,
+    borderColor: '#E0EDFF',
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: spacing.xs,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderWidth: borderWidth.default,
-    borderColor: colors.border.light,
-    borderRadius: borderRadius.lg,
-  },
-  copyText: {
-    fontSize: fontSize.sm,
-    fontWeight: '500',
-    color: colors.primary,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
   },
   buttonsRow: {
     flexDirection: 'row',
-    gap: spacing.sm,
+    gap: 12,
     width: '100%',
   },
   shareButton: {
@@ -361,222 +400,223 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.sm,
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 12,
+    // Purple gradient approximation
     backgroundColor: 'rgb(147, 51, 234)',
-    borderRadius: borderRadius.lg,
-    paddingVertical: spacing.md,
+    shadowColor: 'rgb(147, 51, 234)',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 4,
   },
   shareButtonText: {
-    fontSize: fontSize.md,
+    fontSize: 15,
     fontWeight: '600',
-    color: colors.text.inverse,
+    color: '#ffffff',
   },
   copyLinkButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.sm,
-    backgroundColor: colors.background,
-    borderRadius: borderRadius.lg,
-    paddingVertical: spacing.md,
-    borderWidth: borderWidth.default,
-    borderColor: colors.border.default,
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: '#F0F7FF',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
   copyLinkButtonText: {
-    fontSize: fontSize.md,
+    fontSize: 15,
     fontWeight: '600',
-    color: colors.text.primary,
+    color: '#1E293B',
   },
 
-  // How It Works
+  // How It Works — simplified: no step numbers/connectors, just icon circles + text
   howItWorks: {
-    marginTop: spacing.lg,
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 32,
     backgroundColor: 'rgba(147, 51, 234, 0.1)',
-    borderRadius: borderRadius.xl,
-    borderWidth: borderWidth.default,
+    borderWidth: 1,
     borderColor: 'rgba(147, 51, 234, 0.2)',
-    padding: spacing.lg,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
   howItWorksTitle: {
-    fontSize: fontSize.lg,
+    fontSize: 16,
     fontWeight: '600',
     color: 'rgb(126, 34, 206)',
-    marginBottom: spacing.lg,
-  },
-  sectionTitle: {
-    fontSize: fontSize.lg,
-    fontWeight: '600',
-    color: colors.text.primary,
-    marginBottom: spacing.lg,
+    marginBottom: 16,
   },
   stepItem: {
     flexDirection: 'row',
-    marginBottom: spacing.md,
-  },
-  stepLeft: {
-    alignItems: 'center',
-    marginRight: spacing.md,
-  },
-  stepNumber: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(147, 51, 234, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  stepNumberText: {
-    fontSize: fontSize.sm,
-    fontWeight: '700',
-    color: 'rgb(126, 34, 206)',
-  },
-  stepConnector: {
-    width: 2,
-    flex: 1,
-    backgroundColor: 'rgba(147, 51, 234, 0.2)',
-    marginTop: spacing.xs,
-  },
-  stepContent: {
-    flex: 1,
-    flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: spacing.md,
-    paddingBottom: spacing.md,
+    gap: 12,
+    marginBottom: 16,
   },
-  stepIconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+  stepIconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: 'rgba(147, 51, 234, 0.2)',
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
   },
   stepTextGroup: {
     flex: 1,
   },
   stepTitle: {
-    fontSize: fontSize.md,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '500',
     color: 'rgb(88, 28, 135)',
     marginBottom: 2,
   },
   stepDescription: {
-    fontSize: fontSize.sm,
+    fontSize: 14,
     color: 'rgb(126, 34, 206)',
     lineHeight: 20,
+  },
+  stepBold: {
+    fontWeight: '600',
   },
 
   // Stats Row
   statsRow: {
     flexDirection: 'row',
-    gap: spacing.sm,
-    marginTop: spacing.lg,
+    gap: 12,
+    marginBottom: 32,
   },
   statCard: {
     flex: 1,
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
+    borderRadius: 12,
+    padding: 16,
     alignItems: 'center',
-    gap: spacing.xs,
-  },
-  statCardTotal: {
-    backgroundColor: colors.secondary,
-  },
-  statCardPending: {
-    backgroundColor: 'rgba(245, 158, 11, 0.1)',
-  },
-  statCardPoints: {
-    backgroundColor: 'rgba(34, 197, 94, 0.1)',
+    gap: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
   statValue: {
-    fontSize: fontSize.xl,
+    fontSize: 22,
     fontWeight: '700',
-    color: colors.text.primary,
   },
   statLabel: {
-    fontSize: fontSize.xs,
-    color: colors.text.secondary,
+    fontSize: 12,
     textAlign: 'center',
   },
 
   // History Section
   historySection: {
-    marginTop: spacing.lg,
+    marginBottom: 8,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1E293B',
+    marginBottom: 16,
   },
 
-  // Referral Item
+  // Referral Item — card style per wireframe
   referralItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: spacing.md,
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    borderWidth: borderWidth.default,
-    borderColor: colors.border.light,
-    marginBottom: spacing.sm,
-    gap: spacing.md,
+    padding: 16,
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    marginBottom: 12,
+    gap: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  referralIconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.secondary,
+  referralAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#E0EDFF',
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
   },
   referralInitial: {
-    fontSize: fontSize.md,
-    fontWeight: '700',
-    color: colors.primary,
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#2E7AD9',
   },
   referralInfo: {
     flex: 1,
   },
-  referralEmail: {
-    fontSize: fontSize.sm,
+  referralName: {
+    fontSize: 15,
     fontWeight: '500',
-    color: colors.text.primary,
+    color: '#1E293B',
     marginBottom: 2,
   },
   referralDate: {
-    fontSize: fontSize.xs,
-    color: colors.text.muted,
+    fontSize: 13,
+    color: '#64748B',
   },
-  referralRight: {
-    alignItems: 'flex-end',
-    gap: spacing.xs,
+  statusCompleted: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
-  statusBadge: {
-    paddingVertical: 2,
-    paddingHorizontal: spacing.sm,
-    borderRadius: borderRadius.full,
-  },
-  statusText: {
-    fontSize: fontSize.xs,
+  completedPoints: {
+    fontSize: 14,
     fontWeight: '600',
+    color: '#10B981',
   },
-  referralPoints: {
-    fontSize: fontSize.sm,
-    fontWeight: '700',
-    color: colors.status.success,
+  statusPending: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  pendingText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: 'rgb(217, 119, 6)',
   },
 
   // Empty State
   emptyState: {
     alignItems: 'center',
-    paddingVertical: spacing.xl,
+    paddingVertical: 32,
   },
   emptyTitle: {
-    fontSize: fontSize.md,
-    fontWeight: '600',
-    color: colors.text.primary,
-    marginTop: spacing.sm,
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#64748B',
+    marginTop: 12,
   },
   emptySubtitle: {
-    fontSize: fontSize.sm,
-    color: colors.text.secondary,
-    marginTop: spacing.xs,
+    fontSize: 14,
+    color: '#64748B',
+    opacity: 0.7,
+    marginTop: 4,
     textAlign: 'center',
   },
 });

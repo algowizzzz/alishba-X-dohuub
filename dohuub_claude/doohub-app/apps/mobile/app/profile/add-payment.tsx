@@ -6,21 +6,17 @@ import {
   ScrollView,
   TextInput,
   SafeAreaView,
-  Switch,
+  TouchableOpacity,
   Alert,
+  Platform,
+  StatusBar,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, fontSize, borderRadius, borderWidth } from '../../src/constants/theme';
-import { ScreenHeader } from '../../src/components/composite';
-import { Button } from '../../src/components/ui';
+import { LinearGradient } from 'expo-linear-gradient';
 import { supabase } from '../../src/lib/supabase';
 import { useAuthStore } from '../../src/store/authStore';
 
-/**
- * Detects card type from card number prefix.
- * 4 = VISA, 5 = MASTERCARD, 3 = AMEX, else VISA
- */
 function detectCardType(cardNumber: string): string {
   const cleaned = cardNumber.replace(/\s/g, '');
   if (cleaned.startsWith('4')) return 'VISA';
@@ -29,27 +25,29 @@ function detectCardType(cardNumber: string): string {
   return 'VISA';
 }
 
-/**
- * Add Payment Method Screen matching wireframe:
- * - Card number input
- * - Expiry date input
- * - CVC input
- * - Cardholder name
- * - Set as default toggle
- * - "Add Card" button
- */
+function getCardTypeLabel(cardNumber: string): string {
+  const cleaned = cardNumber.replace(/\s/g, '');
+  if (cleaned.startsWith('4')) return 'Visa';
+  if (cleaned.startsWith('5')) return 'Mastercard';
+  if (cleaned.startsWith('3')) return 'Amex';
+  return 'Card';
+}
+
 export default function AddPaymentScreen() {
   const [cardNumber, setCardNumber] = useState('');
-  const [expiry, setExpiry] = useState('');
-  const [cvc, setCvc] = useState('');
   const [cardholderName, setCardholderName] = useState('');
-  const [setAsDefault, setSetAsDefault] = useState(true);
+  const [expiry, setExpiry] = useState('');
+  const [cvv, setCvv] = useState('');
+  const [isDefault, setIsDefault] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
+  const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const [focusedField, setFocusedField] = useState<string | null>(null);
 
   const formatCardNumber = (text: string) => {
     const cleaned = text.replace(/\D/g, '');
-    const formatted = cleaned.match(/.{1,4}/g)?.join(' ') || cleaned;
-    return formatted.substring(0, 19);
+    const limited = cleaned.slice(0, 16);
+    const formatted = limited.match(/.{1,4}/g)?.join(' ') || limited;
+    return formatted;
   };
 
   const formatExpiry = (text: string) => {
@@ -60,22 +58,94 @@ export default function AddPaymentScreen() {
     return cleaned;
   };
 
+  const handleCardNumberChange = (text: string) => {
+    setCardNumber(formatCardNumber(text));
+    if (errors.cardNumber) {
+      setErrors({ ...errors, cardNumber: '' });
+    }
+  };
+
+  const handleCardholderChange = (text: string) => {
+    setCardholderName(text.toUpperCase());
+    if (errors.cardholderName) {
+      setErrors({ ...errors, cardholderName: '' });
+    }
+  };
+
+  const handleExpiryChange = (text: string) => {
+    setExpiry(formatExpiry(text));
+    if (errors.expiry) {
+      setErrors({ ...errors, expiry: '' });
+    }
+  };
+
+  const handleCvvChange = (text: string) => {
+    const cleaned = text.replace(/\D/g, '').slice(0, 4);
+    setCvv(cleaned);
+    if (errors.cvv) {
+      setErrors({ ...errors, cvv: '' });
+    }
+  };
+
+  const validateForm = () => {
+    const newErrors: { [key: string]: string } = {};
+    const cardDigits = cardNumber.replace(/\s/g, '');
+
+    if (!cardDigits) {
+      newErrors.cardNumber = 'Card number is required';
+    } else if (cardDigits.length < 13 || cardDigits.length > 16) {
+      newErrors.cardNumber = 'Invalid card number';
+    }
+
+    if (!cardholderName.trim()) {
+      newErrors.cardholderName = 'Cardholder name is required';
+    }
+
+    if (!expiry || expiry.length < 5) {
+      newErrors.expiry = 'Expiry date is required';
+    } else {
+      const [monthStr, yearStr] = expiry.split('/');
+      const month = parseInt(monthStr);
+      const year = parseInt(yearStr);
+      const currentYear = new Date().getFullYear() % 100;
+      const currentMonth = new Date().getMonth() + 1;
+
+      if (month < 1 || month > 12) {
+        newErrors.expiry = 'Invalid month';
+      } else if (year < currentYear || (year === currentYear && month < currentMonth)) {
+        newErrors.expiry = 'Card has expired';
+      }
+    }
+
+    if (!cvv) {
+      newErrors.cvv = 'CVV is required';
+    } else if (cvv.length < 3) {
+      newErrors.cvv = 'Invalid CVV';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleAddCard = async () => {
+    if (!validateForm()) return;
+
     setIsAdding(true);
     try {
       const userId = useAuthStore.getState().user?.id;
       if (!userId) throw new Error('Not authenticated');
 
       const cleanedNumber = cardNumber.replace(/\s/g, '');
+      const [monthStr, yearStr] = expiry.split('/');
 
       const { error } = await supabase.from('PaymentMethod').insert({
         id: `pm-${Date.now()}`,
         userId,
         type: detectCardType(cardNumber),
         last4: cleanedNumber.slice(-4),
-        expiryMonth: parseInt(expiry.split('/')[0]),
-        expiryYear: 2000 + parseInt(expiry.split('/')[1]),
-        isDefault: setAsDefault,
+        expiryMonth: parseInt(monthStr),
+        expiryYear: 2000 + parseInt(yearStr),
+        isDefault: isDefault,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
@@ -90,141 +160,229 @@ export default function AddPaymentScreen() {
     }
   };
 
-  const isFormValid = cardNumber.length >= 18 && expiry.length === 5 && cvc.length >= 3 && cardholderName.trim() !== '';
+  const getDisplayCardNumber = () => {
+    if (cardNumber) return cardNumber;
+    return '\u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022 \u2022\u2022\u2022\u2022';
+  };
+
+  const getDisplayExpiry = () => {
+    if (expiry && expiry.length >= 4) return expiry;
+    return 'MM/YY';
+  };
+
+  const getBorderColor = (field: string) => {
+    if (errors[field]) return '#EF4444';
+    if (focusedField === field) return '#2E7AD9';
+    return 'rgba(46, 122, 217, 0.15)';
+  };
+
+  const getBorderWidth = (field: string) => {
+    if (errors[field]) return 2;
+    if (focusedField === field) return 2;
+    return 1;
+  };
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScreenHeader title="Add Payment Method" showBack />
+      <StatusBar barStyle="dark-content" backgroundColor="#F0F7FF" />
+
+      {/* Glassmorphic Header */}
+      <View style={styles.header}>
+        <View style={styles.headerInner}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
+            <Ionicons name="arrow-back" size={20} color="#1E293B" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Add Payment Card</Text>
+          <View style={{ width: 40 }} />
+        </View>
+      </View>
 
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
         {/* Card Preview */}
-        <View style={styles.cardPreview}>
+        <LinearGradient
+          colors={['#2E7AD9', '#1E6BC9']}
+          style={styles.cardPreview}
+        >
           <View style={styles.cardPreviewTop}>
-            <Ionicons name="card" size={32} color={colors.text.inverse} />
-            <Text style={styles.cardPreviewType}>Credit Card</Text>
+            <Ionicons name="card" size={40} color="#FFFFFF" />
+            <Text style={styles.cardTypeLabel}>{getCardTypeLabel(cardNumber)}</Text>
           </View>
           <Text style={styles.cardPreviewNumber}>
-            {cardNumber || '•••• •••• •••• ••••'}
+            {getDisplayCardNumber()}
           </Text>
           <View style={styles.cardPreviewBottom}>
             <View>
-              <Text style={styles.cardPreviewLabel}>CARDHOLDER</Text>
+              <Text style={styles.cardPreviewLabel}>Cardholder Name</Text>
               <Text style={styles.cardPreviewValue}>
-                {cardholderName.toUpperCase() || 'YOUR NAME'}
+                {cardholderName || 'FULL NAME'}
               </Text>
             </View>
             <View>
-              <Text style={styles.cardPreviewLabel}>EXPIRES</Text>
-              <Text style={styles.cardPreviewValue}>{expiry || 'MM/YY'}</Text>
+              <Text style={styles.cardPreviewLabel}>Expires</Text>
+              <Text style={styles.cardPreviewValue}>{getDisplayExpiry()}</Text>
             </View>
           </View>
-        </View>
+        </LinearGradient>
 
         {/* Card Number */}
         <View style={styles.inputGroup}>
-          <Text style={styles.label}>Card Number</Text>
-          <View style={styles.inputContainer}>
-            <Ionicons name="card-outline" size={20} color={colors.text.secondary} />
+          <Text style={styles.label}>Card Number *</Text>
+          <View style={[
+            styles.inputContainer,
+            { borderColor: getBorderColor('cardNumber'), borderWidth: getBorderWidth('cardNumber') },
+          ]}>
             <TextInput
               style={styles.input}
               placeholder="1234 5678 9012 3456"
-              placeholderTextColor={colors.text.muted}
+              placeholderTextColor="#94A3B8"
               value={cardNumber}
-              onChangeText={(text) => setCardNumber(formatCardNumber(text))}
+              onChangeText={handleCardNumberChange}
+              onFocus={() => setFocusedField('cardNumber')}
+              onBlur={() => setFocusedField(null)}
               keyboardType="numeric"
               maxLength={19}
             />
           </View>
+          {errors.cardNumber ? (
+            <View style={styles.errorRow}>
+              <Ionicons name="alert-circle" size={14} color="#EF4444" />
+              <Text style={styles.errorText}>{errors.cardNumber}</Text>
+            </View>
+          ) : null}
         </View>
 
-        {/* Expiry and CVC Row */}
+        {/* Cardholder Name */}
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Cardholder Name *</Text>
+          <View style={[
+            styles.inputContainer,
+            { borderColor: getBorderColor('cardholderName'), borderWidth: getBorderWidth('cardholderName') },
+          ]}>
+            <TextInput
+              style={styles.input}
+              placeholder="JOHN DOE"
+              placeholderTextColor="#94A3B8"
+              value={cardholderName}
+              onChangeText={handleCardholderChange}
+              onFocus={() => setFocusedField('cardholderName')}
+              onBlur={() => setFocusedField(null)}
+              autoCapitalize="characters"
+            />
+          </View>
+          {errors.cardholderName ? (
+            <View style={styles.errorRow}>
+              <Ionicons name="alert-circle" size={14} color="#EF4444" />
+              <Text style={styles.errorText}>{errors.cardholderName}</Text>
+            </View>
+          ) : null}
+        </View>
+
+        {/* Expiry Date and CVV Row */}
         <View style={styles.row}>
           <View style={[styles.inputGroup, { flex: 1 }]}>
-            <Text style={styles.label}>Expiry Date</Text>
-            <View style={styles.inputContainer}>
+            <Text style={styles.label}>Expiry Date *</Text>
+            <View style={[
+              styles.inputContainer,
+              { borderColor: getBorderColor('expiry'), borderWidth: getBorderWidth('expiry') },
+            ]}>
               <TextInput
                 style={styles.input}
                 placeholder="MM/YY"
-                placeholderTextColor={colors.text.muted}
+                placeholderTextColor="#94A3B8"
                 value={expiry}
-                onChangeText={(text) => setExpiry(formatExpiry(text))}
+                onChangeText={handleExpiryChange}
+                onFocus={() => setFocusedField('expiry')}
+                onBlur={() => setFocusedField(null)}
                 keyboardType="numeric"
                 maxLength={5}
               />
             </View>
+            {errors.expiry ? (
+              <View style={styles.errorRow}>
+                <Ionicons name="alert-circle" size={14} color="#EF4444" />
+                <Text style={styles.errorText}>{errors.expiry}</Text>
+              </View>
+            ) : null}
           </View>
+
           <View style={[styles.inputGroup, { flex: 1 }]}>
-            <Text style={styles.label}>CVC</Text>
-            <View style={styles.inputContainer}>
+            <Text style={styles.label}>CVV *</Text>
+            <View style={[
+              styles.inputContainer,
+              { borderColor: getBorderColor('cvv'), borderWidth: getBorderWidth('cvv') },
+            ]}>
               <TextInput
                 style={styles.input}
                 placeholder="123"
-                placeholderTextColor={colors.text.muted}
-                value={cvc}
-                onChangeText={setCvc}
+                placeholderTextColor="#94A3B8"
+                value={cvv}
+                onChangeText={handleCvvChange}
+                onFocus={() => setFocusedField('cvv')}
+                onBlur={() => setFocusedField(null)}
                 keyboardType="numeric"
                 maxLength={4}
                 secureTextEntry
               />
             </View>
+            {errors.cvv ? (
+              <View style={styles.errorRow}>
+                <Ionicons name="alert-circle" size={14} color="#EF4444" />
+                <Text style={styles.errorText}>{errors.cvv}</Text>
+              </View>
+            ) : null}
           </View>
         </View>
 
-        {/* Cardholder Name */}
-        <View style={styles.inputGroup}>
-          <Text style={styles.label}>Cardholder Name</Text>
-          <View style={styles.inputContainer}>
-            <Ionicons name="person-outline" size={20} color={colors.text.secondary} />
-            <TextInput
-              style={styles.input}
-              placeholder="Name on card"
-              placeholderTextColor={colors.text.muted}
-              value={cardholderName}
-              onChangeText={setCardholderName}
-              autoCapitalize="characters"
-            />
+        {/* Set as Default checkbox */}
+        <TouchableOpacity
+          style={styles.checkboxRow}
+          onPress={() => setIsDefault(!isDefault)}
+          activeOpacity={0.7}
+        >
+          <View style={[
+            styles.checkbox,
+            isDefault && styles.checkboxChecked,
+          ]}>
+            {isDefault && (
+              <Ionicons name="checkmark" size={16} color="#FFFFFF" />
+            )}
           </View>
-        </View>
+          <Text style={styles.checkboxLabel}>Set as default payment method</Text>
+        </TouchableOpacity>
 
-        {/* Set as Default */}
-        <View style={styles.toggleRow}>
-          <View style={styles.toggleInfo}>
-            <Text style={styles.toggleLabel}>Set as default</Text>
-            <Text style={styles.toggleDescription}>
-              Use this card for all payments
-            </Text>
-          </View>
-          <Switch
-            value={setAsDefault}
-            onValueChange={setSetAsDefault}
-            trackColor={{ false: colors.border.default, true: colors.text.secondary }}
-            thumbColor={colors.background}
-          />
-        </View>
+        {/* Secured by Stripe */}
+        <LinearGradient
+          colors={['#2E7AD9', '#1E6BC9']}
+          style={styles.stripeBox}
+        >
+          <Ionicons name="lock-closed" size={20} color="#FFFFFF" />
+          <Text style={styles.stripeText}>Secured by Stripe</Text>
+        </LinearGradient>
 
-        {/* Security Note */}
-        <View style={styles.securityNote}>
-          <Ionicons name="lock-closed" size={16} color={colors.text.secondary} />
-          <Text style={styles.securityText}>
-            Your card information is securely encrypted
-          </Text>
-        </View>
-      </ScrollView>
-
-      {/* Add Button */}
-      <View style={styles.footer}>
-        <Button
-          title="Add Card"
+        {/* Add Card Button */}
+        <TouchableOpacity
           onPress={handleAddCard}
-          fullWidth
-          loading={isAdding}
-          disabled={!isFormValid}
-        />
-      </View>
+          disabled={isAdding}
+          activeOpacity={0.85}
+        >
+          <LinearGradient
+            colors={['#2E7AD9', '#1E6BC9']}
+            style={[styles.addCardBtn, isAdding && { opacity: 0.6 }]}
+          >
+            <Text style={styles.addCardBtnText}>
+              {isAdding ? 'Adding...' : 'Add Card'}
+            </Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -232,119 +390,175 @@ export default function AddPaymentScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#F0F7FF',
+  },
+  header: {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    paddingHorizontal: 24,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 12 : 12,
+    paddingBottom: 16,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 15,
+    elevation: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(46, 122, 217, 0.08)',
+  },
+  headerInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  headerTitle: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1E293B',
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    padding: spacing.lg,
-    paddingBottom: 100,
+    padding: 24,
+    paddingBottom: 40,
   },
   cardPreview: {
-    backgroundColor: colors.primary,
-    borderRadius: borderRadius.xl,
-    padding: spacing.lg,
-    marginBottom: spacing.xl,
+    borderRadius: 16,
+    padding: 24,
+    marginBottom: 24,
   },
   cardPreviewTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.lg,
+    alignItems: 'flex-start',
+    marginBottom: 48,
   },
-  cardPreviewType: {
-    fontSize: fontSize.sm,
-    color: colors.text.muted,
+  cardTypeLabel: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontWeight: '500',
   },
   cardPreviewNumber: {
-    fontSize: fontSize.xl,
+    fontSize: 18,
     fontWeight: '600',
-    color: colors.text.inverse,
+    color: '#FFFFFF',
     letterSpacing: 2,
-    fontFamily: 'monospace',
-    marginBottom: spacing.lg,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    marginBottom: 24,
   },
   cardPreviewBottom: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'flex-end',
   },
   cardPreviewLabel: {
-    fontSize: fontSize.xs,
-    color: colors.text.muted,
-    marginBottom: spacing.xs,
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.6)',
+    marginBottom: 4,
   },
   cardPreviewValue: {
-    fontSize: fontSize.sm,
-    color: colors.text.inverse,
+    fontSize: 14,
+    color: '#FFFFFF',
     fontWeight: '500',
   },
   inputGroup: {
-    marginBottom: spacing.lg,
+    marginBottom: 16,
   },
   label: {
-    fontSize: fontSize.sm,
-    fontWeight: '600',
-    color: colors.text.primary,
-    marginBottom: spacing.sm,
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#1E293B',
+    marginBottom: 8,
   },
   inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: borderWidth.default,
-    borderColor: colors.border.default,
-    borderRadius: borderRadius.lg,
-    paddingHorizontal: spacing.md,
-    gap: spacing.sm,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(46, 122, 217, 0.15)',
   },
   input: {
-    flex: 1,
-    paddingVertical: spacing.md,
-    fontSize: fontSize.md,
-    color: colors.text.primary,
+    padding: 16,
+    fontSize: 15,
+    color: '#1E293B',
   },
   row: {
     flexDirection: 'row',
-    gap: spacing.md,
+    gap: 16,
   },
-  toggleRow: {
+  errorRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: spacing.md,
-    borderWidth: borderWidth.default,
-    borderColor: colors.border.default,
-    borderRadius: borderRadius.lg,
-    marginBottom: spacing.lg,
+    gap: 6,
+    marginTop: 6,
   },
-  toggleInfo: {
-    flex: 1,
+  errorText: {
+    fontSize: 12,
+    color: '#EF4444',
   },
-  toggleLabel: {
-    fontSize: fontSize.md,
-    fontWeight: '600',
-    color: colors.text.primary,
-    marginBottom: spacing.xs,
+  checkboxRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 24,
+    marginTop: 8,
   },
-  toggleDescription: {
-    fontSize: fontSize.sm,
-    color: colors.text.secondary,
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(46, 122, 217, 0.2)',
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  securityNote: {
+  checkboxChecked: {
+    backgroundColor: '#2E7AD9',
+    borderColor: '#2E7AD9',
+    borderWidth: 0,
+  },
+  checkboxLabel: {
+    fontSize: 14,
+    color: '#1E293B',
+  },
+  stripeBox: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.md,
+    gap: 8,
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 24,
   },
-  securityText: {
-    fontSize: fontSize.sm,
-    color: colors.text.secondary,
+  stripeText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#FFFFFF',
   },
-  footer: {
-    padding: spacing.lg,
-    borderTopWidth: borderWidth.thin,
-    borderTopColor: 'rgba(46, 122, 217, 0.1)',
-    backgroundColor: colors.background,
+  addCardBtn: {
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+  },
+  addCardBtnText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 });
-

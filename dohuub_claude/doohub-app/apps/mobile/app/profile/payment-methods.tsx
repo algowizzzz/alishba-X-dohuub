@@ -8,14 +8,16 @@ import {
   RefreshControl,
   SafeAreaView,
   ActivityIndicator,
+  Platform,
+  StatusBar,
+  Alert,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, fontSize, borderRadius, borderWidth } from '../../src/constants/theme';
-import { ScreenHeader } from '../../src/components/composite';
-import { Button, EmptyState } from '../../src/components/ui';
+import { LinearGradient } from 'expo-linear-gradient';
 import { getPaymentMethods } from '../../src/lib/queries';
 import { useAuthStore } from '../../src/store/authStore';
+import { supabase } from '../../src/lib/supabase';
 
 interface PaymentMethod {
   id: string;
@@ -25,39 +27,19 @@ interface PaymentMethod {
   isDefault: boolean;
 }
 
-const getCardIcon = (type: string) => {
-  switch (type) {
-    case 'visa':
-      return '💳';
-    case 'mastercard':
-      return '💳';
-    case 'amex':
-      return '💳';
-    default:
-      return '💳';
-  }
-};
-
-const getCardName = (type: string) => {
+const getCardType = (type: string) => {
   switch (type) {
     case 'visa':
       return 'Visa';
     case 'mastercard':
       return 'Mastercard';
     case 'amex':
-      return 'American Express';
+      return 'Amex';
     default:
       return 'Card';
   }
 };
 
-/**
- * Payment Methods List Screen matching wireframe:
- * - Header: "Payment Methods"
- * - List of saved cards
- * - Default card indicator
- * - Add new card button
- */
 export default function PaymentMethodsScreen() {
   const user = useAuthStore((s) => s.user);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
@@ -72,7 +54,7 @@ export default function PaymentMethodsScreen() {
         id: pm.id,
         type: (pm.type || '').toLowerCase() as PaymentMethod['type'],
         last4: pm.last4 || '',
-        expiry: `${pm.expiryMonth}/${String(pm.expiryYear).slice(-2)}`,
+        expiry: `${String(pm.expiryMonth).padStart(2, '0')}/${String(pm.expiryYear).slice(-2)}`,
         isDefault: !!pm.isDefault,
       }));
       setPaymentMethods(mapped);
@@ -100,73 +82,147 @@ export default function PaymentMethodsScreen() {
     router.push(`/profile/edit-payment/${cardId}`);
   };
 
+  const handleDeleteCard = async (cardId: string) => {
+    Alert.alert('Delete Card', 'Are you sure you want to delete this card?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await supabase.from('PaymentMethod').delete().eq('id', cardId);
+            await fetchPaymentMethods();
+          } catch (error) {
+            Alert.alert('Error', 'Failed to delete card');
+          }
+        },
+      },
+    ]);
+  };
+
+  const handleSetDefault = async (cardId: string) => {
+    try {
+      const userId = user?.id;
+      if (!userId) return;
+      // Unset all defaults first
+      await supabase.from('PaymentMethod').update({ isDefault: false }).eq('userId', userId);
+      // Set new default
+      await supabase.from('PaymentMethod').update({ isDefault: true }).eq('id', cardId);
+      await fetchPaymentMethods();
+    } catch (error) {
+      Alert.alert('Error', 'Failed to update default card');
+    }
+  };
+
   const renderPaymentMethod = ({ item }: { item: PaymentMethod }) => (
-    <TouchableOpacity
-      style={styles.cardItem}
-      onPress={() => handleEditCard(item.id)}
-    >
-      <View style={styles.cardIcon}>
-        <Text style={styles.cardEmoji}>{getCardIcon(item.type)}</Text>
-      </View>
-      <View style={styles.cardInfo}>
-        <View style={styles.cardHeader}>
-          <Text style={styles.cardName}>{getCardName(item.type)}</Text>
-          {item.isDefault && (
-            <View style={styles.defaultBadge}>
-              <Text style={styles.defaultText}>Default</Text>
-            </View>
+    <View style={styles.cardItem}>
+      <View style={styles.cardTopRow}>
+        {/* Icon */}
+        <LinearGradient
+          colors={['#2E7AD9', '#1E6BC9']}
+          style={styles.cardIconCircle}
+        >
+          <Ionicons name="card" size={24} color="#FFFFFF" />
+        </LinearGradient>
+
+        {/* Info */}
+        <View style={styles.cardInfo}>
+          <Text style={styles.cardTitle}>
+            {getCardType(item.type)} {'\u2022\u2022\u2022\u2022'} {item.last4}
+          </Text>
+          <Text style={styles.cardExpiry}>Expires {item.expiry}</Text>
+          {item.isDefault ? (
+            <LinearGradient
+              colors={['#2E7AD9', '#1E6BC9']}
+              style={styles.defaultBadge}
+            >
+              <Text style={styles.defaultBadgeText}>Default</Text>
+            </LinearGradient>
+          ) : (
+            <TouchableOpacity
+              onPress={() => handleSetDefault(item.id)}
+              style={styles.setDefaultBtn}
+            >
+              <Text style={styles.setDefaultText}>Set as Default</Text>
+            </TouchableOpacity>
           )}
         </View>
-        <Text style={styles.cardNumber}>•••• •••• •••• {item.last4}</Text>
-        <Text style={styles.cardExpiry}>Expires {item.expiry}</Text>
+
+        {/* Edit + Delete buttons */}
+        <View style={styles.actionButtons}>
+          <TouchableOpacity
+            style={styles.actionBtn}
+            onPress={() => handleEditCard(item.id)}
+          >
+            <Ionicons name="create-outline" size={20} color="#64748B" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.actionBtn}
+            onPress={() => handleDeleteCard(item.id)}
+          >
+            <Ionicons name="trash-outline" size={20} color="#EF4444" />
+          </TouchableOpacity>
+        </View>
       </View>
-      <Ionicons name="chevron-forward" size={20} color={colors.text.muted} />
-    </TouchableOpacity>
+    </View>
   );
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScreenHeader title="Payment Methods" showBack />
+      <StatusBar barStyle="dark-content" backgroundColor="#F0F7FF" />
+
+      {/* Glassmorphic Header */}
+      <View style={styles.header}>
+        <View style={styles.headerInner}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
+            <Ionicons name="arrow-back" size={24} color="#1E293B" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Payment Methods</Text>
+          <View style={{ width: 40 }} />
+        </View>
+      </View>
 
       {isLoading ? (
         <View style={styles.emptyContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <ActivityIndicator size="large" color="#2E7AD9" />
         </View>
       ) : paymentMethods.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <EmptyState
-            icon="card-outline"
-            title="No payment methods"
-            message="Add a card to make payments faster and easier"
-          />
-          <Button
-            title="Add Payment Method"
-            onPress={handleAddCard}
-            style={styles.addButtonEmpty}
-          />
+          <View style={styles.emptyIconCircle}>
+            <Ionicons name="card-outline" size={40} color="#64748B" style={{ opacity: 0.5 }} />
+          </View>
+          <Text style={styles.emptyTitle}>No payment methods added</Text>
+          <Text style={styles.emptySubtitle}>Add a card to get started</Text>
         </View>
       ) : (
-        <>
-          <FlatList
-            data={paymentMethods}
-            keyExtractor={(item) => item.id}
-            renderItem={renderPaymentMethod}
-            contentContainerStyle={styles.listContent}
-            refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-            }
-            showsVerticalScrollIndicator={false}
-          />
-
-          <View style={styles.footer}>
-            <Button
-              title="Add Payment Method"
-              onPress={handleAddCard}
-              fullWidth
-            />
-          </View>
-        </>
+        <FlatList
+          data={paymentMethods}
+          keyExtractor={(item) => item.id}
+          renderItem={renderPaymentMethod}
+          contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+          showsVerticalScrollIndicator={false}
+        />
       )}
+
+      {/* Add New Card button (dashed border) */}
+      <View style={styles.bottomSection}>
+        <TouchableOpacity style={styles.addNewCardBtn} onPress={handleAddCard}>
+          <Ionicons name="add" size={24} color="#2E7AD9" />
+          <Text style={styles.addNewCardText}>Add New Card</Text>
+        </TouchableOpacity>
+
+        {/* Secured by Stripe */}
+        <View style={styles.stripeBox}>
+          <Ionicons name="lock-closed" size={20} color="#2E7AD9" />
+          <Text style={styles.stripeText}>Secured by Stripe</Text>
+        </View>
+      </View>
     </SafeAreaView>
   );
 }
@@ -174,83 +230,182 @@ export default function PaymentMethodsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#F0F7FF',
+  },
+  header: {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    paddingHorizontal: 24,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 12 : 12,
+    paddingBottom: 16,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 15,
+    elevation: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(46, 122, 217, 0.08)',
+  },
+  headerInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  headerTitle: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1E293B',
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: spacing.xl,
+    paddingHorizontal: 24,
   },
-  addButtonEmpty: {
-    marginTop: spacing.lg,
-  },
-  listContent: {
-    padding: spacing.lg,
-    paddingBottom: 100,
-  },
-  cardItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.md,
-    borderWidth: borderWidth.default,
-    borderColor: colors.border.default,
-    borderRadius: borderRadius.lg,
-    marginBottom: spacing.md,
-    backgroundColor: colors.background,
-  },
-  cardIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: borderRadius.md,
-    backgroundColor: colors.secondary,
+  emptyIconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(46, 122, 217, 0.08)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: spacing.md,
+    marginBottom: 16,
   },
-  cardEmoji: {
-    fontSize: 24,
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#64748B',
+    marginBottom: 8,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: '#64748B',
+    opacity: 0.7,
+  },
+  listContent: {
+    padding: 24,
+    paddingBottom: 16,
+  },
+  cardItem: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  cardTopRow: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  cardIconCircle: {
+    width: 48,
+    height: 48,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   cardInfo: {
     flex: 1,
   },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.xs,
-  },
-  cardName: {
-    fontSize: fontSize.md,
+  cardTitle: {
+    fontSize: 15,
     fontWeight: '600',
-    color: colors.text.primary,
-    marginRight: spacing.sm,
-  },
-  defaultBadge: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    backgroundColor: colors.status.success,
-    borderRadius: borderRadius.sm,
-  },
-  defaultText: {
-    fontSize: fontSize.xs,
-    fontWeight: '600',
-    color: colors.text.inverse,
-  },
-  cardNumber: {
-    fontSize: fontSize.sm,
-    color: colors.text.secondary,
-    fontFamily: 'monospace',
-    marginBottom: spacing.xs,
+    color: '#1E293B',
+    marginBottom: 4,
   },
   cardExpiry: {
-    fontSize: fontSize.sm,
-    color: colors.text.secondary,
+    fontSize: 13,
+    color: '#64748B',
+    marginBottom: 6,
   },
-  footer: {
-    padding: spacing.lg,
-    borderTopWidth: borderWidth.thin,
-    borderTopColor: 'rgba(46, 122, 217, 0.1)',
-    backgroundColor: colors.background,
+  defaultBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  defaultBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  setDefaultBtn: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(46, 122, 217, 0.2)',
+  },
+  setDefaultText: {
+    fontSize: 12,
+    color: '#64748B',
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 8,
+    alignSelf: 'flex-start',
+  },
+  actionBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(46, 122, 217, 0.06)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  bottomSection: {
+    paddingHorizontal: 24,
+    paddingBottom: 24,
+  },
+  addNewCardBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    padding: 16,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    borderColor: 'rgba(46, 122, 217, 0.25)',
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  addNewCardText: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#1E293B',
+  },
+  stripeBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: 'rgba(46, 122, 217, 0.06)',
+  },
+  stripeText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#1E293B',
   },
 });
-

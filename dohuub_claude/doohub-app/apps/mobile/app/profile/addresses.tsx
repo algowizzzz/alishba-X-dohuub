@@ -7,13 +7,13 @@ import {
   TouchableOpacity,
   SafeAreaView,
   Alert,
+  Platform,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../src/store/authStore';
-import { colors, spacing, fontSize, borderRadius, borderWidth } from '../../src/constants/theme';
-import { ScreenHeader } from '../../src/components/composite';
 import { supabase } from '../../src/lib/supabase';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const ADDRESS_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
   HOME: 'home',
@@ -46,12 +46,10 @@ export default function AddressesScreen() {
     try {
       const userId = useAuthStore.getState().user?.id;
       if (userId) {
-        // Clear previous default
         await supabase
           .from('Address')
           .update({ isDefault: false, updatedAt: new Date().toISOString() })
           .eq('userId', userId);
-        // Set new default
         await supabase
           .from('Address')
           .update({ isDefault: true, updatedAt: new Date().toISOString() })
@@ -60,7 +58,6 @@ export default function AddressesScreen() {
       setSelectedAddress(addressId);
       if (fetchAddresses) fetchAddresses();
     } catch {
-      // fallback: just update selected
       setSelectedAddress(addressId);
     }
   };
@@ -75,34 +72,56 @@ export default function AddressesScreen() {
 
         <View style={styles.cardInner}>
           <View style={styles.iconCircle}>
-            <Ionicons name={icon} size={22} color={colors.primary} />
+            <Ionicons name={icon} size={24} color="#2E7AD9" />
           </View>
 
           <View style={styles.info}>
             <View style={styles.labelRow}>
               <Text style={styles.label}>{item.label || item.type}</Text>
               {isDefault && (
-                <View style={styles.defaultBadge}>
+                <LinearGradient
+                  colors={['#2E7AD9', '#1E6AC9']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.defaultBadge}
+                >
                   <Text style={styles.defaultBadgeText}>Default</Text>
-                </View>
+                </LinearGradient>
               )}
             </View>
-            <Text style={styles.street}>{item.street}</Text>
-            <Text style={styles.city}>{item.city}, {item.state} {item.zipCode}</Text>
+            <Text style={styles.fullAddress} numberOfLines={2}>
+              {item.street}{item.city ? `, ${item.city}` : ''}{item.state ? `, ${item.state}` : ''} {item.zipCode || ''}
+            </Text>
           </View>
 
           <View style={styles.actions}>
-            <TouchableOpacity style={styles.actionBtn} onPress={() => handleEdit(item.id)}>
-              <Ionicons name="create-outline" size={20} color={colors.text.secondary} />
+            <TouchableOpacity
+              style={styles.actionBtn}
+              onPress={() => handleEdit(item.id)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="create-outline" size={20} color="#64748B" />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.actionBtn} onPress={() => handleDelete(item.id)}>
-              <Ionicons name="trash-outline" size={20} color={colors.status.error} />
+            <TouchableOpacity
+              style={styles.actionBtn}
+              onPress={() => handleDelete(item.id)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="trash-outline" size={20} color="#EF4444" />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.actionBtn} onPress={() => handleSetDefault(item.id)}>
+            <TouchableOpacity
+              style={[
+                styles.actionBtn,
+                isDefault && styles.actionBtnDefault,
+              ]}
+              onPress={() => handleSetDefault(item.id)}
+              activeOpacity={0.7}
+              disabled={isDefault}
+            >
               <Ionicons
                 name={isDefault ? 'star' : 'star-outline'}
                 size={20}
-                color={isDefault ? colors.primary : colors.text.secondary}
+                color={isDefault ? '#FFFFFF' : '#64748B'}
               />
             </TouchableOpacity>
           </View>
@@ -114,16 +133,28 @@ export default function AddressesScreen() {
   const renderEmpty = () => (
     <View style={styles.emptyState}>
       <View style={styles.emptyIcon}>
-        <Ionicons name="location-outline" size={48} color={colors.text.muted} />
+        <Ionicons name="location-outline" size={40} color="#94A3B8" />
       </View>
-      <Text style={styles.emptyTitle}>No addresses saved</Text>
+      <Text style={styles.emptyTitle}>No saved addresses yet</Text>
       <Text style={styles.emptyText}>Add your frequently used addresses for faster booking</Text>
     </View>
   );
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScreenHeader title="Saved Addresses" showBack />
+      {/* Glassmorphic Header */}
+      <View style={styles.header}>
+        <View style={styles.headerContent}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="arrow-back" size={24} color="#1E293B" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Saved Addresses</Text>
+        </View>
+      </View>
 
       <FlatList
         data={addresses}
@@ -132,130 +163,215 @@ export default function AddressesScreen() {
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={renderEmpty}
         showsVerticalScrollIndicator={false}
+        ListFooterComponent={
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={() => router.push('/profile/add-address')}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="add" size={24} color="#2E7AD9" />
+            <Text style={styles.addButtonText}>Add New Address</Text>
+          </TouchableOpacity>
+        }
       />
-
-      <View style={styles.ctaContainer}>
-        <TouchableOpacity style={styles.addButton} onPress={() => router.push('/profile/add-address')}>
-          <Ionicons name="add" size={20} color={colors.primary} />
-          <Text style={styles.addButtonText}>Add New Address</Text>
-        </TouchableOpacity>
-      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  listContent: { padding: spacing.lg, flexGrow: 1 },
+  container: {
+    flex: 1,
+    backgroundColor: '#F0F7FF',
+  },
 
+  // Glassmorphic Header
+  header: {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    paddingTop: Platform.OS === 'ios' ? 0 : 16,
+    paddingBottom: 24,
+    paddingHorizontal: 24,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(46, 122, 217, 0.08)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 15,
+    elevation: 8,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1E293B',
+  },
+
+  listContent: {
+    padding: 24,
+    flexGrow: 1,
+  },
+
+  // Address Card
   card: {
     flexDirection: 'row',
-    borderWidth: borderWidth.default,
-    borderColor: colors.border.light,
-    borderRadius: borderRadius.lg,
-    marginBottom: spacing.md,
-    backgroundColor: colors.surface,
+    borderRadius: 12,
+    marginBottom: 16,
+    backgroundColor: '#FFFFFF',
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
   },
   cardDefault: {
-    borderColor: 'rgba(46,122,217,0.25)',
+    // accent border handles visual distinction
   },
   accentBorder: {
     width: 4,
-    backgroundColor: colors.primary,
+    backgroundColor: '#2E7AD9',
   },
   cardInner: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    padding: spacing.md,
-    gap: spacing.md,
+    padding: 16,
+    gap: 16,
   },
   iconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.secondary,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#E8F1FC',
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#2E7AD9',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  info: { flex: 1 },
+  info: {
+    flex: 1,
+    minWidth: 0,
+  },
   labelRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    marginBottom: 2,
+    gap: 8,
+    marginBottom: 4,
   },
   label: {
-    fontSize: fontSize.md,
+    fontSize: 16,
     fontWeight: '600',
-    color: colors.text.primary,
+    color: '#1E293B',
   },
   defaultBadge: {
-    backgroundColor: colors.primary,
-    borderRadius: borderRadius.full,
-    paddingHorizontal: spacing.sm,
+    borderRadius: 999,
+    paddingHorizontal: 8,
     paddingVertical: 2,
+    shadowColor: '#2E7AD9',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 2,
   },
   defaultBadgeText: {
     fontSize: 11,
     fontWeight: '600',
     color: '#FFFFFF',
   },
-  street: { fontSize: fontSize.sm, color: colors.text.secondary },
-  city: { fontSize: fontSize.sm, color: colors.text.secondary },
+  fullAddress: {
+    fontSize: 13,
+    color: '#64748B',
+    lineHeight: 18,
+  },
 
-  actions: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  actionBtn: { padding: spacing.sm },
-
-  emptyState: {
-    flex: 1,
+  // Action buttons
+  actions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  actionBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#E8F1FC',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: spacing.xxl,
+  },
+  actionBtnDefault: {
+    backgroundColor: '#2E7AD9',
+  },
+
+  // Empty state
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 48,
   },
   emptyIcon: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: colors.secondary,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#E8F1FC',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: spacing.lg,
+    marginBottom: 16,
+    shadowColor: '#2E7AD9',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 4,
   },
   emptyTitle: {
-    fontSize: fontSize.lg,
+    fontSize: 16,
     fontWeight: '600',
-    color: colors.text.primary,
-    marginBottom: spacing.xs,
+    color: '#64748B',
+    marginBottom: 8,
   },
   emptyText: {
-    fontSize: fontSize.sm,
-    color: colors.text.secondary,
+    fontSize: 14,
+    color: '#94A3B8',
     textAlign: 'center',
     maxWidth: 260,
   },
 
-  ctaContainer: {
-    padding: spacing.lg,
-    borderTopWidth: borderWidth.thin,
-    borderTopColor: 'rgba(46,122,217,0.1)',
-  },
+  // Add button
   addButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.md,
-    borderWidth: 1.5,
-    borderColor: colors.primary,
+    gap: 12,
+    paddingVertical: 16,
+    borderWidth: 2,
+    borderColor: 'rgba(46, 122, 217, 0.25)',
     borderStyle: 'dashed',
-    borderRadius: borderRadius.lg,
-    backgroundColor: 'rgba(46,122,217,0.03)',
+    borderRadius: 12,
+    backgroundColor: 'transparent',
+    marginTop: 8,
   },
   addButtonText: {
-    fontSize: fontSize.md,
+    fontSize: 16,
     fontWeight: '500',
-    color: colors.primary,
+    color: '#1E293B',
   },
 });

@@ -40,7 +40,7 @@ export default function BeautyServicesScreen() {
   const PointsBanner = () => (
     <View style={styles.pointsBanner}>
       <View style={styles.pointsIconWrap}><Ionicons name="gift" size={20} color="#F59E0B" /></View>
-      <View>
+      <View style={{ flex: 1 }}>
         <Text style={styles.pointsTitle}>Earn points on this service</Text>
         <Text style={styles.pointsSub}>1 point per $1 spent • Points added after service completion</Text>
       </View>
