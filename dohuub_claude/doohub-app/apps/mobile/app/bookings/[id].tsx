@@ -1,34 +1,11 @@
 import { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  SafeAreaView, ActivityIndicator, Platform, StatusBar,
+  SafeAreaView, ActivityIndicator, Platform, StatusBar, Alert,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useBookingStore } from '../../src/store/bookingStore';
-
-const MOCK_BOOKINGS: Record<string, any> = {
-  'mock-1': {
-    id: 'mock-1', status: 'ACCEPTED', category: 'Deep House Cleaning',
-    scheduledDate: 'Thu, Dec 5', scheduledTime: '10:00 AM', pointsEarned: 150,
-    vendor: { businessName: 'Sparkle Clean Co.', isMichelle: true },
-    address: { label: 'Home', street: '123 Main St, Apt 4B', city: 'New York', state: 'NY' },
-  },
-  'mock-2': {
-    id: 'mock-2', status: 'IN_PROGRESS', category: 'Plumbing Repair',
-    scheduledDate: 'Fri, Dec 6', scheduledTime: '2:00 PM', pointsEarned: null,
-    vendor: { businessName: 'HandyFix Pro', isMichelle: false },
-    address: { label: 'Home', street: '789 Oak Street', city: 'Manhattan', state: 'NY' },
-  },
-};
-
-// Fallback booking for any unknown ID
-const DEFAULT_BOOKING = {
-  id: 'default', status: 'ACCEPTED', category: 'Plumbing Repair',
-  scheduledDate: 'Thu, Dec 5', scheduledTime: '8:00 AM', pointsEarned: null,
-  vendor: { businessName: 'DoHuub Official', isMichelle: true },
-  address: { label: 'Home', street: '123 Main Street, Apt 4B', city: 'New York', state: 'NY' },
-};
 
 const TIMELINE_STEPS = [
   { id: 'ACCEPTED', label: 'Accepted', description: 'Your booking has been confirmed', timestamp: 'Just now' },
@@ -48,29 +25,36 @@ const STATUS_ORDER = ['ACCEPTED', 'IN_PROGRESS', 'COMPLETED'];
  */
 export default function BookingDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { currentBooking, isLoading, fetchBooking } = useBookingStore();
-  const [demoStatus, setDemoStatus] = useState<string>('ACCEPTED');
+  const { currentBooking, isLoading, fetchBooking, completeBooking } = useBookingStore();
+  const [completing, setCompleting] = useState(false);
 
   useEffect(() => {
     if (id) fetchBooking(id);
   }, [id]);
 
-  const booking = currentBooking || MOCK_BOOKINGS[id as string] || DEFAULT_BOOKING;
+  const booking = currentBooking;
 
-  useEffect(() => {
-    if (booking?.status) setDemoStatus(booking.status);
-  }, [booking?.status]);
-
-  if (isLoading && !booking) {
+  if (isLoading || !booking) {
     return (
       <SafeAreaView style={s.container}>
         <Header />
-        <View style={s.centered}><ActivityIndicator size="large" color="#2E7AD9" /></View>
+        {isLoading ? (
+          <View style={s.centered}><ActivityIndicator size="large" color="#2E7AD9" /></View>
+        ) : (
+          <View style={s.centered}>
+            <Ionicons name="document-text-outline" size={56} color="#94A3B8" />
+            <Text style={{ fontSize: 16, fontWeight: '600', color: '#1E293B', marginTop: 16 }}>Booking not found</Text>
+            <Text style={{ fontSize: 13, color: '#64748B', marginTop: 6, textAlign: 'center', paddingHorizontal: 32 }}>We couldn't locate this booking. It may have been removed or the link is invalid.</Text>
+            <TouchableOpacity onPress={() => router.back()} style={{ marginTop: 20, backgroundColor: '#2E7AD9', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 10 }}>
+              <Text style={{ color: '#FFF', fontWeight: '600' }}>Go Back</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </SafeAreaView>
     );
   }
 
-  const currentStatusIndex = STATUS_ORDER.indexOf(demoStatus);
+  const currentStatusIndex = STATUS_ORDER.indexOf(booking.status);
   const serviceName = booking.listing?.title || booking.category || 'Service';
   const vendorName = booking.vendor?.businessName || booking.Vendor?.businessName || 'Provider';
   const addr = booking.address || booking.Address;
@@ -181,30 +165,48 @@ export default function BookingDetailScreen() {
           )}
         </View>
 
-        {/* Demo Status Changer */}
-        <View style={s.demoBox}>
-          <Text style={s.demoLabel}>Demo: Change Status</Text>
-          <View style={s.demoButtons}>
-            {STATUS_ORDER.map((st) => (
-              <TouchableOpacity
-                key={st}
-                style={[s.demoBtn, demoStatus === st && s.demoBtnActive]}
-                onPress={() => {
-                  setDemoStatus(st);
-                  if (st === 'COMPLETED') {
-                    setTimeout(() => {
-                      router.push(`/review/${id}?serviceName=${encodeURIComponent(serviceName)}&scheduledDate=${encodeURIComponent(booking.scheduledDate || '')}&scheduledTime=${encodeURIComponent(booking.scheduledTime || '')}` as any);
-                    }, 2000);
-                  }
-                }}
-              >
-                <Text style={[s.demoBtnText, demoStatus === st && s.demoBtnTextActive]}>
-                  {st === 'ACCEPTED' ? 'Accepted' : st === 'IN_PROGRESS' ? 'In Progress' : 'Completed'}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
+        {/* Actions */}
+        {(booking.status === 'ACCEPTED' || booking.status === 'IN_PROGRESS') && (
+          <TouchableOpacity
+            style={[s.completeBtn, completing && { opacity: 0.5 }]}
+            disabled={completing}
+            onPress={async () => {
+              if (!id || completing) return;
+              setCompleting(true);
+              try {
+                const result = await completeBooking(id as string);
+                Alert.alert(
+                  'Service Completed',
+                  result.pointsEarned > 0
+                    ? `You earned ${result.pointsEarned} points!`
+                    : 'Booking marked complete.',
+                  [{
+                    text: 'Leave Review',
+                    onPress: () => router.push(`/review/${id}?serviceName=${encodeURIComponent(serviceName)}&scheduledDate=${encodeURIComponent(booking.scheduledDate || '')}&scheduledTime=${encodeURIComponent(booking.scheduledTime || '')}` as any),
+                  }, { text: 'Later', style: 'cancel' }]
+                );
+              } catch (e: any) {
+                Alert.alert('Error', e?.message || 'Could not complete booking');
+              } finally {
+                setCompleting(false);
+              }
+            }}
+          >
+            <Ionicons name="checkmark-circle" size={20} color="#FFF" />
+            <Text style={s.completeBtnText}>
+              {completing ? 'Completing…' : 'Mark Service as Complete'}
+            </Text>
+          </TouchableOpacity>
+        )}
+        {booking.status === 'COMPLETED' && (
+          <TouchableOpacity
+            style={s.completeBtn}
+            onPress={() => router.push(`/review/${id}?serviceName=${encodeURIComponent(serviceName)}&scheduledDate=${encodeURIComponent(booking.scheduledDate || '')}&scheduledTime=${encodeURIComponent(booking.scheduledTime || '')}` as any)}
+          >
+            <Ionicons name="star" size={20} color="#FFF" />
+            <Text style={s.completeBtnText}>Leave a Review</Text>
+          </TouchableOpacity>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -324,18 +326,11 @@ const s = StyleSheet.create({
   detailValueBold: { fontSize: 14, fontWeight: '600', color: '#1E293B' },
 
   // Demo Box
-  demoBox: {
-    backgroundColor: 'rgba(245, 158, 11, 0.1)', borderRadius: 12, padding: 16,
-    borderWidth: 1, borderColor: 'rgba(245, 158, 11, 0.3)', gap: 12,
+  completeBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10,
+    backgroundColor: '#2E7AD9', borderRadius: 12, paddingVertical: 16,
+    marginTop: 8, shadowColor: '#2E7AD9', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3, shadowRadius: 10, elevation: 4,
   },
-  demoLabel: { fontSize: 13, fontWeight: '500', color: '#B45309' },
-  demoButtons: { flexDirection: 'row', gap: 8 },
-  demoBtn: {
-    flex: 1, paddingVertical: 10, borderRadius: 8,
-    alignItems: 'center', backgroundColor: '#FFFFFF',
-    borderWidth: 1, borderColor: 'rgba(46, 122, 217, 0.15)',
-  },
-  demoBtnActive: { backgroundColor: '#2E7AD9', borderColor: '#2E7AD9' },
-  demoBtnText: { fontSize: 13, color: '#64748B', fontWeight: '500' },
-  demoBtnTextActive: { color: '#FFFFFF', fontWeight: '600' },
+  completeBtnText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' },
 });

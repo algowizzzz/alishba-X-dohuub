@@ -18,20 +18,6 @@ import { getServiceImages } from '../../../src/constants/serviceImages';
 
 const ACCENT = '#EAB308';
 
-const MOCK_VENDORS: Record<string, any> = {
-  '1': { id: '1', businessName: 'DoHuub Official',     rating: 4.9, reviewCount: 1247, isMichelle: true,  description: 'Trusted, verified handyman services across all categories. Our certified professionals handle everything from plumbing to electrical work.' },
-  '2': { id: '2', businessName: 'The Handyman Hub',    rating: 4.9, reviewCount: 401,  isMichelle: false, description: 'One-stop solution for all home repair needs with 15+ years of experience serving homeowners across the city.' },
-  '3': { id: '3', businessName: 'Home Repair Masters', rating: 4.8, reviewCount: 256,  isMichelle: false, description: 'Specializes in general repairs, painting, and furniture assembly. Fast turnaround and quality guaranteed.' },
-  '4': { id: '4', businessName: 'Quick Fix Services',  rating: 4.7, reviewCount: 189,  isMichelle: false, description: 'Fast and efficient solutions for appliance repairs and installations. Available 7 days a week.' },
-};
-
-const MOCK_LISTINGS = [
-  { id: 'l1', title: 'Plumbing Repair',       basePrice: 85,  priceUnit: 'per_job', rating: 4.8, duration: '1-2 hours', description: 'Fix leaks, unclog drains, and replace fixtures.',         images: [], whatsIncluded: ['Professional-grade tools and equipment', 'Experienced and licensed professionals', 'Quality parts and materials included', 'Clean-up after job completion'] },
-  { id: 'l2', title: 'Electrical Work',        basePrice: 120, priceUnit: 'per_job', rating: 4.9, duration: '1-3 hours', description: 'Outlet installation, wiring, panel upgrades.',            images: [], whatsIncluded: ['Licensed electrician', 'Safety inspection included', 'Quality wiring materials', 'Clean-up after job completion'] },
-  { id: 'l3', title: 'Furniture Assembly',     basePrice: 60,  priceUnit: 'per_job', rating: 4.7, duration: '1-2 hours', description: 'IKEA and flat-pack furniture assembled quickly.',          images: [], whatsIncluded: ['Professional assembly tools', 'Experienced assemblers', 'Hardware inspection', 'Clean-up after completion'] },
-  { id: 'l4', title: 'TV & Appliance Install', basePrice: 75,  priceUnit: 'per_job', rating: 4.8, duration: '1 hour', description: 'TV mounting, washing machine and dishwasher installation.', images: [], whatsIncluded: ['Wall bracket included', 'Cable management', 'Safety secured mounting', 'Clean-up after installation'] },
-];
-
 const PointsBanner = () => (
   <View style={styles.pointsBanner}>
     <View style={styles.pointsIcon}>
@@ -54,11 +40,11 @@ function VendorPage({ vendorId }: { vendorId: string }) {
     (async () => {
       try {
         const [v, l] = await Promise.all([getVendorById(vendorId), getHandymanListings(vendorId)]);
-        setVendor(v || MOCK_VENDORS[vendorId] || null);
-        setListings(l?.length > 0 ? l : MOCK_LISTINGS);
+        setVendor(v);
+        setListings(l ?? []);
       } catch (e) {
-        setVendor(MOCK_VENDORS[vendorId] || null);
-        setListings(MOCK_LISTINGS);
+        setVendor(null);
+        setListings([]);
       } finally {
         setLoading(false);
       }
@@ -165,14 +151,12 @@ function ServiceDetailPage({ vendorId, listingId }: { vendorId: string; listingI
     (async () => {
       try {
         const [v, listings] = await Promise.all([getVendorById(vendorId), getHandymanListings(vendorId)]);
-        const resolvedVendor = v || MOCK_VENDORS[vendorId] || null;
-        const resolvedListings = listings?.length > 0 ? listings : MOCK_LISTINGS;
-        setVendor(resolvedVendor);
-        setListing(resolvedListings.find((l: any) => l.id === listingId) || resolvedListings[0]);
+        setVendor(v);
+        setListing((listings ?? []).find((l: any) => l.id === listingId) || (listings ?? [])[0] || null);
         try { setReviews(await getReviewsByVendor(vendorId)); } catch { setReviews([]); }
       } catch (e) {
-        setVendor(MOCK_VENDORS[vendorId] || null);
-        setListing(MOCK_LISTINGS.find(l => l.id === listingId) || MOCK_LISTINGS[0]);
+        setVendor(null);
+        setListing(null);
       } finally {
         setLoading(false);
       }

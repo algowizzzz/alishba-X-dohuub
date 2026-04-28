@@ -23,20 +23,6 @@ const cleaningLogos = [
   require('../../../assets/cleaning/logos/logo3.png'),
 ];
 
-const MOCK_VENDORS: Record<string, any> = {
-  '1': { id: '1', businessName: 'Sparkle Clean Co.',    rating: 4.9, reviewCount: 312, isMichelle: true,  description: 'Top-rated cleaning service with certified professionals. We deliver spotless results every time.' },
-  '2': { id: '2', businessName: 'ProClean Services',    rating: 4.8, reviewCount: 198, isMichelle: true,  description: 'Professional cleaning for homes and offices. Eco-friendly products and reliable staff.' },
-  '3': { id: '3', businessName: 'Office Shine Co.',     rating: 4.9, reviewCount: 97,  isMichelle: false, description: 'Specializing in commercial and office cleaning with flexible scheduling.' },
-  '4': { id: '4', businessName: 'Home Fresh Cleaners',  rating: 4.7, reviewCount: 154, isMichelle: false, description: 'Affordable deep cleaning and regular maintenance for residential properties.' },
-};
-
-const MOCK_LISTINGS = [
-  { id: 'l1', title: 'Standard Cleaning',    basePrice: 80,  rating: 4.8, description: 'Regular home cleaning — dusting, vacuuming, mopping and surface wipe-downs.', images: [] },
-  { id: 'l2', title: 'Deep Cleaning',         basePrice: 150, rating: 4.9, description: 'Full deep clean including appliances, baseboards, and inside cabinets.',         images: [] },
-  { id: 'l3', title: 'Office & Commercial',   basePrice: 200, rating: 4.9, description: 'Complete office cleaning solution tailored for businesses of all sizes.',        images: [] },
-  { id: 'l4', title: 'Move-In / Move-Out',    basePrice: 180, rating: 4.7, description: 'Thorough cleaning for empty properties before or after a move.',                 images: [] },
-];
-
 const PointsBanner = () => (
   <View style={styles.pointsBanner}>
     <View style={styles.pointsIcon}>
@@ -59,11 +45,11 @@ function VendorPage({ vendorId }: { vendorId: string }) {
     (async () => {
       try {
         const [v, l] = await Promise.all([getVendorById(vendorId), getCleaningListings(vendorId)]);
-        setVendor(v || MOCK_VENDORS[vendorId] || null);
-        setListings(l?.length > 0 ? l : MOCK_LISTINGS);
+        setVendor(v);
+        setListings(l ?? []);
       } catch (e) {
-        setVendor(MOCK_VENDORS[vendorId] || null);
-        setListings(MOCK_LISTINGS);
+        setVendor(null);
+        setListings([]);
       } finally {
         setLoading(false);
       }
@@ -175,14 +161,12 @@ function ServiceDetailPage({ vendorId, listingId }: { vendorId: string; listingI
     (async () => {
       try {
         const [v, listings] = await Promise.all([getVendorById(vendorId), getCleaningListings(vendorId)]);
-        const resolvedVendor = v || MOCK_VENDORS[vendorId] || null;
-        const resolvedListings = listings?.length > 0 ? listings : MOCK_LISTINGS;
-        setVendor(resolvedVendor);
-        setListing(resolvedListings.find((l: any) => l.id === listingId) || resolvedListings[0]);
+        setVendor(v);
+        setListing((listings ?? []).find((l: any) => l.id === listingId) || (listings ?? [])[0] || null);
         try { setReviews(await getReviewsByVendor(vendorId)); } catch { setReviews([]); }
       } catch (e) {
-        setVendor(MOCK_VENDORS[vendorId] || null);
-        setListing(MOCK_LISTINGS.find(l => l.id === listingId) || MOCK_LISTINGS[0]);
+        setVendor(null);
+        setListing(null);
       } finally {
         setLoading(false);
       }

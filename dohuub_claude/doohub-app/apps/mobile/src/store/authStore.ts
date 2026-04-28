@@ -1,6 +1,18 @@
 import { create } from 'zustand';
 import { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import api from '../services/api';
+
+// Keep api client's stored token in sync with Supabase session.
+// API's auth middleware validates Supabase JWTs via supabase.auth.getUser().
+async function syncApiToken(session: Session | null) {
+  if (session?.access_token) {
+    await api.setToken(session.access_token);
+    if (session.refresh_token) await api.setRefreshToken(session.refresh_token);
+  } else {
+    await api.clearTokens();
+  }
+}
 
 interface User {
   id: string;
@@ -160,6 +172,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         session: data.session,
         isAuthenticated: true,
       });
+      await syncApiToken(data.session);
 
       // Load addresses in background
       loadAddresses(data.user.id).then(({ addresses, selectedId }) => {
@@ -202,6 +215,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } catch (e) {
       // Ignore error
     }
+    await syncApiToken(null);
     set({
       user: null,
       session: null,
@@ -223,11 +237,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           session,
           isAuthenticated: true,
         });
+        await syncApiToken(session);
 
         // Load addresses
         const { addresses, selectedId } = await loadAddresses(session.user.id);
         set({ addresses, selectedAddressId: selectedId });
       } else {
+        await syncApiToken(null);
         set({ isAuthenticated: false, user: null, session: null });
       }
     } catch (e) {
@@ -241,6 +257,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       session,
       isAuthenticated: true,
     });
+    syncApiToken(session);
 
     fetchUserFromDb(session.user.id, session.user.email || '').then((user) => {
       set({ user });
@@ -264,47 +281,31 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   updateProfile: async (data: any) => {
     set({ isLoading: true });
     try {
-      // Update Supabase Auth metadata
-      await supabase.auth.updateUser({
-        data: {
+      const response = await api.put<{ success: boolean; data: any; error?: string }>(
+        '/api/v1/users/me',
+        {
           firstName: data.firstName,
           lastName: data.lastName,
           phone: data.phone,
-        },
-      });
-
-      // Update UserProfile table
-      const userId = get().user?.id;
-      if (userId) {
-        await supabase
-          .from('UserProfile')
-          .update({
-            firstName: data.firstName,
-            lastName: data.lastName,
-            updatedAt: new Date().toISOString(),
-          })
-          .eq('userId', userId);
-
-        // Update phone on User table if provided
-        if (data.phone) {
-          await supabase
-            .from('User')
-            .update({ phone: data.phone, updatedAt: new Date().toISOString() })
-            .eq('id', userId);
+          avatar: data.avatar,
         }
+      );
+      if (!response.success || !response.data) {
+        throw new Error(response.error || 'Profile update failed');
       }
 
-      // Update local state
+      const updated = response.data;
       const currentUser = get().user;
       if (currentUser) {
         set({
           user: {
             ...currentUser,
-            phone: data.phone || currentUser.phone,
+            phone: updated.phone || currentUser.phone,
             profile: {
               ...currentUser.profile,
-              firstName: data.firstName || currentUser.profile?.firstName || '',
-              lastName: data.lastName || currentUser.profile?.lastName || '',
+              firstName: updated.profile?.firstName || '',
+              lastName: updated.profile?.lastName || '',
+              avatar: updated.profile?.avatar,
             },
           },
         });
@@ -321,43 +322,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   addAddress: async (address: Omit<Address, 'id'>) => {
     set({ isLoading: true });
     try {
-      const userId = get().user?.id;
-      if (!userId) throw new Error('Not authenticated');
-
-      const newId = 'addr_' + Date.now().toString();
-
-      const { error } = await supabase.from('Address').insert({
-        id: newId,
-        userId,
-        type: address.type,
-        label: address.label,
-        street: address.street,
-        apartment: address.apartment || null,
-        city: address.city,
-        state: address.state,
-        zipCode: address.zipCode,
-        country: address.country,
-        latitude: address.latitude || null,
-        longitude: address.longitude || null,
-        isDefault: address.isDefault,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
-
-      if (error) throw error;
-
-      // If new address is default, unset others
-      if (address.isDefault) {
-        await supabase
-          .from('Address')
-          .update({ isDefault: false, updatedAt: new Date().toISOString() })
-          .eq('userId', userId)
-          .neq('id', newId);
-      }
-
-      const newAddress: Address = { ...address, id: newId };
+      const response = await api.post<{ success: boolean; data: Address; error?: string }>(
+        '/api/v1/addresses',
+        address
+      );
+      if (!response.success || !response.data) throw new Error(response.error || 'Add address failed');
+      const newAddress = response.data;
       set((state) => ({
-        addresses: [...state.addresses, newAddress],
+        addresses: newAddress.isDefault
+          ? [...state.addresses.map((a) => ({ ...a, isDefault: false })), newAddress]
+          : [...state.addresses, newAddress],
         selectedAddressId: newAddress.isDefault ? newAddress.id : state.selectedAddressId || newAddress.id,
       }));
     } finally {
@@ -368,15 +342,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   updateAddress: async (id: string, address: Partial<Address>) => {
     set({ isLoading: true });
     try {
-      const { error } = await supabase
-        .from('Address')
-        .update({ ...address, updatedAt: new Date().toISOString() })
-        .eq('id', id);
-
-      if (error) throw error;
-
+      const response = await api.put<{ success: boolean; data: Address; error?: string }>(
+        `/api/v1/addresses/${id}`,
+        address
+      );
+      if (!response.success || !response.data) throw new Error(response.error || 'Update address failed');
+      const updated = response.data;
       set((state) => ({
-        addresses: state.addresses.map((a) => (a.id === id ? { ...a, ...address } : a)),
+        addresses: state.addresses.map((a) =>
+          a.id === id ? updated : updated.isDefault ? { ...a, isDefault: false } : a
+        ),
       }));
     } finally {
       set({ isLoading: false });
@@ -386,10 +361,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   deleteAddress: async (id: string) => {
     set({ isLoading: true });
     try {
-      const { error } = await supabase.from('Address').delete().eq('id', id);
-
-      if (error) throw error;
-
+      await api.delete(`/api/v1/addresses/${id}`);
       set((state) => ({
         addresses: state.addresses.filter((a) => a.id !== id),
         selectedAddressId: state.selectedAddressId === id ? state.addresses[0]?.id || null : state.selectedAddressId,

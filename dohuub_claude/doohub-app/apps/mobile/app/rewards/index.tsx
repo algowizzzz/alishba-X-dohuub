@@ -14,14 +14,6 @@ import { colors, spacing, fontSize, borderRadius, borderWidth } from '../../src/
 import { ScreenHeader, StreakCard, MilestoneProgressCard } from '../../src/components/composite';
 import { useRewardsStore } from '../../src/store/rewardsStore';
 
-const MOCK_TRANSACTIONS = [
-  { id: '1', type: 'EARNED', description: 'Deep House Cleaning', vendor: 'Sparkle Clean Co.', date: 'Dec 5', amount: 125 },
-  { id: '2', type: 'REDEEMED', description: 'Discount on Food Order', vendor: 'The Golden Spoon', date: 'Dec 1', amount: -500 },
-  { id: '3', type: 'REFERRAL', description: 'Referral bonus - John D. co...', vendor: '', date: 'Nov 28', amount: 60 },
-  { id: '4', type: 'EARNED', description: 'Food Order', vendor: 'Sushi Paradise', date: 'Nov 25', amount: 89 },
-  { id: '5', type: 'EARNED', description: 'Grocery Order', vendor: 'Organic Market', date: 'Nov 22', amount: 156 },
-];
-
 const TX_ICON: Record<string, keyof typeof Ionicons.glyphMap> = {
   EARNED: 'trending-up',
   REDEEMED: 'trending-down',
@@ -57,14 +49,14 @@ export default function RewardsWalletScreen() {
     setRefreshing(false);
   }, [loadData]);
 
-  const totalPoints = wallet?.totalPoints ?? 2450;
-  const pendingPoints = wallet?.pendingPoints ?? 125;
-  const expiringPoints = wallet?.expiringPoints ?? 150;
-  const expiryDate = wallet?.expiringDate ? `by ${new Date(wallet.expiringDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : 'by Feb 15';
+  const totalPoints = wallet?.totalPoints ?? 0;
+  const pendingPoints = wallet?.pendingPoints ?? 0;
+  const expiringPoints = wallet?.expiringPoints ?? 0;
+  const expiryDate = wallet?.expiringDate ? `by ${new Date(wallet.expiringDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : '';
   const dollarValue = (totalPoints * 0.01).toFixed(2);
 
-  const displayStreak = streak ?? { currentStreak: 6, longestStreak: 8, lastActiveWeek: null };
-  const recentTx = transactions.length > 0 ? transactions.slice(0, 5) : MOCK_TRANSACTIONS;
+  const displayStreak = streak ?? { currentStreak: 0, longestStreak: 0, lastActiveWeek: null };
+  const recentTx = transactions.slice(0, 5);
 
   return (
     <SafeAreaView style={styles.container}>

@@ -14,7 +14,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, fontSize, borderRadius, borderWidth } from '../../../src/constants/theme';
 import { ScreenHeader, ProviderCard } from '../../../src/components/composite';
 import { getCleaningListings } from '../../../src/lib/queries';
-import { SAMPLE_CLEANING_VENDORS } from '../../../src/constants/sampleVendors';
 import { getServiceImage } from '../../../src/constants/serviceImages';
 
 const SUB_CATEGORIES = [
@@ -61,15 +60,12 @@ export default function CleaningServicesScreen() {
           idx++;
         }
       });
-      const result = Array.from(vendorMap.values());
-      // Fall back to sample vendors if no real data
-      setProviders(result.length > 0 ? result : SAMPLE_CLEANING_VENDORS);
+      setProviders(Array.from(vendorMap.values()));
     } catch (e: any) {
       const msg = e?.message || 'Failed to fetch cleaning providers';
       console.error('Failed to fetch cleaning providers:', e);
       setError(msg);
-      // Show sample data on error so the app isn't empty
-      setProviders(SAMPLE_CLEANING_VENDORS);
+      setProviders([]);
     }
   };
 

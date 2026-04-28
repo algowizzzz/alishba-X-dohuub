@@ -1,41 +1,97 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, Image, ScrollView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, Image, ScrollView, ActivityIndicator } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, fontSize } from '../../../src/constants/theme';
+import { getBeautyListings, getReviewsByVendor } from '../../../src/lib/queries';
 
 const ACCENT = '#EC4899';
 const SERVICE_CATEGORIES = ['All', 'Makeup', 'Hair', 'Skincare', 'Nails', 'Spa'];
 
-const SERVICES = [
-  { id: 1,  name: 'Professional Makeup', category: 'Makeup',   price: '$80.00',  duration: '90 min',  rating: 4.9, reviews: 342, image: 'https://images.unsplash.com/photo-1487412947147-5cebf100ffc2?w=800&h=400&fit=crop' },
-  { id: 2,  name: 'Bridal Makeup',       category: 'Makeup',   price: '$200.00', duration: '180 min', rating: 4.9, reviews: 289, image: 'https://images.unsplash.com/photo-1519014816548-bf5fe059798b?w=800&h=400&fit=crop' },
-  { id: 3,  name: 'Hair Styling',        category: 'Hair',     price: '$60.00',  duration: '60 min',  rating: 4.8, reviews: 425, image: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=800&h=400&fit=crop' },
-  { id: 4,  name: 'Hair Coloring',       category: 'Hair',     price: '$120.00', duration: '120 min', rating: 4.7, reviews: 198, image: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=800&h=400&fit=crop' },
-  { id: 5,  name: 'Facial Treatment',    category: 'Skincare', price: '$70.00',  duration: '75 min',  rating: 4.8, reviews: 267, image: 'https://images.unsplash.com/photo-1571875257727-256c39da42af?w=800&h=400&fit=crop' },
-  { id: 6,  name: 'Deep Cleansing Facial',category: 'Skincare',price: '$90.00',  duration: '90 min',  rating: 4.9, reviews: 312, image: 'https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=800&h=400&fit=crop' },
-  { id: 7,  name: 'Manicure',            category: 'Nails',    price: '$35.00',  duration: '45 min',  rating: 4.7, reviews: 453, image: 'https://images.unsplash.com/photo-1604654894610-df63bc536371?w=800&h=400&fit=crop' },
-  { id: 8,  name: 'Pedicure',            category: 'Nails',    price: '$40.00',  duration: '60 min',  rating: 4.8, reviews: 389, image: 'https://images.unsplash.com/photo-1519751138087-5bf79df62d5b?w=800&h=400&fit=crop' },
-  { id: 9,  name: 'Gel Nail Extensions', category: 'Nails',    price: '$65.00',  duration: '90 min',  rating: 4.9, reviews: 276, image: 'https://images.unsplash.com/photo-1604654894610-df63bc536371?w=800&h=400&fit=crop' },
-  { id: 10, name: 'Full Body Massage',   category: 'Spa',      price: '$100.00', duration: '90 min',  rating: 4.9, reviews: 521, image: 'https://images.unsplash.com/photo-1544161515-4ab6ce6db874?w=800&h=400&fit=crop' },
-];
+const BEAUTY_TYPE_TO_CATEGORY: Record<string, string> = {
+  MAKEUP: 'Makeup',
+  HAIR: 'Hair',
+  NAILS: 'Nails',
+  WELLNESS: 'Skincare',
+};
 
-const MOCK_REVIEWS = [
-  { id: '1', userName: 'Sarah M.',   rating: 5, comment: 'Absolutely amazing service! Very professional and the results were stunning.', date: '2 days ago',  photos: ['https://images.unsplash.com/photo-1487412947147-5cebf100ffc2?w=200&h=200&fit=crop','https://images.unsplash.com/photo-1519014816548-bf5fe059798b?w=200&h=200&fit=crop'] },
-  { id: '2', userName: 'Emily J.',   rating: 5, comment: "Best beauty service I've ever had. The attention to detail was incredible.", date: '1 week ago',  photos: ['https://images.unsplash.com/photo-1560066984-138dadb4c035?w=200&h=200&fit=crop','https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=200&h=200&fit=crop','https://images.unsplash.com/photo-1571875257727-256c39da42af?w=200&h=200&fit=crop'] },
-  { id: '3', userName: 'Jessica B.', rating: 4, comment: 'Great service overall. Very satisfied with the results.', date: '2 weeks ago' },
-];
+type BeautyService = {
+  id: string;
+  name: string;
+  category: string;
+  price: string;
+  priceValue: number;
+  duration: string;
+  rating: number;
+  reviews: number;
+  image: string;
+};
+
+function formatRelativeDate(iso: string): string {
+  const d = new Date(iso);
+  const diff = Date.now() - d.getTime();
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  if (days < 1) return 'Today';
+  if (days === 1) return 'Yesterday';
+  if (days < 7) return `${days} days ago`;
+  if (days < 14) return '1 week ago';
+  if (days < 30) return `${Math.floor(days / 7)} weeks ago`;
+  return d.toLocaleDateString();
+}
+
+function reviewerName(r: any): string {
+  const p = r?.User?.UserProfile;
+  if (p?.firstName) return `${p.firstName} ${p.lastName?.[0] ?? ''}.`.trim();
+  if (r?.User?.email) return r.User.email.split('@')[0];
+  return 'Anonymous';
+}
 
 export default function BeautyServicesScreen() {
   const params = useLocalSearchParams<{ id: string; name: string; isPoweredByDoHuub: string; rating: string; reviews: string }>();
   const providerName = params.name || 'Beauty Services';
   const isPoweredByDoHuub = params.isPoweredByDoHuub === 'true';
+  const vendorId = params.id;
 
   const [page, setPage] = useState<'services' | 'detail'>('services');
-  const [selectedService, setSelectedService] = useState<typeof SERVICES[0] | null>(null);
+  const [selectedService, setSelectedService] = useState<BeautyService | null>(null);
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [services, setServices] = useState<BeautyService[]>([]);
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filteredServices = selectedCategory === 'All' ? SERVICES : SERVICES.filter(s => s.category === selectedCategory);
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      if (!vendorId) return;
+      try {
+        const [listings, revs] = await Promise.all([
+          getBeautyListings(vendorId),
+          getReviewsByVendor(vendorId),
+        ]);
+        if (cancelled) return;
+        const vendorRating = parseFloat(params.rating || '4.8');
+        const vendorReviewCount = parseInt(params.reviews || '0', 10);
+        setServices(listings.map((l: any) => ({
+          id: l.id,
+          name: l.title,
+          category: BEAUTY_TYPE_TO_CATEGORY[l.beautyType] || 'Other',
+          price: `$${Number(l.basePrice).toFixed(2)}`,
+          priceValue: Number(l.basePrice),
+          duration: `${l.duration} min`,
+          rating: vendorRating,
+          reviews: vendorReviewCount,
+          image: l.images?.[0] || 'https://images.unsplash.com/photo-1487412947147-5cebf100ffc2?w=800&h=400&fit=crop',
+        })));
+        setReviews(revs);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+  }, [vendorId, params.rating, params.reviews]);
+
+  const filteredServices = selectedCategory === 'All' ? services : services.filter(s => s.category === selectedCategory);
 
   const PointsBanner = () => (
     <View style={styles.pointsBanner}>
@@ -121,11 +177,13 @@ export default function BeautyServicesScreen() {
                 <Text style={styles.viewAllLink}>View All</Text>
               </TouchableOpacity>
             </View>
-            {MOCK_REVIEWS.map(review => (
+            {reviews.length === 0 ? (
+              <Text style={{ color: colors.text.secondary, fontSize: fontSize.sm, paddingVertical: 12 }}>No reviews yet.</Text>
+            ) : reviews.slice(0, 3).map((review: any) => (
               <View key={review.id} style={styles.reviewCard}>
                 <View style={styles.reviewTop}>
-                  <Text style={styles.reviewName}>{review.userName}</Text>
-                  <Text style={styles.reviewDate}>{review.date}</Text>
+                  <Text style={styles.reviewName}>{reviewerName(review)}</Text>
+                  <Text style={styles.reviewDate}>{formatRelativeDate(review.createdAt)}</Text>
                 </View>
                 <View style={styles.starsRow}>
                   {[1,2,3,4,5].map(s => <Ionicons key={s} name="star" size={14} color={s <= review.rating ? '#FACC15' : '#E5E7EB'} />)}
@@ -133,7 +191,7 @@ export default function BeautyServicesScreen() {
                 <Text style={styles.reviewComment}>{review.comment}</Text>
                 {review.photos && review.photos.length > 0 && (
                   <View style={{ flexDirection: 'row', gap: 6, marginTop: 8 }}>
-                    {review.photos.map((photo, i) => (
+                    {review.photos.map((photo: string, i: number) => (
                       <Image key={i} source={{ uri: photo }} style={{ width: 72, height: 72, borderRadius: 8, overflow: 'hidden' }} resizeMode="cover" />
                     ))}
                   </View>

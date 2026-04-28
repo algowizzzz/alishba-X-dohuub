@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -11,12 +11,26 @@ import {
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, fontSize, borderRadius } from '../../../src/constants/theme';
+import { getReviewsByVendor, getVendorById } from '../../../src/lib/queries';
 
-const MOCK_REVIEWS = [
-  { name: 'Emma L.',  date: '1 day ago',  rating: 5, comment: 'Amazing food! The burger was cooked perfectly and arrived hot. Will definitely order again.', ordered: 'Signature Burger, Fries', photos: ['https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=200&h=200&fit=crop','https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=200&h=200&fit=crop'] },
-  { name: 'James K.', date: '3 days ago', rating: 5, comment: 'Great service and delicious food. Delivery was quick and the driver was friendly.', ordered: 'Main Course', photos: ['https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=200&h=200&fit=crop','https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=200&h=200&fit=crop','https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=200&h=200&fit=crop'] },
-  { name: 'Maria S.', date: '1 week ago', rating: 4, comment: 'Good food but took longer than estimated. Still tasty though.', ordered: 'Starter, Dessert' },
-];
+function formatRelativeDate(iso: string): string {
+  const d = new Date(iso);
+  const diff = Date.now() - d.getTime();
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  if (days < 1) return 'Today';
+  if (days === 1) return '1 day ago';
+  if (days < 7) return `${days} days ago`;
+  if (days < 14) return '1 week ago';
+  if (days < 30) return `${Math.floor(days / 7)} weeks ago`;
+  return d.toLocaleDateString();
+}
+
+function reviewerName(r: any): string {
+  const p = r?.User?.UserProfile;
+  if (p?.firstName) return `${p.firstName} ${p.lastName?.[0] ?? ''}.`.trim();
+  if (r?.User?.email) return r.User.email.split('@')[0];
+  return 'Anonymous';
+}
 
 export default function FoodVendorProfileScreen() {
   const params = useLocalSearchParams<{ id: string; name: string; cuisine: string; isPoweredByDoHuub: string; rating: string; deliveryTime: string; menuId: string }>();
@@ -26,8 +40,17 @@ export default function FoodVendorProfileScreen() {
   const rating = parseFloat(params.rating || '4.7');
   const deliveryTime = params.deliveryTime || '25-35 min';
   const menuId = params.menuId || '0';
+  const vendorId = params.id || '';
 
   const cuisineTypes = cuisine.split(', ');
+
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [vendor, setVendor] = useState<any>(null);
+  useEffect(() => {
+    if (!vendorId) return;
+    getReviewsByVendor(vendorId).then(setReviews).catch(() => setReviews([]));
+    getVendorById(vendorId).then(setVendor).catch(() => setVendor(null));
+  }, [vendorId]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -56,7 +79,10 @@ export default function FoodVendorProfileScreen() {
             <Text style={styles.ratingText}>{rating}</Text>
             <Text style={styles.reviewCountText}>(250 reviews)</Text>
           </View>
-          <Text style={styles.deliveryInfo}>{deliveryTime} • $2.99 delivery</Text>
+          <Text style={styles.deliveryInfo}>
+            {vendor?.estimatedDeliveryTime ?? deliveryTime}
+            {vendor?.deliveryFee != null ? ` • $${vendor.deliveryFee.toFixed(2)} delivery` : ''}
+          </Text>
         </View>
 
         <View style={styles.body}>
@@ -70,20 +96,33 @@ export default function FoodVendorProfileScreen() {
 
           {/* Restaurant Info */}
           <Text style={styles.sectionTitle}>Restaurant Information</Text>
-          <View style={styles.infoCard}>
-            <Ionicons name="location" size={20} color={colors.primary} />
-            <View style={{ marginLeft: 12 }}>
-              <Text style={styles.infoLabel}>123 Main Street</Text>
-              <Text style={styles.infoSub}>Miami, FL 33101</Text>
+          {vendor?.address && (
+            <View style={styles.infoCard}>
+              <Ionicons name="location" size={20} color={colors.primary} />
+              <View style={{ marginLeft: 12 }}>
+                <Text style={styles.infoLabel}>{vendor.address}</Text>
+                <Text style={styles.infoSub}>{[vendor.city, vendor.state, vendor.zipCode].filter(Boolean).join(', ')}</Text>
+              </View>
             </View>
-          </View>
-          <View style={styles.infoCard}>
-            <Ionicons name="time" size={20} color={colors.primary} />
-            <View style={{ marginLeft: 12 }}>
-              <Text style={styles.infoLabel}>Delivery Hours</Text>
-              <Text style={styles.infoSub}>11:00 AM - 10:00 PM Daily</Text>
+          )}
+          {vendor?.hoursOfOperation && (
+            <View style={styles.infoCard}>
+              <Ionicons name="time" size={20} color={colors.primary} />
+              <View style={{ marginLeft: 12 }}>
+                <Text style={styles.infoLabel}>Delivery Hours</Text>
+                <Text style={styles.infoSub}>{vendor.hoursOfOperation}</Text>
+              </View>
             </View>
-          </View>
+          )}
+          {vendor?.contactPhone && (
+            <View style={styles.infoCard}>
+              <Ionicons name="call" size={20} color={colors.primary} />
+              <View style={{ marginLeft: 12 }}>
+                <Text style={styles.infoLabel}>Contact</Text>
+                <Text style={styles.infoSub}>{vendor.contactPhone}</Text>
+              </View>
+            </View>
+          )}
 
           {/* Reviews & Ratings */}
           <View style={styles.reviewsHeader}>
@@ -115,16 +154,18 @@ export default function FoodVendorProfileScreen() {
           </View>
 
           {/* Reviews */}
-          {MOCK_REVIEWS.map((review, i) => (
-            <View key={i} style={styles.reviewCard}>
+          {reviews.length === 0 ? (
+            <Text style={{ color: colors.text.secondary, fontSize: fontSize.sm, paddingVertical: 12 }}>No reviews yet.</Text>
+          ) : reviews.slice(0, 5).map((review: any) => (
+            <View key={review.id} style={styles.reviewCard}>
               <View style={styles.reviewTop}>
                 <View style={styles.reviewAvatar}>
                   <Ionicons name="person" size={18} color={colors.text.secondary} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <View style={styles.reviewNameRow}>
-                    <Text style={styles.reviewName}>{review.name}</Text>
-                    <Text style={styles.reviewDate}>{review.date}</Text>
+                    <Text style={styles.reviewName}>{reviewerName(review)}</Text>
+                    <Text style={styles.reviewDate}>{formatRelativeDate(review.createdAt)}</Text>
                   </View>
                   <View style={styles.starsRow}>
                     {[1,2,3,4,5].map(s => (
@@ -134,14 +175,13 @@ export default function FoodVendorProfileScreen() {
                 </View>
               </View>
               <Text style={styles.reviewComment}>{review.comment}</Text>
-              {(review as any).photos && (review as any).photos.length > 0 && (
+              {review.photos && review.photos.length > 0 && (
                 <View style={{ flexDirection: 'row', gap: 6, marginTop: 8, marginBottom: 4 }}>
-                  {(review as any).photos.map((photo: string, i: number) => (
+                  {review.photos.map((photo: string, i: number) => (
                     <Image key={i} source={{ uri: photo }} style={{ width: 72, height: 72, borderRadius: 8, overflow: 'hidden' }} resizeMode="cover" />
                   ))}
                 </View>
               )}
-              <Text style={styles.reviewOrdered}>Ordered: {review.ordered}</Text>
             </View>
           ))}
         </View>

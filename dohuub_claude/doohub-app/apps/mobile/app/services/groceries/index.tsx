@@ -14,7 +14,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, fontSize, borderRadius, borderWidth } from '../../../src/constants/theme';
 import { ScreenHeader, ProviderCard } from '../../../src/components/composite';
 import { getStoresByCategory } from '../../../src/lib/queries';
-import { SAMPLE_GROCERY_VENDORS } from '../../../src/constants/sampleVendors';
 import { getServiceImage } from '../../../src/constants/serviceImages';
 
 const SUB_CATEGORIES = [
@@ -49,11 +48,11 @@ export default function GroceriesScreen() {
           imageUrl: v?.logo || getServiceImage('groceries', idx),
         };
       });
-      setProviders(mapped.length > 0 ? mapped : SAMPLE_GROCERY_VENDORS);
+      setProviders(mapped);
     } catch (e: any) {
       console.error('Failed to fetch grocery stores:', e);
       setError(e?.message || 'Failed to load grocery stores');
-      setProviders(SAMPLE_GROCERY_VENDORS);
+      setProviders([]);
     } finally {
       setLoading(false);
     }

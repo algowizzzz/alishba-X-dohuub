@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma, BookingStatus } from '@doohub/database';
 import { authenticate, AuthRequest } from '../middleware/auth';
+import { supabase } from '../utils/supabase';
 
 const router = Router();
 
@@ -295,6 +296,100 @@ router.post('/:id/cancel', authenticate, async (req: AuthRequest, res) => {
   } catch (error) {
     console.error('Cancel booking error:', error);
     res.status(500).json({ error: 'Failed to cancel booking' });
+  }
+});
+
+// Complete booking + accrue reward points to the customer.
+// Callable by the booking owner (simulate "I got the service") or the vendor.
+// Points = floor(total). Creates PointsTransaction + upserts RewardsWallet.
+// Rewards tables aren't in the Prisma schema yet, so we go through the Supabase
+// admin client (service role) directly.
+router.post('/:id/complete', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+
+    const booking = await prisma.booking.findUnique({
+      where: { id },
+      include: { vendor: { select: { id: true, userId: true, businessName: true } } },
+    });
+
+    if (!booking) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    const isOwner = booking.userId === req.user!.id;
+    const isVendorForBooking = booking.vendor?.userId === req.user!.id;
+    if (!isOwner && !isVendorForBooking && req.user!.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'Not authorized to complete this booking' });
+    }
+
+    if (!['ACCEPTED', 'IN_PROGRESS'].includes(booking.status)) {
+      return res.status(400).json({
+        error: `Cannot complete a booking in status ${booking.status}`,
+      });
+    }
+
+    const points = Math.max(0, Math.floor(booking.total || 0));
+    const now = new Date();
+
+    const updated = await prisma.booking.update({
+      where: { id },
+      data: {
+        status: 'COMPLETED',
+        completedAt: now,
+        statusHistory: { create: { status: 'COMPLETED', note: 'Points awarded' } },
+      },
+      include: { vendor: true, address: true },
+    });
+
+    // pointsEarned column exists in DB but not in Prisma schema yet — set it via supabase
+    if (points > 0 && supabase) {
+      await supabase
+        .from('Booking')
+        .update({ pointsEarned: points })
+        .eq('id', id);
+    }
+
+    if (points > 0 && supabase) {
+      // Upsert wallet: read current, then write new totals. Use service role so RLS doesn't block.
+      const { data: wallet } = await supabase
+        .from('RewardsWallet')
+        .select('id, totalPoints')
+        .eq('userId', booking.userId)
+        .maybeSingle();
+
+      if (wallet) {
+        await supabase
+          .from('RewardsWallet')
+          .update({
+            totalPoints: (wallet.totalPoints || 0) + points,
+            updatedAt: now.toISOString(),
+          })
+          .eq('id', wallet.id);
+      } else {
+        await supabase.from('RewardsWallet').insert({
+          userId: booking.userId,
+          totalPoints: points,
+          pendingPoints: 0,
+          expiringPoints: 0,
+          updatedAt: now.toISOString(),
+        });
+      }
+
+      await supabase.from('PointsTransaction').insert({
+        userId: booking.userId,
+        type: 'EARNED',
+        amount: points,
+        description: `Earned from ${booking.category} booking`,
+        bookingId: booking.id,
+        vendorName: booking.vendor?.businessName || null,
+      });
+    }
+
+    res.json({ success: true, data: { ...updated, pointsEarned: points } });
+  } catch (error) {
+    console.error('Complete booking error:', error);
+    res.status(500).json({ error: 'Failed to complete booking' });
   }
 });
 

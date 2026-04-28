@@ -35,21 +35,11 @@ const CATEGORY_LABELS: Record<string, string> = {
   CAREGIVING: 'Caregiving Services',
 };
 
-const MOCK_MILESTONES: Milestone[] = [
-  { id: '1', category: 'CLEANING', progress: 2, total: 3 },
-  { id: '2', category: 'HANDYMAN', progress: 0, total: 3 },
-  { id: '3', category: 'FOOD', progress: 1, total: 3 },
-  { id: '4', category: 'GROCERIES', progress: 2, total: 3 },
-  { id: '5', category: 'BEAUTY', progress: 0, total: 3 },
-  { id: '6', category: 'RENTALS', progress: 0, total: 3 },
-  { id: '7', category: 'CAREGIVING', progress: 0, total: 3 },
-];
-
 export function MilestoneProgressCard({ milestones }: MilestoneProgressCardProps) {
-  const data = milestones.length > 0 ? milestones : MOCK_MILESTONES;
+  const data = milestones;
   const achieved = data.filter((m) => m.progress >= m.total).length;
   const remaining = data.reduce((sum, m) => sum + Math.max(m.total - m.progress, 0), 0);
-  const ptsEarned = data.reduce((sum, m) => sum + (m.pointsEarned || 0), 0) || 175;
+  const ptsEarned = data.reduce((sum, m) => sum + (m.pointsEarned || 0), 0);
 
   return (
     <View style={styles.container}>

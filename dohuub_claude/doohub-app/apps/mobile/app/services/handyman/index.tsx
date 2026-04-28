@@ -14,7 +14,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, fontSize, borderRadius, borderWidth } from '../../../src/constants/theme';
 import { ScreenHeader, ProviderCard } from '../../../src/components/composite';
 import { getHandymanListings } from '../../../src/lib/queries';
-import { SAMPLE_HANDYMAN_VENDORS } from '../../../src/constants/sampleVendors';
 import { getServiceImages } from '../../../src/constants/serviceImages';
 
 const SUB_CATEGORIES = [
@@ -56,12 +55,11 @@ export default function HandymanServicesScreen() {
           idx++;
         }
       });
-      const result = Array.from(vendorMap.values());
-      setProviders(result.length > 0 ? result : SAMPLE_HANDYMAN_VENDORS);
+      setProviders(Array.from(vendorMap.values()));
     } catch (e: any) {
       console.error('Failed to fetch handyman providers:', e);
       setError(e?.message || 'Failed to load handyman services');
-      setProviders(SAMPLE_HANDYMAN_VENDORS);
+      setProviders([]);
     }
   };
 

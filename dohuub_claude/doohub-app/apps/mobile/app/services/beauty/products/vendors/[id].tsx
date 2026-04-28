@@ -1,47 +1,47 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, ScrollView, Image, Switch } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, fontSize } from '../../../../../src/constants/theme';
+import { getBeautyProducts } from '../../../../../src/lib/queries';
 
 const CATEGORY_TABS = ['All', 'Makeup', 'Skincare', 'Haircare', 'Fragrances', 'Tools & Brushes', 'Bath & Body'];
 
-const SAMPLE_PRODUCTS = [
-  { id: '1',  name: 'Matte Liquid Lipstick',   description: 'Long-lasting matte finish',    category: 'Makeup',          price: 18.99, size: '5ml',   image: 'https://images.unsplash.com/photo-1586495777744-4e6232bf2176?w=200&h=200&fit=crop' },
-  { id: '2',  name: 'Foundation SPF 30',        description: 'Full coverage, all-day wear', category: 'Makeup',          price: 34.99, size: '30ml',  image: 'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?w=200&h=200&fit=crop' },
-  { id: '3',  name: 'Mascara Volume Boost',     description: 'Volumizing & lengthening',    category: 'Makeup',          price: 14.99, size: '10ml',  image: 'https://images.unsplash.com/photo-1512496015851-a90fb38ba796?w=200&h=200&fit=crop' },
-  { id: '4',  name: 'Eyeshadow Palette',        description: '12 pigmented shades',         category: 'Makeup',          price: 29.99, size: '12g',   image: 'https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=200&h=200&fit=crop' },
-  { id: '5',  name: 'Vitamin C Serum',          description: 'Brightening & anti-aging',    category: 'Skincare',        price: 42.99, size: '30ml',  image: 'https://images.unsplash.com/photo-1571875257727-256c39da42af?w=200&h=200&fit=crop' },
-  { id: '6',  name: 'Hydrating Face Cream',     description: '24-hour moisture barrier',    category: 'Skincare',        price: 28.99, size: '50ml',  image: 'https://images.unsplash.com/photo-1556228578-0d85b1a4d571?w=200&h=200&fit=crop' },
-  { id: '7',  name: 'Retinol Night Cream',      description: 'Anti-wrinkle, firming',       category: 'Skincare',        price: 38.99, size: '50ml',  image: 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=200&h=200&fit=crop' },
-  { id: '8',  name: 'Micellar Cleansing Water', description: 'Gentle makeup remover',       category: 'Skincare',        price: 12.99, size: '200ml', image: 'https://images.unsplash.com/photo-1608248597279-f99d160bfcbc?w=200&h=200&fit=crop' },
-  { id: '9',  name: 'Argan Oil Hair Serum',     description: 'Frizz control & shine',       category: 'Haircare',        price: 22.99, size: '100ml', image: 'https://images.unsplash.com/photo-1519735777090-ec97162dc266?w=200&h=200&fit=crop' },
-  { id: '10', name: 'Color-Safe Shampoo',       description: 'Nourishing & gentle',         category: 'Haircare',        price: 16.99, size: '250ml', image: 'https://images.unsplash.com/photo-1535585209827-a15fcdbc4c2d?w=200&h=200&fit=crop' },
-  { id: '11', name: 'Deep Conditioning Mask',   description: 'Intense repair treatment',    category: 'Haircare',        price: 19.99, size: '200ml', image: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=200&h=200&fit=crop' },
-  { id: '12', name: 'Floral Eau de Parfum',     description: 'Fresh floral notes',          category: 'Fragrances',      price: 65.99, size: '50ml',  image: 'https://images.unsplash.com/photo-1541643600914-78b084683702?w=200&h=200&fit=crop' },
-  { id: '13', name: 'Oud & Amber Perfume',      description: 'Rich, warm oriental',         category: 'Fragrances',      price: 79.99, size: '75ml',  image: 'https://images.unsplash.com/photo-1592945403244-b3fbafd7f539?w=200&h=200&fit=crop' },
-  { id: '14', name: 'Kabuki Brush Set',         description: 'Professional 5-piece set',    category: 'Tools & Brushes', price: 32.99, size: '5 pcs', image: 'https://images.unsplash.com/photo-1487412947147-5cebf100ffc2?w=200&h=200&fit=crop' },
-  { id: '15', name: 'Eyelash Curler',           description: 'Salon-quality curl',          category: 'Tools & Brushes', price: 11.99, size: '1 pc',  image: 'https://images.unsplash.com/photo-1512496015851-a90fb38ba796?w=200&h=200&fit=crop' },
-  { id: '16', name: 'Rose Bath Salts',          description: 'Relaxing & moisturizing',     category: 'Bath & Body',     price: 14.99, size: '300g',  image: 'https://images.unsplash.com/photo-1570194065650-d99fb4d44e62?w=200&h=200&fit=crop' },
-  { id: '17', name: 'Shea Body Butter',         description: 'Rich, ultra-nourishing',      category: 'Bath & Body',     price: 17.99, size: '200ml', image: 'https://images.unsplash.com/photo-1614159869907-bb2b3fbbf3f7?w=200&h=200&fit=crop' },
-];
+type Product = { id: string; name: string; description: string; category: string; price: number; size: string; image: string };
 
 type Step = 'products' | 'checkout' | 'review' | 'confirm';
 
 export default function BeautyProductsCatalog() {
   const params = useLocalSearchParams<{ id: string; name: string; isPoweredByDoHuub: string; rating: string }>();
   const isPoweredByDoHuub = params.isPoweredByDoHuub === 'true';
+  const vendorId = params.id || '';
 
   const [step, setStep] = useState<Step>('products');
   const [activeTab, setActiveTab] = useState('All');
   const [cart, setCart] = useState<Record<string, number>>({});
   const [redeemPoints, setRedeemPoints] = useState(false);
+  const [products, setProducts] = useState<Product[]>([]);
+
+  useEffect(() => {
+    if (!vendorId) return;
+    getBeautyProducts(vendorId).then((rows: any[]) => {
+      setProducts(rows.map(r => ({
+        id: r.id,
+        name: r.name,
+        description: r.description,
+        category: r.category,
+        price: Number(r.price),
+        size: r.quantityAmount && r.quantityUnit ? `${r.quantityAmount}${r.quantityUnit}` : '',
+        image: r.image || '',
+      })));
+    }).catch(() => setProducts([]));
+  }, [vendorId]);
 
   const filteredProducts = activeTab === 'All'
-    ? SAMPLE_PRODUCTS
-    : SAMPLE_PRODUCTS.filter(p => p.category === activeTab);
+    ? products
+    : products.filter(p => p.category === activeTab);
 
-  const cartItems = SAMPLE_PRODUCTS.filter(p => cart[p.id] > 0);
+  const cartItems = products.filter(p => cart[p.id] > 0);
   const subtotal = cartItems.reduce((sum, p) => sum + cart[p.id] * p.price, 0);
   const deliveryFee = 2.99;
   const pointsDiscount = redeemPoints ? Math.min(5.00, subtotal * 0.1) : 0;

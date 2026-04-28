@@ -1,12 +1,33 @@
 import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
 import { prisma } from '@doohub/database';
+import { supabase } from '../utils/supabase';
 
 export interface AuthRequest extends Request {
   user?: {
     id: string;
     email: string;
     role: 'CUSTOMER' | 'VENDOR' | 'ADMIN';
+  };
+}
+
+async function resolveUserFromToken(token: string) {
+  if (!supabase) return null;
+  const { data, error } = await supabase.auth.getUser(token);
+  if (error || !data?.user) return null;
+  const authUser = data.user;
+
+  // Map Supabase auth user → public.User row. Trigger handle_new_auth_user
+  // creates the row on signup, so it should exist.
+  const user = await prisma.user.findUnique({
+    where: { id: authUser.id },
+    select: { id: true, email: true, role: true, isActive: true },
+  });
+
+  if (!user || !user.isActive) return null;
+  return {
+    id: user.id,
+    email: user.email,
+    role: user.role as 'CUSTOMER' | 'VENDOR' | 'ADMIN',
   };
 }
 
@@ -23,37 +44,16 @@ export const authenticate = async (
     }
 
     const token = authHeader.split(' ')[1];
-    const secret = process.env.JWT_SECRET || 'default-secret-change-in-production';
+    const user = await resolveUserFromToken(token);
 
-    const decoded = jwt.verify(token, secret) as {
-      userId: string;
-      email: string;
-      role: string;
-    };
-
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.userId },
-      select: { id: true, email: true, role: true, isActive: true },
-    });
-
-    if (!user || !user.isActive) {
-      return res.status(401).json({ error: 'User not found or inactive' });
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid or expired token' });
     }
 
-    req.user = {
-      id: user.id,
-      email: user.email,
-      role: user.role as 'CUSTOMER' | 'VENDOR' | 'ADMIN',
-    };
-
+    req.user = user;
     next();
   } catch (error) {
-    if (error instanceof jwt.TokenExpiredError) {
-      return res.status(401).json({ error: 'Token expired' });
-    }
-    if (error instanceof jwt.JsonWebTokenError) {
-      return res.status(401).json({ error: 'Invalid token' });
-    }
+    console.error('Authentication error:', error);
     return res.status(500).json({ error: 'Authentication failed' });
   }
 };
@@ -72,7 +72,6 @@ export const requireRole = (...roles: ('CUSTOMER' | 'VENDOR' | 'ADMIN')[]) => {
   };
 };
 
-// Convenience middleware for admin-only routes
 export const requireAdmin = requireRole('ADMIN');
 
 export const optionalAuth = async (
@@ -82,36 +81,14 @@ export const optionalAuth = async (
 ) => {
   try {
     const authHeader = req.headers.authorization;
-
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return next();
     }
-
     const token = authHeader.split(' ')[1];
-    const secret = process.env.JWT_SECRET || 'default-secret-change-in-production';
-
-    const decoded = jwt.verify(token, secret) as {
-      userId: string;
-      email: string;
-      role: string;
-    };
-
-    const user = await prisma.user.findUnique({
-      where: { id: decoded.userId },
-      select: { id: true, email: true, role: true },
-    });
-
-    if (user) {
-      req.user = {
-        id: user.id,
-        email: user.email,
-        role: user.role as 'CUSTOMER' | 'VENDOR' | 'ADMIN',
-      };
-    }
-
+    const user = await resolveUserFromToken(token);
+    if (user) req.user = user;
     next();
   } catch {
     next();
   }
 };
-

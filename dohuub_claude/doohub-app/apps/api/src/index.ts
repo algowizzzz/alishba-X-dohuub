@@ -1,14 +1,11 @@
+import './env'; // must be first - loads .env before any module reads process.env
+
 import express from 'express';
 import path from 'path';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
-import dotenv from 'dotenv';
-
-// Load environment variables (try multiple paths for different environments)
-dotenv.config(); // First try .env in current directory
-dotenv.config({ path: '../../.env' }); // Then try root .env for local development
 
 // Import routes
 import authRoutes from './routes/auth';
@@ -49,18 +46,19 @@ const PORT = process.env.PORT || process.env.API_PORT || 3001;
 // Security middleware
 app.use(helmet());
 app.use(cors({
-  origin: [
-    'http://localhost:3000',
-    'http://localhost:3002',
-    'http://localhost:3003',
-    'http://localhost:5173',
-    'http://localhost:8081',
-    'exp://localhost:8081',
-    // Production URLs
-    'https://dohuubclaude-production.up.railway.app',
-    'https://dohuub-claude.vercel.app',
-    process.env.FRONTEND_URL,
-  ].filter(Boolean) as string[],
+  origin: (origin, callback) => {
+    // Allow no-origin requests (e.g. mobile apps, Postman) and any localhost.
+    if (!origin) return callback(null, true);
+    if (/^https?:\/\/localhost:\d+$/.test(origin)) return callback(null, true);
+    if (/^exp:\/\/localhost:\d+$/.test(origin)) return callback(null, true);
+    // Allow any Vercel preview/production URL ending in vercel.app
+    if (/^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(origin)) return callback(null, true);
+    // Allow Railway production URLs
+    if (/^https:\/\/[a-z0-9-]+\.up\.railway\.app$/i.test(origin)) return callback(null, true);
+    // Allow explicit FRONTEND_URL
+    if (process.env.FRONTEND_URL && origin === process.env.FRONTEND_URL) return callback(null, true);
+    return callback(new Error(`CORS: origin ${origin} not allowed`));
+  },
   credentials: true,
 }));
 

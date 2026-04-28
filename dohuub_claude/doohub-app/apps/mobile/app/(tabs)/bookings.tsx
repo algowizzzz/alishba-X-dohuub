@@ -16,101 +16,6 @@ import { colors, spacing, fontSize, borderRadius, borderWidth } from '../../src/
 
 const TABS = ['All', 'Upcoming', 'In Progress', 'Completed'];
 
-const MOCK_BOOKINGS = [
-  {
-    id: 'mock-1',
-    status: 'IN_PROGRESS',
-    category: 'Deep House Cleaning',
-    scheduledDate: '2026-03-28',
-    scheduledTime: '10:00 AM',
-    total: 120.00,
-    pointsEarned: null,
-    vendor: { businessName: 'Sparkle Clean Co.', isMichelle: true },
-    listing: { title: 'Deep House Cleaning', Vendor: { isMichelle: true } },
-    address: { street: '123 Main St', city: 'New York' },
-    icon: 'sparkles',
-    iconColor: '#2E7AD9',
-    image: 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=200&h=200&fit=crop',
-  },
-  {
-    id: 'mock-2',
-    status: 'ACCEPTED',
-    category: 'Handyman – TV Mounting',
-    scheduledDate: '2026-03-30',
-    scheduledTime: '2:00 PM',
-    total: 85.00,
-    pointsEarned: null,
-    vendor: { businessName: 'HandyFix Pro', isMichelle: true },
-    listing: { title: 'Handyman – TV Mounting', Vendor: { isMichelle: true } },
-    address: { street: '456 Park Ave', city: 'Manhattan' },
-    icon: 'construct',
-    iconColor: '#EAB308',
-    image: 'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=200&h=200&fit=crop',
-  },
-  {
-    id: 'mock-3',
-    status: 'COMPLETED',
-    category: 'Grocery Delivery',
-    scheduledDate: '2026-03-22',
-    scheduledTime: '11:00 AM',
-    total: 55.00,
-    pointsEarned: 55,
-    vendor: { businessName: 'FreshCart Express', isMichelle: false },
-    listing: { title: 'Grocery Delivery', Vendor: { isMichelle: false } },
-    address: { street: '789 Oak Street', city: 'Brooklyn' },
-    icon: 'cart',
-    iconColor: '#F59E0B',
-    image: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=200&h=200&fit=crop',
-  },
-  {
-    id: 'mock-4',
-    status: 'COMPLETED',
-    category: 'Ride Assistance',
-    scheduledDate: '2026-03-19',
-    scheduledTime: '9:00 AM',
-    total: 140.00,
-    pointsEarned: 140,
-    pointsRedeemed: null,
-    vendor: { businessName: 'DoHuub Care Transport', isMichelle: true },
-    listing: { title: 'Ride Assistance', Vendor: { isMichelle: true } },
-    address: { street: '22 West 34th St', city: 'Manhattan' },
-    icon: 'car',
-    iconColor: '#A855F7',
-    image: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=200&h=200&fit=crop',
-  },
-  {
-    id: 'mock-5',
-    status: 'ACCEPTED',
-    category: 'Hair & Makeup',
-    scheduledDate: '2026-04-02',
-    scheduledTime: '3:00 PM',
-    total: 95.00,
-    pointsEarned: null,
-    pointsRedeemed: 200,
-    vendor: { businessName: 'Glow Beauty Studio', isMichelle: false },
-    listing: { title: 'Hair & Makeup', Vendor: { isMichelle: false } },
-    address: { street: '55 Spring St', city: 'SoHo, New York' },
-    icon: 'color-wand',
-    iconColor: '#EC4899',
-    image: 'https://images.unsplash.com/photo-1560066984-138daaa3b4e0?w=200&h=200&fit=crop',
-  },
-  {
-    id: 'mock-6',
-    status: 'COMPLETED',
-    category: 'Companionship – 3hrs',
-    scheduledDate: '2026-03-15',
-    scheduledTime: '1:00 PM',
-    total: 105.00,
-    pointsEarned: 105,
-    vendor: { businessName: 'Maria Garcia', isMichelle: true },
-    listing: { title: 'Companionship – 3hrs', Vendor: { isMichelle: true } },
-    address: { street: '123 Main St', city: 'New York' },
-    icon: 'people',
-    iconColor: '#EC4899',
-    image: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=200&h=200&fit=crop',
-  },
-];
-
 const STATUS_STYLES: Record<string, { bg: string; text: string; label: string }> = {
   PENDING: { bg: 'rgba(46, 122, 217, 0.1)', text: colors.text.primary, label: 'Pending' },
   ACCEPTED: { bg: '#DCFCE7', text: '#166534', label: 'Accepted' },
@@ -142,8 +47,7 @@ export default function BookingsScreen() {
     setRefreshing(false);
   };
 
-  // Use mock data as fallback when no real bookings
-  const displayBookings = [...MOCK_BOOKINGS, ...bookings];
+  const displayBookings = bookings;
 
   const filteredBookings = displayBookings.filter((booking: any) => {
     if (activeTab === 'All') return true;

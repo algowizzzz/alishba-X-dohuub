@@ -1,6 +1,5 @@
 import { create } from 'zustand';
-import { supabase } from '../lib/supabase';
-import { useAuthStore } from './authStore';
+import api from '../services/api';
 
 interface CartItem {
   id: string;
@@ -22,7 +21,33 @@ interface CartState {
   updateQuantity: (itemId: string, quantity: number) => Promise<void>;
   removeItem: (itemId: string) => Promise<void>;
   clearCart: () => Promise<void>;
+  checkout: (addressId: string, specialNotes?: string) => Promise<any>;
   clearError: () => void;
+}
+
+type CartResponse = { success: boolean; data?: any; error?: string };
+
+function applyCart(setState: (partial: Partial<CartState>) => void, cart: any) {
+  if (!cart) {
+    setState({ items: [], vendorId: null, vendor: null, subtotal: 0, isLoading: false });
+    return;
+  }
+  setState({
+    items: (cart.items || []).map((item: any) => ({
+      id: item.id,
+      listingId: item.listingId,
+      listing: item.listing || null,
+      quantity: item.quantity,
+    })),
+    vendorId: cart.vendorId ?? null,
+    vendor: cart.vendor ?? null,
+    subtotal: cart.subtotal ?? 0,
+    isLoading: false,
+  });
+}
+
+function extractMessage(error: any, fallback: string) {
+  return error?.response?.data?.error || error?.message || fallback;
 }
 
 export const useCartStore = create<CartState>((set, get) => ({
@@ -36,45 +61,17 @@ export const useCartStore = create<CartState>((set, get) => ({
   fetchCart: async () => {
     set({ isLoading: true, error: null });
     try {
-      const userId = useAuthStore.getState().user?.id;
-      if (!userId) {
-        set({ items: [], vendorId: null, vendor: null, subtotal: 0, isLoading: false });
-        return;
-      }
-
-      const { data: cart, error } = await supabase
-        .from('Cart')
-        .select('id, vendorId, CartItem(id, listingId, quantity)')
-        .eq('userId', userId)
-        .maybeSingle();
-
-      if (error) throw error;
-
-      if (!cart || !cart.CartItem?.length) {
-        set({ items: [], vendorId: null, vendor: null, subtotal: 0, isLoading: false });
-        return;
-      }
-
-      set({
-        items: (cart.CartItem as any[]).map((item: any) => ({
-          id: item.id,
-          listingId: item.listingId,
-          listing: null,
-          quantity: item.quantity,
-        })),
-        vendorId: cart.vendorId,
-        subtotal: 0,
-        isLoading: false,
-      });
+      const response = await api.get<CartResponse>('/api/v1/cart');
+      if (!response.success) throw new Error(response.error || 'Fetch cart failed');
+      applyCart(set, response.data);
     } catch (error: any) {
-      console.error('Failed to fetch cart:', error);
       set({
         items: [],
         vendorId: null,
         vendor: null,
         subtotal: 0,
         isLoading: false,
-        error: error.message || 'Failed to load cart',
+        error: extractMessage(error, 'Failed to load cart'),
       });
     }
   },
@@ -82,133 +79,68 @@ export const useCartStore = create<CartState>((set, get) => ({
   addItem: async (listingId: string, quantity = 1) => {
     set({ isLoading: true, error: null });
     try {
-      const userId = useAuthStore.getState().user?.id;
-      if (!userId) throw new Error('Not authenticated');
-
-      // Get or create cart
-      let { data: cart } = await supabase
-        .from('Cart')
-        .select('id')
-        .eq('userId', userId)
-        .maybeSingle();
-
-      if (!cart) {
-        const { data: newCart, error: cartError } = await supabase
-          .from('Cart')
-          .insert({ id: `cart-${Date.now()}`, userId, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() })
-          .select()
-          .single();
-        if (cartError) throw cartError;
-        cart = newCart;
-      }
-
-      // Check if item exists
-      const { data: existing } = await supabase
-        .from('CartItem')
-        .select('id, quantity')
-        .eq('cartId', cart.id)
-        .eq('listingId', listingId)
-        .maybeSingle();
-
-      if (existing) {
-        await supabase
-          .from('CartItem')
-          .update({ quantity: existing.quantity + quantity })
-          .eq('id', existing.id);
-      } else {
-        await supabase
-          .from('CartItem')
-          .insert({ id: `ci-${Date.now()}`, cartId: cart.id, listingId, quantity });
-      }
-
-      set({ isLoading: false });
-      await get().fetchCart();
+      const response = await api.post<CartResponse>('/api/v1/cart/items', { listingId, quantity });
+      if (!response.success) throw new Error(response.error || 'Add item failed');
+      applyCart(set, response.data);
     } catch (error: any) {
-      set({ isLoading: false, error: error.message || 'Failed to add item' });
-      throw error;
+      const msg = extractMessage(error, 'Failed to add item');
+      set({ isLoading: false, error: msg });
+      throw new Error(msg);
     }
   },
 
   updateQuantity: async (itemId: string, quantity: number) => {
+    if (quantity <= 0) {
+      await get().removeItem(itemId);
+      return;
+    }
     set({ isLoading: true, error: null });
     try {
-      if (quantity <= 0) {
-        await get().removeItem(itemId);
-        return;
-      }
-
-      const { error } = await supabase
-        .from('CartItem')
-        .update({ quantity })
-        .eq('id', itemId);
-
-      if (error) throw error;
-
-      set((state) => ({
-        items: state.items.map((item) =>
-          item.id === itemId ? { ...item, quantity } : item
-        ),
-        isLoading: false,
-      }));
+      await api.put<CartResponse>(`/api/v1/cart/items/${itemId}`, { quantity });
+      await get().fetchCart();
     } catch (error: any) {
-      set({ isLoading: false, error: error.message || 'Failed to update quantity' });
-      throw error;
+      const msg = extractMessage(error, 'Failed to update quantity');
+      set({ isLoading: false, error: msg });
+      throw new Error(msg);
     }
   },
 
   removeItem: async (itemId: string) => {
     set({ isLoading: true, error: null });
     try {
-      const { error } = await supabase
-        .from('CartItem')
-        .delete()
-        .eq('id', itemId);
-
-      if (error) throw error;
-
-      set((state) => ({
-        items: state.items.filter((item) => item.id !== itemId),
-        isLoading: false,
-      }));
+      await api.delete<CartResponse>(`/api/v1/cart/items/${itemId}`);
+      await get().fetchCart();
     } catch (error: any) {
-      set({ isLoading: false, error: error.message || 'Failed to remove item' });
-      throw error;
+      const msg = extractMessage(error, 'Failed to remove item');
+      set({ isLoading: false, error: msg });
+      throw new Error(msg);
     }
   },
 
   clearCart: async () => {
     set({ isLoading: true, error: null });
     try {
-      const userId = useAuthStore.getState().user?.id;
-      if (userId) {
-        const { data: cart } = await supabase
-          .from('Cart')
-          .select('id')
-          .eq('userId', userId)
-          .maybeSingle();
+      await api.delete<CartResponse>('/api/v1/cart');
+    } catch {
+      // still reset local state even if server call fails
+    } finally {
+      set({ items: [], vendorId: null, vendor: null, subtotal: 0, isLoading: false });
+    }
+  },
 
-        if (cart) {
-          await supabase.from('CartItem').delete().eq('cartId', cart.id);
-          await supabase.from('Cart').delete().eq('id', cart.id);
-        }
+  checkout: async (addressId: string, specialNotes?: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await api.post<CartResponse>('/api/v1/orders', { addressId, specialNotes });
+      if (!response.success || !response.data) {
+        throw new Error(response.error || 'Failed to place order');
       }
-
-      set({
-        items: [],
-        vendorId: null,
-        vendor: null,
-        subtotal: 0,
-        isLoading: false,
-      });
+      set({ items: [], vendorId: null, vendor: null, subtotal: 0, isLoading: false });
+      return response.data;
     } catch (error: any) {
-      set({
-        items: [],
-        vendorId: null,
-        vendor: null,
-        subtotal: 0,
-        isLoading: false,
-        error: error.message || 'Failed to clear cart',
-      });
+      const msg = extractMessage(error, 'Failed to place order');
+      set({ isLoading: false, error: msg });
+      throw new Error(msg);
     }
   },
 

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from './authStore';
+import api from '../services/api';
 
 interface Booking {
   id: string;
@@ -32,20 +33,9 @@ interface BookingState {
   fetchBooking: (id: string) => Promise<void>;
   createBooking: (data: any) => Promise<Booking>;
   cancelBooking: (id: string, reason?: string) => Promise<void>;
+  completeBooking: (id: string) => Promise<{ pointsEarned: number }>;
   clearCurrentBooking: () => void;
   clearError: () => void;
-}
-
-function getListingIdField(category: string): string | null {
-  const map: Record<string, string> = {
-    CLEANING: 'cleaningListingId',
-    HANDYMAN: 'handymanListingId',
-    BEAUTY: 'beautyListingId',
-    RENTALS: 'rentalListingId',
-    RIDE_ASSISTANCE: 'rideAssistanceListingId',
-    COMPANIONSHIP: 'companionshipListingId',
-  };
-  return map[category] || null;
 }
 
 export const useBookingStore = create<BookingState>((set) => ({
@@ -109,7 +99,7 @@ export const useBookingStore = create<BookingState>((set) => ({
       const userId = useAuthStore.getState().user?.id;
       if (!userId) throw new Error('Not authenticated');
 
-      // Get user's default address (or first address)
+      // Resolve address: server requires it. Use provided, or user's default.
       let addressId = data.addressId;
       if (!addressId) {
         const { data: addresses } = await supabase
@@ -118,84 +108,55 @@ export const useBookingStore = create<BookingState>((set) => ({
           .eq('userId', userId)
           .order('isDefault', { ascending: false })
           .limit(1);
-        addressId = addresses?.[0]?.id || null;
+        addressId = addresses?.[0]?.id;
       }
+      if (!addressId) throw new Error('No address on file. Add one in your profile.');
 
-      // Map category to the correct listing ID field
-      const listingIdField = getListingIdField(data.category);
-      const listingIdData = listingIdField && data.listingId
-        ? { [listingIdField]: data.listingId }
-        : {};
+      // Server calculates fees + creates status history. We only send inputs.
+      const response = await api.post<{ success: boolean; data: any; error?: string }>(
+        '/api/v1/bookings',
+        {
+          vendorId: data.vendorId,
+          addressId,
+          category: data.category,
+          listingId: data.listingId,
+          scheduledDate: data.scheduledDate,
+          scheduledTime: data.scheduledTime,
+          duration: data.duration,
+          specialInstructions: data.specialInstructions,
+          pickupLocation: data.pickupLocation,
+          dropoffLocation: data.dropoffLocation,
+          stops: data.stops,
+          isRoundTrip: data.isRoundTrip,
+        }
+      );
 
-      const bookingData = {
-        id: `booking-${Date.now()}`,
-        userId,
-        vendorId: data.vendorId,
-        addressId: addressId || userId, // fallback to userId as placeholder if no address
-        category: data.category,
-        ...listingIdData,
-        scheduledDate: data.scheduledDate,
-        scheduledTime: data.scheduledTime,
-        duration: data.duration || null,
-        specialInstructions: data.specialInstructions || null,
-        subtotal: data.subtotal,
-        serviceFee: data.serviceFee,
-        total: data.total,
-        status: 'PENDING',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-
-      const { data: booking, error } = await supabase
-        .from('Booking')
-        .insert(bookingData)
-        .select()
-        .single();
-
-      if (error) throw error;
-
-      // Create notification for the booking
-      try {
-        await supabase.from('Notification').insert({
-          id: `notif-${Date.now()}`,
-          userId,
-          title: 'Booking Confirmed',
-          body: `Your ${data.serviceName || data.category} booking for ${data.scheduledDate} at ${data.scheduledTime} has been confirmed.`,
-          type: 'booking',
-          data: { bookingId: booking.id },
-          isRead: false,
-          createdAt: new Date().toISOString(),
-        });
-      } catch (notifError) {
-        console.warn('Failed to create notification:', notifError);
+      if (!response.success || !response.data) {
+        throw new Error(response.error || 'Failed to create booking');
       }
+      const booking = response.data;
 
       set((state) => ({
-        bookings: [booking as any, ...state.bookings],
-        currentBooking: booking as any,
+        bookings: [booking, ...state.bookings],
+        currentBooking: booking,
         isLoading: false,
       }));
-      return booking as any;
+      return booking;
     } catch (error: any) {
-      set({ isLoading: false, error: error.message || 'Failed to create booking' });
-      throw error;
+      const msg = error?.response?.data?.error || error?.message || 'Failed to create booking';
+      set({ isLoading: false, error: msg });
+      throw new Error(msg);
     }
   },
 
   cancelBooking: async (id: string, reason?: string) => {
     set({ isLoading: true, error: null });
     try {
-      const { error } = await supabase
-        .from('Booking')
-        .update({
-          status: 'CANCELLED',
-          cancelledAt: new Date().toISOString(),
-          cancellationReason: reason || null,
-          updatedAt: new Date().toISOString(),
-        })
-        .eq('id', id);
-
-      if (error) throw error;
+      const response = await api.post<{ success: boolean; data: any; error?: string }>(
+        `/api/v1/bookings/${id}/cancel`,
+        { reason }
+      );
+      if (!response.success) throw new Error(response.error || 'Cancel failed');
 
       set((state) => ({
         bookings: state.bookings.map((b) =>
@@ -207,8 +168,36 @@ export const useBookingStore = create<BookingState>((set) => ({
         isLoading: false,
       }));
     } catch (error: any) {
-      set({ isLoading: false, error: error.message || 'Failed to cancel booking' });
-      throw error;
+      const msg = error?.response?.data?.error || error?.message || 'Failed to cancel booking';
+      set({ isLoading: false, error: msg });
+      throw new Error(msg);
+    }
+  },
+
+  completeBooking: async (id: string) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await api.post<{ success: boolean; data: any; error?: string }>(
+        `/api/v1/bookings/${id}/complete`
+      );
+      if (!response.success || !response.data) {
+        throw new Error(response.error || 'Complete failed');
+      }
+      const pointsEarned = response.data.pointsEarned || 0;
+      set((state) => ({
+        bookings: state.bookings.map((b) =>
+          b.id === id ? { ...b, status: 'COMPLETED', pointsEarned } : b
+        ),
+        currentBooking: state.currentBooking?.id === id
+          ? { ...state.currentBooking, status: 'COMPLETED', pointsEarned }
+          : state.currentBooking,
+        isLoading: false,
+      }));
+      return { pointsEarned };
+    } catch (error: any) {
+      const msg = error?.response?.data?.error || error?.message || 'Failed to complete booking';
+      set({ isLoading: false, error: msg });
+      throw new Error(msg);
     }
   },
 

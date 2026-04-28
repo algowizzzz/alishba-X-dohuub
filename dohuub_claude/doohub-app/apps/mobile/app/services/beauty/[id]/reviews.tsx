@@ -1,33 +1,50 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, fontSize } from '../../../../src/constants/theme';
-
-const MOCK_REVIEWS = [
-  { id: '1',  userName: 'Sarah M.',    rating: 5, comment: 'Absolutely amazing service! Very professional and the results were stunning. Highly recommend!', date: '2 days ago' },
-  { id: '2',  userName: 'Emily J.',    rating: 5, comment: "Best beauty service I've ever had. The attention to detail was incredible.", date: '1 week ago' },
-  { id: '3',  userName: 'Jessica B.',  rating: 4, comment: 'Great service overall. Very satisfied with the results.', date: '2 weeks ago' },
-  { id: '4',  userName: 'Amanda R.',   rating: 5, comment: 'So happy with my results! The beautician was very skilled and professional.', date: '3 weeks ago' },
-  { id: '5',  userName: 'Laura K.',    rating: 4, comment: 'Good service, arrived on time and did a great job.', date: '1 month ago' },
-  { id: '6',  userName: 'Michelle T.', rating: 5, comment: 'Exceeded my expectations. Will definitely book again!', date: '1 month ago' },
-  { id: '7',  userName: 'Natalie P.',  rating: 3, comment: 'Service was okay, but took longer than expected.', date: '2 months ago' },
-  { id: '8',  userName: 'Sophia W.',   rating: 5, comment: 'Absolutely loved the results. Very professional team.', date: '2 months ago' },
-  { id: '9',  userName: 'Caroline H.', rating: 4, comment: 'Really happy with the outcome. Would recommend.', date: '3 months ago' },
-  { id: '10', userName: 'Olivia G.',   rating: 5, comment: 'Perfect experience from start to finish!', date: '3 months ago' },
-];
+import { getReviewsByVendor } from '../../../../src/lib/queries';
 
 const FILTER_TABS = ['All', '5★', '4★', '3★', '2★', '1★'];
+
+function formatRelativeDate(iso: string): string {
+  const d = new Date(iso);
+  const diff = Date.now() - d.getTime();
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  if (days < 1) return 'Today';
+  if (days === 1) return 'Yesterday';
+  if (days < 7) return `${days} days ago`;
+  if (days < 14) return '1 week ago';
+  if (days < 30) return `${Math.floor(days / 7)} weeks ago`;
+  if (days < 60) return '1 month ago';
+  if (days < 365) return `${Math.floor(days / 30)} months ago`;
+  return d.toLocaleDateString();
+}
+
+function reviewerName(r: any): string {
+  const p = r?.User?.UserProfile;
+  if (p?.firstName) return `${p.firstName} ${p.lastName?.[0] ?? ''}.`.trim();
+  if (r?.User?.email) return r.User.email.split('@')[0];
+  return 'Anonymous';
+}
 
 export default function BeautyReviewsScreen() {
   const params = useLocalSearchParams<{ id: string; name: string }>();
   const [activeFilter, setActiveFilter] = useState('All');
+  const [reviews, setReviews] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!params.id) return;
+    getReviewsByVendor(params.id).then(setReviews).catch(() => setReviews([]));
+  }, [params.id]);
 
   const filteredReviews = activeFilter === 'All'
-    ? MOCK_REVIEWS
-    : MOCK_REVIEWS.filter(r => r.rating === parseInt(activeFilter));
+    ? reviews
+    : reviews.filter(r => r.rating === parseInt(activeFilter));
 
-  const avgRating = (MOCK_REVIEWS.reduce((s, r) => s + r.rating, 0) / MOCK_REVIEWS.length).toFixed(1);
+  const avgRating = reviews.length > 0
+    ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)
+    : '—';
 
   return (
     <SafeAreaView style={styles.container}>
@@ -54,7 +71,7 @@ export default function BeautyReviewsScreen() {
               <View style={styles.starsRow}>
                 {[1,2,3,4,5].map(s => <Ionicons key={s} name="star" size={20} color="#FACC15" />)}
               </View>
-              <Text style={styles.ratingCount}>{MOCK_REVIEWS.length} reviews</Text>
+              <Text style={styles.ratingCount}>{reviews.length} reviews</Text>
             </View>
 
             {/* Filter Tabs */}
@@ -70,8 +87,8 @@ export default function BeautyReviewsScreen() {
         renderItem={({ item }) => (
           <View style={styles.reviewCard}>
             <View style={styles.reviewTop}>
-              <Text style={styles.reviewName}>{item.userName}</Text>
-              <Text style={styles.reviewDate}>{item.date}</Text>
+              <Text style={styles.reviewName}>{reviewerName(item)}</Text>
+              <Text style={styles.reviewDate}>{formatRelativeDate(item.createdAt)}</Text>
             </View>
             <View style={styles.starsRow}>
               {[1,2,3,4,5].map(s => <Ionicons key={s} name="star" size={14} color={s <= item.rating ? '#FACC15' : '#E5E7EB'} />)}

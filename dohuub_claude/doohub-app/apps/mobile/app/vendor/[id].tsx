@@ -13,17 +13,23 @@ const cleaningLogos = [
   require('../../assets/cleaning/logos/logo3.png'),
 ];
 
-const MOCK_SERVICES = [
-  { id: 1, name: 'Basic Cleaning', description: 'Essential cleaning for your home', price: 89, duration: '2-3 hours', rating: 4.8 },
-  { id: 2, name: 'Deep Cleaning', description: 'Thorough cleaning of every corner', price: 149, duration: '4-5 hours', rating: 4.9 },
-  { id: 3, name: 'Move In/Out Cleaning', description: 'Complete cleaning for moving', price: 199, duration: '5-6 hours', rating: 4.7 },
-];
+function formatRelativeDate(iso: string): string {
+  const d = new Date(iso);
+  const days = Math.floor((Date.now() - d.getTime()) / (1000 * 60 * 60 * 24));
+  if (days < 1) return 'Today';
+  if (days === 1) return '1 day ago';
+  if (days < 7) return `${days} days ago`;
+  if (days < 14) return '1 week ago';
+  if (days < 30) return `${Math.floor(days / 7)} weeks ago`;
+  return d.toLocaleDateString();
+}
 
-const MOCK_REVIEWS = [
-  { id: 'r1', name: 'Sarah M.', date: '3 days ago', rating: 5, comment: 'Excellent service! The team was professional, thorough, and my home has never looked better. Highly recommend!' },
-  { id: 'r2', name: 'Michael R.', date: '1 week ago', rating: 5, comment: "Very reliable and detail-oriented. They cleaned areas I didn't even think about. Great value for money." },
-  { id: 'r3', name: 'Jennifer K.', date: '2 weeks ago', rating: 4, comment: 'Good service overall. A bit pricey but the quality is there. Would use again.' },
-];
+function reviewerName(r: any): string {
+  const p = r?.User?.UserProfile;
+  if (p?.firstName) return `${p.firstName} ${p.lastName?.[0] ?? ''}.`.trim();
+  if (r?.User?.email) return r.User.email.split('@')[0];
+  return 'Anonymous';
+}
 
 /**
  * Vendor Profile — exact match to boss wireframe (CleaningVendorProfileScreen.tsx):
@@ -51,10 +57,10 @@ export default function VendorProfileScreen() {
   }, [id]);
 
   const displayName = vendor?.businessName || name || 'Provider';
-  const displayRating = vendor?.rating ?? 4.9;
-  const displayReviews = vendor?.reviewCount ?? 342;
+  const displayRating = vendor?.rating ?? 0;
+  const displayReviews = vendor?.reviewCount ?? 0;
   const isPowered = vendor?.isMichelle ?? false;
-  const displayReviewList = reviews.length > 0 ? reviews : MOCK_REVIEWS;
+  const displayReviewList = reviews;
 
   if (loading) {
     return (
@@ -137,32 +143,6 @@ export default function VendorProfileScreen() {
           </View>
         </View>
 
-        {/* Services Offered */}
-        <View style={s.sectionGap}>
-          <Text style={s.sectionTitle}>Services Offered</Text>
-          {MOCK_SERVICES.map((svc) => (
-            <TouchableOpacity key={svc.id} style={s.card} activeOpacity={0.7}>
-              <View style={s.serviceRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={s.serviceName}>{svc.name}</Text>
-                  <Text style={s.serviceDesc}>{svc.description}</Text>
-                  <View style={s.serviceMetaRow}>
-                    <View style={s.ratingSmall}>
-                      <Ionicons name="star" size={14} color="#FACC15" />
-                      <Text style={s.serviceRating}>{svc.rating}</Text>
-                    </View>
-                    <View style={s.ratingSmall}>
-                      <Ionicons name="time-outline" size={14} color="#64748B" />
-                      <Text style={s.serviceDuration}>{svc.duration}</Text>
-                    </View>
-                  </View>
-                </View>
-                <Text style={s.servicePrice}>${svc.price}</Text>
-              </View>
-            </TouchableOpacity>
-          ))}
-        </View>
-
         {/* Reviews & Ratings */}
         <View style={s.sectionGap}>
           <View style={s.reviewsHeaderRow}>
@@ -199,7 +179,9 @@ export default function VendorProfileScreen() {
           </View>
 
           {/* Review Cards */}
-          {displayReviewList.slice(0, 3).map((review: any, idx: number) => (
+          {displayReviewList.length === 0 ? (
+            <Text style={{ color: '#64748B', fontSize: 13, paddingVertical: 12 }}>No reviews yet.</Text>
+          ) : displayReviewList.slice(0, 3).map((review: any, idx: number) => (
             <View key={review.id || idx} style={s.card}>
               <View style={s.reviewTopRow}>
                 <View style={s.reviewAvatar}>
@@ -207,8 +189,8 @@ export default function VendorProfileScreen() {
                 </View>
                 <View style={{ flex: 1 }}>
                   <View style={s.reviewNameRow}>
-                    <Text style={s.reviewName}>{review.name || review.userName || 'Customer'}</Text>
-                    <Text style={s.reviewDate}>{review.date || '1 week ago'}</Text>
+                    <Text style={s.reviewName}>{reviewerName(review)}</Text>
+                    <Text style={s.reviewDate}>{formatRelativeDate(review.createdAt)}</Text>
                   </View>
                   <View style={s.starsRow}>
                     {[1,2,3,4,5].map(star => (

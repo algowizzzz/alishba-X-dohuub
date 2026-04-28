@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -11,12 +11,26 @@ import {
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, fontSize } from '../../../src/constants/theme';
+import { getReviewsByVendor, getVendorById } from '../../../src/lib/queries';
 
-const MOCK_REVIEWS = [
-  { name: 'Sarah M.', date: '2 days ago', rating: 5, comment: 'Great selection of fresh produce! Everything was well-packaged and delivery was fast.', ordered: 'Fruits & Vegetables', photos: ['https://images.unsplash.com/photo-1542838132-92c53300491e?w=200&h=200&fit=crop','https://images.unsplash.com/photo-1603833665858-e61d17a86224?w=200&h=200&fit=crop','https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=200&h=200&fit=crop'] },
-  { name: 'David R.', date: '5 days ago', rating: 5, comment: 'My go-to grocery store for online orders. Always fresh and prices are great.', ordered: 'Dairy & Bakery', photos: ['https://images.unsplash.com/photo-1509440159596-0249088772ff?w=200&h=200&fit=crop','https://images.unsplash.com/photo-1488477181946-6428a0291777?w=200&h=200&fit=crop'] },
-  { name: 'Priya K.', date: '1 week ago', rating: 4, comment: 'Good variety but one item was substituted. Still happy with the service overall.', ordered: 'Mixed groceries' },
-];
+function formatRelativeDate(iso: string): string {
+  const d = new Date(iso);
+  const diff = Date.now() - d.getTime();
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  if (days < 1) return 'Today';
+  if (days === 1) return '1 day ago';
+  if (days < 7) return `${days} days ago`;
+  if (days < 14) return '1 week ago';
+  if (days < 30) return `${Math.floor(days / 7)} weeks ago`;
+  return d.toLocaleDateString();
+}
+
+function reviewerName(r: any): string {
+  const p = r?.User?.UserProfile;
+  if (p?.firstName) return `${p.firstName} ${p.lastName?.[0] ?? ''}.`.trim();
+  if (r?.User?.email) return r.User.email.split('@')[0];
+  return 'Anonymous';
+}
 
 export default function GroceryProfileScreen() {
   const params = useLocalSearchParams<{ id: string; name: string; type: string; rating: string; reviewCount: string; isPoweredByDoHuub: string }>();
@@ -25,6 +39,15 @@ export default function GroceryProfileScreen() {
   const isPoweredByDoHuub = params.isPoweredByDoHuub === 'true';
   const rating = parseFloat(params.rating || '4.7');
   const reviewCount = parseInt(params.reviewCount || '100', 10);
+  const vendorId = params.id || '';
+
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [vendor, setVendor] = useState<any>(null);
+  useEffect(() => {
+    if (!vendorId) return;
+    getReviewsByVendor(vendorId).then(setReviews).catch(() => setReviews([]));
+    getVendorById(vendorId).then(setVendor).catch(() => setVendor(null));
+  }, [vendorId]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -53,7 +76,10 @@ export default function GroceryProfileScreen() {
             <Text style={styles.ratingText}>{rating}</Text>
             <Text style={styles.reviewCountText}>({reviewCount} reviews)</Text>
           </View>
-          <Text style={styles.deliveryInfo}>30-50 min • Free delivery over $35</Text>
+          <Text style={styles.deliveryInfo}>
+            {vendor?.estimatedDeliveryTime ?? '30-50 min'}
+            {vendor?.minOrderAmount ? ` • Min order $${vendor.minOrderAmount.toFixed(2)}` : ''}
+          </Text>
         </View>
 
         <View style={styles.body}>
@@ -67,27 +93,36 @@ export default function GroceryProfileScreen() {
 
           {/* Store Info */}
           <Text style={styles.sectionTitle}>Store Information</Text>
-          <View style={styles.infoCard}>
-            <Ionicons name="location" size={20} color="#10B981" />
-            <View style={{ marginLeft: 12 }}>
-              <Text style={styles.infoLabel}>456 Market Street</Text>
-              <Text style={styles.infoSub}>New York, NY 10002</Text>
+          {vendor?.address && (
+            <View style={styles.infoCard}>
+              <Ionicons name="location" size={20} color="#10B981" />
+              <View style={{ marginLeft: 12 }}>
+                <Text style={styles.infoLabel}>{vendor.address}</Text>
+                <Text style={styles.infoSub}>{[vendor.city, vendor.state, vendor.zipCode].filter(Boolean).join(', ')}</Text>
+              </View>
             </View>
-          </View>
-          <View style={styles.infoCard}>
-            <Ionicons name="time" size={20} color="#10B981" />
-            <View style={{ marginLeft: 12 }}>
-              <Text style={styles.infoLabel}>Delivery Hours</Text>
-              <Text style={styles.infoSub}>8:00 AM - 10:00 PM Daily</Text>
+          )}
+          {vendor?.hoursOfOperation && (
+            <View style={styles.infoCard}>
+              <Ionicons name="time" size={20} color="#10B981" />
+              <View style={{ marginLeft: 12 }}>
+                <Text style={styles.infoLabel}>Delivery Hours</Text>
+                <Text style={styles.infoSub}>{vendor.hoursOfOperation}</Text>
+              </View>
             </View>
-          </View>
-          <View style={styles.infoCard}>
-            <Ionicons name="cube" size={20} color="#10B981" />
-            <View style={{ marginLeft: 12 }}>
-              <Text style={styles.infoLabel}>Minimum Order</Text>
-              <Text style={styles.infoSub}>$15.00 • Free delivery over $35</Text>
+          )}
+          {(vendor?.minOrderAmount != null || vendor?.deliveryFee != null) && (
+            <View style={styles.infoCard}>
+              <Ionicons name="cube" size={20} color="#10B981" />
+              <View style={{ marginLeft: 12 }}>
+                <Text style={styles.infoLabel}>Minimum Order</Text>
+                <Text style={styles.infoSub}>
+                  {vendor.minOrderAmount != null ? `$${vendor.minOrderAmount.toFixed(2)}` : ''}
+                  {vendor.deliveryFee != null ? ` • Delivery $${vendor.deliveryFee.toFixed(2)}` : ''}
+                </Text>
+              </View>
             </View>
-          </View>
+          )}
 
           {/* Reviews */}
           <View style={styles.reviewsHeader}>
@@ -117,16 +152,18 @@ export default function GroceryProfileScreen() {
             </View>
           </View>
 
-          {MOCK_REVIEWS.map((review, i) => (
-            <View key={i} style={styles.reviewCard}>
+          {reviews.length === 0 ? (
+            <Text style={{ color: colors.text.secondary, fontSize: fontSize.sm, paddingVertical: 12 }}>No reviews yet.</Text>
+          ) : reviews.slice(0, 5).map((review: any) => (
+            <View key={review.id} style={styles.reviewCard}>
               <View style={styles.reviewTop}>
                 <View style={styles.reviewAvatar}>
                   <Ionicons name="person" size={18} color={colors.text.secondary} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <View style={styles.reviewNameRow}>
-                    <Text style={styles.reviewName}>{review.name}</Text>
-                    <Text style={styles.reviewDate}>{review.date}</Text>
+                    <Text style={styles.reviewName}>{reviewerName(review)}</Text>
+                    <Text style={styles.reviewDate}>{formatRelativeDate(review.createdAt)}</Text>
                   </View>
                   <View style={styles.starsRow}>
                     {[1,2,3,4,5].map(s => (
@@ -136,14 +173,13 @@ export default function GroceryProfileScreen() {
                 </View>
               </View>
               <Text style={styles.reviewComment}>{review.comment}</Text>
-              {(review as any).photos && (review as any).photos.length > 0 && (
+              {review.photos && review.photos.length > 0 && (
                 <View style={{ flexDirection: 'row', gap: 6, marginTop: 8, marginBottom: 4 }}>
-                  {(review as any).photos.map((photo: string, i: number) => (
+                  {review.photos.map((photo: string, i: number) => (
                     <Image key={i} source={{ uri: photo }} style={{ width: 72, height: 72, borderRadius: 8, overflow: 'hidden' }} resizeMode="cover" />
                   ))}
                 </View>
               )}
-              <Text style={styles.reviewOrdered}>Ordered: {review.ordered}</Text>
             </View>
           ))}
         </View>

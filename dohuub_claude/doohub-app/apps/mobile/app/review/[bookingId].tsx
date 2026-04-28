@@ -13,8 +13,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, fontSize, borderRadius, borderWidth } from '../../src/constants/theme';
 import { ScreenHeader } from '../../src/components/composite';
-import { supabase } from '../../src/lib/supabase';
-import { useAuthStore } from '../../src/store/authStore';
+import api from '../../src/services/api';
 
 export default function LeaveReviewScreen() {
   const { bookingId, serviceName, scheduledDate, scheduledTime } = useLocalSearchParams<{
@@ -31,33 +30,18 @@ export default function LeaveReviewScreen() {
   const canSubmit = rating > 0 && reviewText.trim().length > 0;
 
   const handleSubmit = async () => {
-    if (!canSubmit) return;
+    if (!canSubmit || !bookingId) return;
     setIsSubmitting(true);
     try {
-      const userId = useAuthStore.getState().user?.id;
-      if (userId && bookingId) {
-        const { data: booking } = await supabase
-          .from('Booking')
-          .select('vendorId')
-          .eq('id', bookingId)
-          .single();
-
-        if (booking) {
-          await supabase.from('Review').insert({
-            id: `review-${Date.now()}`,
-            userId,
-            vendorId: booking.vendorId,
-            bookingId,
-            rating,
-            comment: reviewText,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          });
-        }
-      }
+      const response = await api.post<{ success: boolean; data: any; error?: string }>(
+        '/api/v1/reviews',
+        { bookingId, rating, comment: reviewText }
+      );
+      if (!response.success) throw new Error(response.error || 'Submit failed');
       router.back();
-    } catch {
-      Alert.alert('Error', 'Failed to submit review. Please try again.');
+    } catch (e: any) {
+      const msg = e?.response?.data?.error || e?.message || 'Failed to submit review. Please try again.';
+      Alert.alert('Error', msg);
     } finally {
       setIsSubmitting(false);
     }

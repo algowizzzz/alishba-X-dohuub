@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, Image, Dimensions } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,6 +12,7 @@ const GALLERY_IMAGES = [
   require('../../../assets/rental-4.png'),
 ];
 import { colors, fontSize } from '../../../src/constants/theme';
+import { getReviewsByVendor, getRentalById } from '../../../src/lib/queries';
 
 const TEAL = '#14B8A6';
 
@@ -20,11 +21,23 @@ const AMENITY_ICONS: Record<string, string> = {
   Pool: 'water-outline', Kitchen: 'restaurant-outline', Washer: 'shirt-outline', Heating: 'flame-outline',
 };
 
-const MOCK_REVIEWS = [
-  { id: '1', name: 'John D.',    date: '2 days ago',  rating: 5, comment: 'Excellent property! Very clean and professional. My family loved every moment.', photos: ['https://images.unsplash.com/photo-1586105251261-72a756497a11?w=200&h=200&fit=crop','https://images.unsplash.com/photo-1560185893-a55cbc8c57e8?w=200&h=200&fit=crop','https://images.unsplash.com/photo-1556912172-45b7abe8b7e1?w=200&h=200&fit=crop'] },
-  { id: '2', name: 'Sarah M.',   date: '1 week ago',  rating: 5, comment: 'Highly recommend! The location was perfect and the host was super responsive.', photos: ['https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=200&h=200&fit=crop','https://images.unsplash.com/photo-1631049307264-da0ec9d70304?w=200&h=200&fit=crop'] },
-  { id: '3', name: 'Michael R.', date: '2 weeks ago', rating: 4, comment: 'Good stay overall. Would use again for our next trip to Dubai.' },
-];
+function formatRelativeDate(iso: string): string {
+  const d = new Date(iso);
+  const days = Math.floor((Date.now() - d.getTime()) / (1000 * 60 * 60 * 24));
+  if (days < 1) return 'Today';
+  if (days === 1) return '1 day ago';
+  if (days < 7) return `${days} days ago`;
+  if (days < 14) return '1 week ago';
+  if (days < 30) return `${Math.floor(days / 7)} weeks ago`;
+  return d.toLocaleDateString();
+}
+
+function reviewerName(r: any): string {
+  const p = r?.User?.UserProfile;
+  if (p?.firstName) return `${p.firstName} ${p.lastName?.[0] ?? ''}.`.trim();
+  if (r?.User?.email) return r.User.email.split('@')[0];
+  return 'Anonymous';
+}
 
 export default function PropertyDetailScreen() {
   const params = useLocalSearchParams<{
@@ -38,6 +51,22 @@ export default function PropertyDetailScreen() {
   const isPowered = params.isPoweredByDoHuub === 'true';
   const amenities = params.amenities ? params.amenities.split(',') : [];
   const houseRules = params.houseRules ? params.houseRules.split('||') : [];
+
+  const [reviews, setReviews] = useState<any[]>([]);
+  useEffect(() => {
+    if (!params.id) return;
+    // Fetch reviews via the rental's vendorId
+    (async () => {
+      try {
+        const rental = await getRentalById(params.id);
+        const vendorId = (rental as any)?.vendorId ?? (rental as any)?.Vendor?.id;
+        if (vendorId) {
+          const revs = await getReviewsByVendor(vendorId);
+          setReviews(revs);
+        }
+      } catch { setReviews([]); }
+    })();
+  }, [params.id]);
 
   const goToCalendar = () => {
     router.push({ pathname: '/services/rentals/[id]/calendar', params: { ...params } } as any);
@@ -194,11 +223,13 @@ export default function PropertyDetailScreen() {
               <Text style={styles.viewAllLink}>View All</Text>
             </TouchableOpacity>
           </View>
-          {MOCK_REVIEWS.map(r => (
+          {reviews.length === 0 ? (
+            <Text style={{ color: colors.text.secondary, fontSize: fontSize.sm, paddingVertical: 12 }}>No reviews yet.</Text>
+          ) : reviews.slice(0, 3).map((r: any) => (
             <View key={r.id} style={styles.reviewCard}>
               <View style={styles.reviewTop}>
-                <Text style={styles.reviewName}>{r.name}</Text>
-                <Text style={styles.reviewDate}>{r.date}</Text>
+                <Text style={styles.reviewName}>{reviewerName(r)}</Text>
+                <Text style={styles.reviewDate}>{formatRelativeDate(r.createdAt)}</Text>
               </View>
               <View style={styles.starsRow}>
                 {[1,2,3,4,5].map(s => <Ionicons key={s} name="star" size={14} color={s <= r.rating ? '#FACC15' : '#E5E7EB'} />)}
@@ -206,7 +237,7 @@ export default function PropertyDetailScreen() {
               <Text style={styles.reviewComment}>{r.comment}</Text>
               {r.photos && r.photos.length > 0 && (
                 <View style={{ flexDirection: 'row', gap: 6, marginTop: 8 }}>
-                  {r.photos.map((photo, i) => (
+                  {r.photos.map((photo: string, i: number) => (
                     <Image key={i} source={{ uri: photo }} style={{ width: 72, height: 72, borderRadius: 8, overflow: 'hidden' }} resizeMode="cover" />
                   ))}
                 </View>

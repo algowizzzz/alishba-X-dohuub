@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -8,14 +8,16 @@ import {
   ScrollView,
   SafeAreaView,
   Image,
+  ActivityIndicator,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, fontSize, borderRadius } from '../../../src/constants/theme';
 import { useAuthStore } from '../../../src/store/authStore';
+import { getFoodListings } from '../../../src/lib/queries';
 
 interface MenuItem {
-  id: number;
+  id: string;
   name: string;
   description: string;
   price: number;
@@ -26,105 +28,53 @@ interface CartItem extends MenuItem { quantity: number; }
 
 const CATEGORIES = ['All', "Chef's Recommendations", 'Starters', 'Mains', 'Desserts', 'Ice Cream', 'Beverages'];
 
-const getVendorMenu = (menuId: number): MenuItem[] => {
-  const b = menuId * 100;
-  switch (menuId) {
-    case 1: return [
-      { id: b+1,  name: 'Signature Margherita Pizza',  description: 'Our famous wood-fired pizza with fresh mozzarella',  price: 16.99, category: "Chef's Recommendations", image: 'https://images.unsplash.com/photo-1574071318508-1cdbab80d002?w=120&h=120&fit=crop' },
-      { id: b+2,  name: 'Truffle Fettuccine Alfredo',  description: 'Creamy alfredo with black truffle oil',               price: 18.99, category: "Chef's Recommendations", image: 'https://images.unsplash.com/photo-1555949258-eb67b1ef0ceb?w=120&h=120&fit=crop' },
-      { id: b+3,  name: 'Garlic Knots',                description: 'Soft bread knots with garlic butter and herbs',       price: 6.99,  category: 'Starters',               image: 'https://images.unsplash.com/photo-1509722747041-616f39b57569?w=120&h=120&fit=crop' },
-      { id: b+4,  name: 'Bruschetta',                  description: 'Toasted bread with tomatoes, basil, and olive oil',   price: 8.99,  category: 'Starters',               image: 'https://images.unsplash.com/photo-1572695157366-5e585ab2b69f?w=120&h=120&fit=crop' },
-      { id: b+5,  name: 'Mozzarella Sticks',           description: 'Breaded mozzarella with marinara sauce',              price: 7.99,  category: 'Starters',               image: 'https://images.unsplash.com/photo-1548340748-6d2b7d7da280?w=120&h=120&fit=crop' },
-      { id: b+6,  name: 'Pepperoni Pizza',             description: 'Loaded with pepperoni and cheese',                    price: 15.99, category: 'Mains',                  image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=120&h=120&fit=crop' },
-      { id: b+7,  name: 'BBQ Chicken Pizza',           description: 'BBQ sauce, chicken, onions, and cilantro',            price: 17.99, category: 'Mains',                  image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=120&h=120&fit=crop' },
-      { id: b+8,  name: 'Spaghetti Carbonara',         description: 'Creamy carbonara with bacon and parmesan',            price: 15.99, category: 'Mains',                  image: 'https://images.unsplash.com/photo-1612874742237-6526221588e3?w=120&h=120&fit=crop' },
-      { id: b+9,  name: 'Lasagna',                     description: 'Layers of pasta, meat sauce, and cheese',             price: 16.99, category: 'Mains',                  image: 'https://images.unsplash.com/photo-1574894709920-11b28e7367e3?w=120&h=120&fit=crop' },
-      { id: b+10, name: 'Tiramisu',                    description: 'Classic Italian coffee-flavored dessert',             price: 7.99,  category: 'Desserts',               image: 'https://images.unsplash.com/photo-1571877227200-a0d98ea607e9?w=120&h=120&fit=crop' },
-      { id: b+11, name: 'Gelato Trio',                 description: 'Three scoops of Italian gelato',                      price: 7.99,  category: 'Ice Cream',              image: 'https://images.unsplash.com/photo-1501443762994-82bd5dace89a?w=120&h=120&fit=crop' },
-      { id: b+12, name: 'Italian Soda',                description: 'Sparkling soda with fruit syrup',                     price: 3.99,  category: 'Beverages',              image: 'https://images.unsplash.com/photo-1437418747212-8d9709afab22?w=120&h=120&fit=crop' },
-      { id: b+13, name: 'Iced Tea',                    description: 'Fresh brewed iced tea',                               price: 2.99,  category: 'Beverages',              image: 'https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=120&h=120&fit=crop' },
-    ];
-    case 2: return [
-      { id: b+1,  name: 'Dragon Roll',              description: 'Specialty roll with eel, avocado, and tobiko',  price: 18.99, category: "Chef's Recommendations", image: 'https://images.unsplash.com/photo-1617196034183-421b4040ed20?w=120&h=120&fit=crop' },
-      { id: b+2,  name: "Chef's Sashimi Platter",   description: 'Assorted fresh sashimi selection',              price: 24.99, category: "Chef's Recommendations", image: 'https://images.unsplash.com/photo-1553621042-f6e147245754?w=120&h=120&fit=crop' },
-      { id: b+3,  name: 'Edamame',                  description: 'Steamed soybeans with sea salt',                price: 5.99,  category: 'Starters',               image: 'https://images.unsplash.com/photo-1540914124281-342587941389?w=120&h=120&fit=crop' },
-      { id: b+4,  name: 'Miso Soup',                description: 'Traditional Japanese soybean soup',             price: 4.99,  category: 'Starters',               image: 'https://images.unsplash.com/photo-1547592180-85f173990554?w=120&h=120&fit=crop' },
-      { id: b+5,  name: 'Gyoza',                    description: 'Pan-fried pork dumplings',                      price: 8.99,  category: 'Starters',               image: 'https://images.unsplash.com/photo-1496116218417-1a781b1c416c?w=120&h=120&fit=crop' },
-      { id: b+6,  name: 'California Roll',          description: 'Crab, avocado, and cucumber roll',              price: 10.99, category: 'Mains',                  image: 'https://images.unsplash.com/photo-1559410545-0bdcd187e0a6?w=120&h=120&fit=crop' },
-      { id: b+7,  name: 'Spicy Tuna Roll',          description: 'Spicy tuna with cucumber',                      price: 12.99, category: 'Mains',                  image: 'https://images.unsplash.com/photo-1534482421-64566f976cfa?w=120&h=120&fit=crop' },
-      { id: b+8,  name: 'Teriyaki Chicken',         description: 'Grilled chicken with teriyaki glaze',           price: 15.99, category: 'Mains',                  image: 'https://images.unsplash.com/photo-1569050467447-ce54b3bbc37d?w=120&h=120&fit=crop' },
-      { id: b+9,  name: 'Mochi Ice Cream',          description: 'Rice cake filled with ice cream',               price: 6.99,  category: 'Desserts',               image: 'https://images.unsplash.com/photo-1563805042-7684c019e1cb?w=120&h=120&fit=crop' },
-      { id: b+10, name: 'Green Tea',                description: 'Hot or iced Japanese green tea',                price: 3.99,  category: 'Beverages',              image: 'https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=120&h=120&fit=crop' },
-    ];
-    case 3: return [
-      { id: b+1, name: 'Carne Asada Tacos',   description: 'Grilled steak tacos with special marinade', price: 14.99, category: "Chef's Recommendations", image: 'https://images.unsplash.com/photo-1565299585323-38d6b0865b47?w=120&h=120&fit=crop' },
-      { id: b+2, name: 'Chips & Guacamole',   description: 'Fresh guacamole with tortilla chips',       price: 8.99,  category: 'Starters',               image: 'https://images.unsplash.com/photo-1541519227354-08fa5d50c820?w=120&h=120&fit=crop' },
-      { id: b+3, name: 'Beef Tacos',          description: 'Seasoned beef with fresh toppings',         price: 11.99, category: 'Mains',                  image: 'https://images.unsplash.com/photo-1512152272829-e3139592d56f?w=120&h=120&fit=crop' },
-      { id: b+4, name: 'Chicken Burrito',     description: 'Large burrito with grilled chicken',        price: 13.99, category: 'Mains',                  image: 'https://images.unsplash.com/photo-1626700051175-6818013e1d4f?w=120&h=120&fit=crop' },
-      { id: b+5, name: 'Fish Tacos',          description: 'Grilled fish with cabbage slaw',            price: 13.99, category: 'Mains',                  image: 'https://images.unsplash.com/photo-1611250188496-e966043a0629?w=120&h=120&fit=crop' },
-      { id: b+6, name: 'Churros',             description: 'Fried dough with cinnamon sugar',           price: 6.99,  category: 'Desserts',               image: 'https://images.unsplash.com/photo-1624371414361-e670edf4a5f1?w=120&h=120&fit=crop' },
-      { id: b+7, name: 'Horchata',            description: 'Sweet rice milk with cinnamon',             price: 4.99,  category: 'Beverages',              image: 'https://images.unsplash.com/photo-1437418747212-8d9709afab22?w=120&h=120&fit=crop' },
-    ];
-    case 4: return [
-      { id: b+1, name: 'Hyderabadi Biryani',  description: 'Traditional Hyderabad style biryani with lamb', price: 19.99, category: "Chef's Recommendations", image: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=120&h=120&fit=crop' },
-      { id: b+2, name: 'Samosas',             description: 'Crispy pastries filled with spiced potatoes',   price: 6.99,  category: 'Starters',               image: 'https://images.unsplash.com/photo-1601050690597-df0568f70950?w=120&h=120&fit=crop' },
-      { id: b+3, name: 'Chicken Tikka',       description: 'Marinated chicken in tandoor',                  price: 11.99, category: 'Starters',               image: 'https://images.unsplash.com/photo-1599487488170-d11ec9c172f0?w=120&h=120&fit=crop' },
-      { id: b+4, name: 'Butter Chicken',      description: 'Creamy tomato curry with chicken',              price: 16.99, category: 'Mains',                  image: 'https://images.unsplash.com/photo-1603894584373-5ac82b2ae398?w=120&h=120&fit=crop' },
-      { id: b+5, name: 'Chicken Biryani',     description: 'Fragrant basmati rice with spiced chicken',     price: 15.99, category: 'Mains',                  image: 'https://images.unsplash.com/photo-1589302168068-964664d93dc0?w=120&h=120&fit=crop' },
-      { id: b+6, name: 'Palak Paneer',        description: 'Cottage cheese in spinach gravy',               price: 14.99, category: 'Mains',                  image: 'https://images.unsplash.com/photo-1596797038530-2c107229654b?w=120&h=120&fit=crop' },
-      { id: b+7, name: 'Gulab Jamun',         description: 'Sweet milk balls in syrup',                     price: 5.99,  category: 'Desserts',               image: 'https://images.unsplash.com/photo-1601050690117-94f5f7a7b1a2?w=120&h=120&fit=crop' },
-      { id: b+8, name: 'Mango Lassi',         description: 'Yogurt drink with mango',                       price: 4.99,  category: 'Beverages',              image: 'https://images.unsplash.com/photo-1553361371-9b22f78e8b1d?w=120&h=120&fit=crop' },
-    ];
-    case 5: return [
-      { id: b+1, name: 'Paradise Signature Burger',   description: 'Double patty with special sauce and premium toppings', price: 16.99, category: "Chef's Recommendations", image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=120&h=120&fit=crop' },
-      { id: b+2, name: 'Chicken Wings',               description: 'Buffalo wings with ranch dressing',                   price: 11.99, category: 'Starters',               image: 'https://images.unsplash.com/photo-1567620832903-9fc6debc209f?w=120&h=120&fit=crop' },
-      { id: b+3, name: 'Onion Rings',                 description: 'Crispy beer-battered onion rings',                    price: 7.99,  category: 'Starters',               image: 'https://images.unsplash.com/photo-1639024471283-03518883512d?w=120&h=120&fit=crop' },
-      { id: b+4, name: 'Classic Burger',              description: 'Beef patty with lettuce, tomato, and pickles',        price: 12.99, category: 'Mains',                  image: 'https://images.unsplash.com/photo-1550317138-10000687a72b?w=120&h=120&fit=crop' },
-      { id: b+5, name: 'Bacon Cheeseburger',          description: 'Double patty with bacon and cheese',                  price: 15.99, category: 'Mains',                  image: 'https://images.unsplash.com/photo-1586816001966-79b736744398?w=120&h=120&fit=crop' },
-      { id: b+6, name: 'Crispy Chicken Sandwich',     description: 'Fried chicken with coleslaw',                         price: 13.99, category: 'Mains',                  image: 'https://images.unsplash.com/photo-1606755962773-d324e0a13086?w=120&h=120&fit=crop' },
-      { id: b+7, name: 'Milkshake',                   description: 'Thick shake - vanilla, chocolate, or strawberry',     price: 5.99,  category: 'Beverages',              image: 'https://images.unsplash.com/photo-1572490122747-3968b75cc699?w=120&h=120&fit=crop' },
-    ];
-    case 6: return [
-      { id: b+1, name: 'Royal Thai Curry',    description: 'Premium curry with seafood and coconut',       price: 19.99, category: "Chef's Recommendations", image: 'https://images.unsplash.com/photo-1559314809-0d155014e29e?w=120&h=120&fit=crop' },
-      { id: b+2, name: 'Spring Rolls',        description: 'Fresh vegetables wrapped in rice paper',        price: 7.99,  category: 'Starters',               image: 'https://images.unsplash.com/photo-1606516284428-cf54c2cb50a3?w=120&h=120&fit=crop' },
-      { id: b+3, name: 'Tom Yum Soup',        description: 'Spicy and sour Thai soup',                     price: 8.99,  category: 'Starters',               image: 'https://images.unsplash.com/photo-1555126634-323283e090fa?w=120&h=120&fit=crop' },
-      { id: b+4, name: 'Pad Thai',            description: 'Stir-fried rice noodles with shrimp',          price: 14.99, category: 'Mains',                  image: 'https://images.unsplash.com/photo-1562565652-a0d8f0c59eb4?w=120&h=120&fit=crop' },
-      { id: b+5, name: 'Green Curry',         description: 'Coconut curry with chicken and vegetables',    price: 15.99, category: 'Mains',                  image: 'https://images.unsplash.com/photo-1455619452474-d2be8b1e70cd?w=120&h=120&fit=crop' },
-      { id: b+6, name: 'Mango Sticky Rice',   description: 'Sweet rice with fresh mango',                  price: 7.99,  category: 'Desserts',               image: 'https://images.unsplash.com/photo-1563245372-f21724e3856d?w=120&h=120&fit=crop' },
-      { id: b+7, name: 'Thai Iced Tea',       description: 'Sweet tea with condensed milk',                price: 4.99,  category: 'Beverages',              image: 'https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=120&h=120&fit=crop' },
-    ];
-    default: return [
-      { id: b+1, name: 'DoHuub Special',    description: 'Our chef\'s daily special',     price: 14.99, category: "Chef's Recommendations", image: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=120&h=120&fit=crop' },
-      { id: b+2, name: 'Seasonal Starter',  description: 'Fresh seasonal appetizer',      price: 8.99,  category: 'Starters',               image: 'https://images.unsplash.com/photo-1572695157366-5e585ab2b69f?w=120&h=120&fit=crop' },
-      { id: b+3, name: 'Signature Main',    description: 'House specialty main course',   price: 16.99, category: 'Mains',                  image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=120&h=120&fit=crop' },
-      { id: b+4, name: 'Daily Dessert',     description: 'Freshly made dessert',          price: 6.99,  category: 'Desserts',               image: 'https://images.unsplash.com/photo-1571877227200-a0d98ea607e9?w=120&h=120&fit=crop' },
-      { id: b+5, name: 'Fresh Juice',       description: 'Seasonal fresh juice',          price: 4.99,  category: 'Beverages',              image: 'https://images.unsplash.com/photo-1437418747212-8d9709afab22?w=120&h=120&fit=crop' },
-    ];
-  }
-};
-
 export default function FoodMenuScreen() {
-  const params = useLocalSearchParams<{ id: string; name: string; cuisine: string; isPoweredByDoHuub: string; menuId: string }>();
+  const params = useLocalSearchParams<{ id: string; storeId?: string; vendorId?: string; name: string; cuisine: string; isPoweredByDoHuub: string; menuId: string }>();
   const vendorName = params.name || 'Restaurant';
   const cuisine = params.cuisine || '';
   const isPoweredByDoHuub = params.isPoweredByDoHuub === 'true';
-  const menuId = parseInt(params.menuId || '0', 10);
+  const storeId = params.storeId || params.id || '';
+  const vendorId = params.vendorId || '';
 
   const [step, setStep] = useState<'menu' | 'checkout' | 'confirm'>('menu');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [menuLoading, setMenuLoading] = useState(true);
 
   const { addresses } = useAuthStore();
   const deliveryAddress = addresses?.[0] ?? null;
 
-  const menuItems = getVendorMenu(menuId);
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      if (!storeId && !vendorId) { setMenuLoading(false); return; }
+      try {
+        const rows = await getFoodListings({ storeId: storeId || undefined, vendorId: vendorId || undefined });
+        if (cancelled) return;
+        setMenuItems(rows.map((r: any) => ({
+          id: r.id,
+          name: r.name,
+          description: r.description,
+          price: Number(r.price),
+          category: r.category,
+          image: r.image,
+        })));
+      } finally {
+        if (!cancelled) setMenuLoading(false);
+      }
+    }
+    load();
+    return () => { cancelled = true; };
+  }, [storeId, vendorId]);
+
   const filteredItems = selectedCategory === 'All'
     ? menuItems
     : menuItems.filter(item => item.category === selectedCategory);
 
   const getTotalItems = () => cart.reduce((s, i) => s + i.quantity, 0);
   const getSubtotal = () => cart.reduce((s, i) => s + i.price * i.quantity, 0);
-  const getItemQty = (id: number) => cart.find(c => c.id === id)?.quantity ?? 0;
+  const getItemQty = (id: string) => cart.find(c => c.id === id)?.quantity ?? 0;
 
   const handleAdd = (item: MenuItem) => {
     setCart(prev => {
@@ -134,11 +84,11 @@ export default function FoodMenuScreen() {
     });
   };
 
-  const handleUpdateQty = (id: number, delta: number) => {
+  const handleUpdateQty = (id: string, delta: number) => {
     setCart(prev => prev.map(c => c.id === id ? { ...c, quantity: c.quantity + delta } : c).filter(c => c.quantity > 0));
   };
 
-  const handleRemove = (id: number) => {
+  const handleRemove = (id: string) => {
     setCart(prev => prev.filter(c => c.id !== id));
   };
 

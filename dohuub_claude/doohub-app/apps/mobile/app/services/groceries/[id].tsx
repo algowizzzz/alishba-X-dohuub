@@ -17,7 +17,6 @@ import { Button, Badge, Rating, ImageCarousel } from '../../../src/components/ui
 import { ReportModal } from '../../../src/components/modals';
 import { getVendorById, getGroceryListings } from '../../../src/lib/queries';
 import { getHeroImage } from '../../../src/constants/serviceImages';
-import { isSampleId, getSampleVendorById } from '../../../src/constants/sampleVendors';
 
 interface StoreData {
   id: string;
@@ -49,32 +48,6 @@ export default function StoreDetailScreen() {
   const loadStore = async () => {
     try {
       if (!id) return;
-
-      // Handle sample vendor IDs
-      if (isSampleId(id)) {
-        const sample = getSampleVendorById(id);
-        if (sample) {
-          setStore({
-            id: sample.id,
-            name: sample.name,
-            description: sample.description,
-            rating: sample.rating,
-            reviewCount: sample.reviewCount,
-            isPoweredByDoHuub: sample.isPoweredByDoHuub,
-            categories: [
-              { id: '1', name: 'Fresh Produce', itemCount: 45 },
-              { id: '2', name: 'Dairy & Eggs', itemCount: 28 },
-              { id: '3', name: 'Pantry Essentials', itemCount: 62 },
-              { id: '4', name: 'Beverages', itemCount: 35 },
-            ],
-            deliveryFee: 4.99,
-            minOrder: Number(sample.startingPrice) || 15,
-            deliveryTime: '30-45 min',
-          });
-        }
-        setLoading(false);
-        return;
-      }
 
       const vendor = await getVendorById(id);
       const listings = await getGroceryListings();

@@ -24,6 +24,7 @@ export async function getVendorById(vendorId: string) {
     .from('Vendor')
     .select(`
       id, businessName, description, logo, coverImage, contactEmail, contactPhone, website,
+      address, city, state, zipCode, hoursOfOperation, deliveryFee, minOrderAmount, estimatedDeliveryTime,
       rating, reviewCount, isMichelle, status
     `)
     .eq('id', vendorId)
@@ -123,7 +124,11 @@ export async function getGroceryListings(storeId?: string) {
 
 // ============ FOOD ============
 
-export async function getFoodListings(storeId?: string) {
+export async function getFoodListings(opts?: { storeId?: string; vendorId?: string } | string) {
+  // Backward compat: if a string is passed, treat as storeId
+  const storeId = typeof opts === 'string' ? opts : opts?.storeId;
+  const vendorId = typeof opts === 'string' ? undefined : opts?.vendorId;
+
   let query = supabase
     .from('FoodListing')
     .select(`
@@ -133,6 +138,7 @@ export async function getFoodListings(storeId?: string) {
     .eq('status', 'ACTIVE');
 
   if (storeId) query = query.eq('storeId', storeId);
+  if (vendorId) query = query.eq('vendorId', vendorId);
 
   const { data, error } = await query.order('createdAt', { ascending: false });
   if (error) throw error;
@@ -212,7 +218,10 @@ export async function getCompanionListings() {
 export async function getReviewsByVendor(vendorId: string) {
   const { data, error } = await supabase
     .from('Review')
-    .select('id, rating, comment, vendorResponse, photos, createdAt, userId')
+    .select(`
+      id, rating, comment, vendorResponse, photos, createdAt, userId,
+      User(id, email, UserProfile(firstName, lastName, avatar))
+    `)
     .eq('vendorId', vendorId)
     .order('createdAt', { ascending: false });
 

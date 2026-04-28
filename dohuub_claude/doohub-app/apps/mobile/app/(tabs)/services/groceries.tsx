@@ -18,23 +18,6 @@ import { useCartStore } from '../../../src/store/cartStore';
 import { Card, Rating, PoweredByDoHuubBadge } from '../../../src/components/ui';
 import { colors, spacing, fontSize, borderRadius } from '../../../src/constants/theme';
 
-const SAMPLE_GROCERY_VENDORS = [
-  { id: 'g1', name: 'DoHuub Supermarket', type: 'Supermarket, Groceries', rating: 4.8, deliveryTime: '20-30 min', isPoweredByDoHuub: true,  image: 'https://images.unsplash.com/photo-1534723452862-4c874018d66d?w=200&h=200&fit=crop' },
-  { id: 'g2', name: 'Fresh Market',       type: 'Supermarket, Groceries', rating: 4.7, deliveryTime: '25-40 min', isPoweredByDoHuub: false, image: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=200&h=200&fit=crop' },
-  { id: 'g3', name: 'Quick Stop Grocer',  type: 'Supermarket, Groceries', rating: 4.5, deliveryTime: '15-25 min', isPoweredByDoHuub: false, image: 'https://images.unsplash.com/photo-1608198093002-ad4e005484ec?w=200&h=200&fit=crop' },
-  { id: 'g4', name: 'Organic Valley',     type: 'Organic, Fresh Produce', rating: 4.9, deliveryTime: '30-45 min', isPoweredByDoHuub: false, image: 'https://images.unsplash.com/photo-1610348725531-843dff563e2c?w=200&h=200&fit=crop' },
-  { id: 'g5', name: 'City Supermarket',   type: 'Supermarket, Groceries', rating: 4.4, deliveryTime: '20-35 min', isPoweredByDoHuub: false, image: 'https://images.unsplash.com/photo-1578916171728-46686eac8d58?w=200&h=200&fit=crop' },
-];
-
-const SAMPLE_FOOD_VENDORS = [
-  { id: 'f1', name: 'DoHuub Kitchen',    cuisine: 'Multi-Cuisine',     rating: 4.9, deliveryTime: '20-30 min', isPoweredByDoHuub: true,  image: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=200&h=200&fit=crop' },
-  { id: 'f2', name: 'The Italian Corner', cuisine: 'Italian, Pizza',   rating: 4.7, deliveryTime: '25-35 min', isPoweredByDoHuub: false, image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=200&h=200&fit=crop' },
-  { id: 'f3', name: 'Sushi Masters',     cuisine: 'Japanese, Sushi',   rating: 4.8, deliveryTime: '30-40 min', isPoweredByDoHuub: false, image: 'https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=200&h=200&fit=crop' },
-  { id: 'f4', name: 'Biryani House',     cuisine: 'Indian, Biryani',   rating: 4.6, deliveryTime: '35-45 min', isPoweredByDoHuub: false, image: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=200&h=200&fit=crop' },
-  { id: 'f5', name: 'Burger Paradise',   cuisine: 'American, Burgers', rating: 4.5, deliveryTime: '20-30 min', isPoweredByDoHuub: false, image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=200&h=200&fit=crop' },
-  { id: 'f6', name: 'Thai Delight',      cuisine: 'Thai, Asian',       rating: 4.7, deliveryTime: '30-40 min', isPoweredByDoHuub: false, image: 'https://images.unsplash.com/photo-1559314809-0d155014e29e?w=200&h=200&fit=crop' },
-];
-
 export default function GroceriesScreen() {
   const [subCategory, setSubCategory] = useState<'food' | 'grocery' | null>(null);
   const [vendors, setVendors] = useState<any[]>([]);
@@ -64,6 +47,7 @@ export default function GroceriesScreen() {
       // Map stores to vendor-like shape for rendering
       setVendors(data.map((store: any) => ({
         id: store.id,
+        vendorId: store.Vendor?.id,
         businessName: store.name,
         description: store.description,
         rating: store.Vendor?.rating || 0,
@@ -259,9 +243,16 @@ export default function GroceriesScreen() {
 
   // ── Food Delivery List ───────────────────────────────────────────────────
   if (subCategory === 'food') {
-    const foodVendors = vendors.length > 0
-      ? vendors.map(v => ({ ...v, cuisine: v.description || 'Multi-Cuisine', deliveryTime: '20-35 min' }))
-      : SAMPLE_FOOD_VENDORS;
+    const foodVendors = vendors.map(v => ({
+      id: v.id,
+      vendorId: v.vendorId,
+      name: v.businessName,
+      cuisine: v.description || 'Multi-Cuisine',
+      rating: v.rating,
+      deliveryTime: '20-35 min',
+      isPoweredByDoHuub: v.isMichelle,
+      image: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=200&h=200&fit=crop',
+    }));
     return (
       <View style={styles.container}>
         <View style={styles.pickerHeader}>
@@ -311,6 +302,8 @@ export default function GroceriesScreen() {
                       name: item.name,
                       cuisine: item.cuisine,
                       isPoweredByDoHuub: String(item.isPoweredByDoHuub ?? false),
+                      storeId: item.id,
+                      vendorId: (item as any).vendorId ?? item.id,
                       menuId: String(foodVendors.indexOf(item) + 1),
                     },
                   } as any)}
@@ -328,6 +321,8 @@ export default function GroceriesScreen() {
                       isPoweredByDoHuub: String(item.isPoweredByDoHuub ?? false),
                       rating: String(item.rating),
                       deliveryTime: item.deliveryTime,
+                      storeId: item.id,
+                      vendorId: (item as any).vendorId ?? item.id,
                       menuId: String(foodVendors.indexOf(item) + 1),
                     },
                   } as any)}
@@ -343,9 +338,16 @@ export default function GroceriesScreen() {
   }
 
   // ── Grocery List ─────────────────────────────────────────────────────────
-  const groceryVendors = vendors.length > 0
-    ? vendors.map(v => ({ id: v.id, name: v.businessName, type: v.description || 'Grocery', rating: v.rating, reviewCount: v.reviewCount, isPoweredByDoHuub: v.isMichelle }))
-    : SAMPLE_GROCERY_VENDORS;
+  const groceryVendors = vendors.map(v => ({
+    id: v.id,
+    vendorId: v.vendorId,
+    name: v.businessName,
+    type: v.description || 'Grocery',
+    rating: v.rating,
+    reviewCount: v.reviewCount,
+    isPoweredByDoHuub: v.isMichelle,
+    image: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=200&h=200&fit=crop',
+  }));
 
   return (
     <View style={styles.container}>

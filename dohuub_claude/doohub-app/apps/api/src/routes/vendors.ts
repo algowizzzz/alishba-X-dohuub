@@ -694,5 +694,62 @@ router.get('/:id/reviews', async (req, res) => {
   }
 });
 
+// Vendor's own bookings — for VendorOrders + VendorDashboard recent orders
+router.get('/me/bookings', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const vendor = await prisma.vendor.findFirst({ where: { userId: req.user!.id } });
+    if (!vendor) return res.status(404).json({ error: 'Vendor profile not found' });
+
+    const { status, limit = '50' } = req.query;
+    const take = Math.min(parseInt(limit as string, 10) || 50, 200);
+
+    const where: any = { vendorId: vendor.id };
+    if (status) where.status = status;
+
+    const bookings = await prisma.booking.findMany({
+      where,
+      include: {
+        user: { select: { id: true, email: true, profile: true } },
+        address: true,
+      },
+      orderBy: { createdAt: 'desc' },
+      take,
+    });
+    res.json({ success: true, data: bookings });
+  } catch (error) {
+    console.error('Get vendor bookings error:', error);
+    res.status(500).json({ error: 'Failed to get bookings' });
+  }
+});
+
+// Vendor's own orders (e-commerce-style) — same shape as bookings, different table
+router.get('/me/orders', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const vendor = await prisma.vendor.findFirst({ where: { userId: req.user!.id } });
+    if (!vendor) return res.status(404).json({ error: 'Vendor profile not found' });
+
+    const { status, limit = '50' } = req.query;
+    const take = Math.min(parseInt(limit as string, 10) || 50, 200);
+
+    const where: any = { vendorId: vendor.id };
+    if (status) where.status = status;
+
+    const orders = await prisma.order.findMany({
+      where,
+      include: {
+        user: { select: { id: true, email: true, profile: true } },
+        items: true,
+        address: true,
+      },
+      orderBy: { createdAt: 'desc' },
+      take,
+    });
+    res.json({ success: true, data: orders });
+  } catch (error) {
+    console.error('Get vendor orders error:', error);
+    res.status(500).json({ error: 'Failed to get orders' });
+  }
+});
+
 export default router;
 

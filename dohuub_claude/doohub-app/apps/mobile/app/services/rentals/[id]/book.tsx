@@ -1,19 +1,14 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, Switch, Modal } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, fontSize } from '../../../../src/constants/theme';
+import { useAuthStore } from '../../../../src/store/authStore';
+import { getPaymentMethods } from '../../../../src/lib/queries';
 
 const TEAL = '#14B8A6';
 
 type Step = 'booking' | 'confirm';
-
-const MOCK_ADDRESSES = [
-  { id: '1', label: 'Home', street: '123 Main Street', city: 'Dubai', state: 'Dubai', zipCode: '00000', isDefault: true },
-];
-const MOCK_CARDS = [
-  { id: '1', cardNumber: '4242424242429012', cardholderName: 'John Doe', isDefault: true },
-];
 
 export default function PropertyBookingScreen() {
   const params = useLocalSearchParams<{
@@ -22,12 +17,23 @@ export default function PropertyBookingScreen() {
     [key: string]: string;
   }>();
 
+  const { addresses, user } = useAuthStore();
+  const selectedAddress = addresses?.[0] ?? null;
+
   const [step, setStep] = useState<Step>('booking');
-  const [selectedAddress] = useState(MOCK_ADDRESSES[0]);
-  const [selectedCard, setSelectedCard] = useState(MOCK_CARDS[0]);
+  const [cards, setCards] = useState<any[]>([]);
+  const [selectedCard, setSelectedCard] = useState<any | null>(null);
   const [showCardSheet, setShowCardSheet] = useState(false);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [redeemPoints, setRedeemPoints] = useState(false);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    getPaymentMethods(user.id).then((rows: any[]) => {
+      setCards(rows);
+      setSelectedCard(rows.find(c => c.isDefault) ?? rows[0] ?? null);
+    }).catch(() => setCards([]));
+  }, [user?.id]);
 
   const isPowered = params.isPoweredByDoHuub === 'true';
   const totalPrice = parseFloat(params.totalPrice || '0');
@@ -205,8 +211,14 @@ export default function PropertyBookingScreen() {
         <View>
           <Text style={styles.sectionTitle}>Billing Address</Text>
           <View style={styles.card}>
-            <Text style={[styles.propName, { marginBottom: 3 }]}>{selectedAddress.label}</Text>
-            <Text style={styles.propLoc}>{selectedAddress.street}, {selectedAddress.city} {selectedAddress.zipCode}</Text>
+            {selectedAddress ? (
+              <>
+                <Text style={[styles.propName, { marginBottom: 3 }]}>{selectedAddress.label}</Text>
+                <Text style={styles.propLoc}>{selectedAddress.street}, {selectedAddress.city} {selectedAddress.zipCode}</Text>
+              </>
+            ) : (
+              <Text style={styles.propLoc}>No saved address. Add one in your profile.</Text>
+            )}
           </View>
         </View>
 
@@ -290,9 +302,11 @@ export default function PropertyBookingScreen() {
               </TouchableOpacity>
             </View>
             <View style={{ padding: 20, gap: 12 }}>
-              {MOCK_CARDS.map(c => (
-                <TouchableOpacity key={c.id} style={[styles.cardOption, selectedCard.id === c.id && styles.cardOptionSelected]} onPress={() => { setSelectedCard(c); setShowCardSheet(false); }}>
-                  <Text style={styles.propName}>•••• {c.cardNumber.slice(-4)}</Text>
+              {cards.length === 0 ? (
+                <Text style={{ color: colors.text.secondary, fontSize: fontSize.sm }}>No payment methods saved.</Text>
+              ) : cards.map((c: any) => (
+                <TouchableOpacity key={c.id} style={[styles.cardOption, selectedCard?.id === c.id && styles.cardOptionSelected]} onPress={() => { setSelectedCard(c); setShowCardSheet(false); }}>
+                  <Text style={styles.propName}>•••• {(c.cardNumber || '').slice(-4)}</Text>
                   <Text style={styles.propLoc}>{c.cardholderName}</Text>
                 </TouchableOpacity>
               ))}

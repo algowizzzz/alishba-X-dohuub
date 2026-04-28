@@ -13,6 +13,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../src/lib/supabase';
 import { useAuthStore } from '../src/store/authStore';
+import api from '../src/services/api';
 
 interface Notification {
   id: string;
@@ -56,59 +57,6 @@ const getNotificationIcon = (type: string): { name: keyof typeof Ionicons.glyphM
       return { name: 'information-circle-outline', color: '#64748B', bg: 'rgba(100, 116, 139, 0.1)' };
   }
 };
-
-// Sample notifications matching boss wireframe exactly
-const SAMPLE_NOTIFICATIONS: Notification[] = [
-  {
-    id: '1',
-    type: 'order',
-    title: 'Order Placed Successfully',
-    message: 'Your cleaning service order #1234 has been placed and confirmed. Lorem ipsum dolor sit amet, consectetur adipiscing elit.',
-    timestamp: '2 minutes ago',
-    read: false,
-  },
-  {
-    id: '3',
-    type: 'promo',
-    title: 'Special Offer: 20% Off',
-    message: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Use code SAVE20 for your next grocery order. Sed do eiusmod tempor incididunt ut labore.',
-    timestamp: '1 hour ago',
-    read: false,
-  },
-  {
-    id: '4',
-    type: 'order',
-    title: 'Order In Progress',
-    message: 'Your beauty service appointment is currently in progress. The specialist will complete the service shortly.',
-    timestamp: '2 hours ago',
-    read: true,
-  },
-  {
-    id: '5',
-    type: 'update',
-    title: 'Order Completed',
-    message: 'Your order #1122 has been completed successfully. Please rate your experience with the service provider.',
-    timestamp: '3 hours ago',
-    read: true,
-  },
-  {
-    id: '6',
-    type: 'reminder',
-    title: 'Upcoming Appointment Reminder',
-    message: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Your handyman service is scheduled for tomorrow at 2:00 PM.',
-    timestamp: '5 hours ago',
-    read: true,
-  },
-  {
-    id: '7',
-    type: 'promo',
-    title: 'Weekend Flash Sale',
-    message: 'Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Get 30% off on all beauty services this weekend only.',
-    timestamp: '1 day ago',
-    read: true,
-  },
-];
-
 /**
  * Notifications Screen — exact copy of boss wireframe (NotificationsPanel.tsx)
  */
@@ -120,7 +68,7 @@ export default function NotificationsScreen() {
 
   const fetchNotifications = async () => {
     if (!userId) {
-      setNotifications(SAMPLE_NOTIFICATIONS);
+      setNotifications([]);
       setLoading(false);
       return;
     }
@@ -141,10 +89,10 @@ export default function NotificationsScreen() {
         pointsAmount: n.data?.pointsAmount,
         actionRoute: n.data?.bookingId ? `/bookings/${n.data.bookingId}` : undefined,
       }));
-      setNotifications(dbNotifications.length > 0 ? dbNotifications : SAMPLE_NOTIFICATIONS);
+      setNotifications(dbNotifications);
     } catch (error) {
       console.error('Failed to fetch notifications:', error);
-      setNotifications(SAMPLE_NOTIFICATIONS);
+      setNotifications([]);
     } finally {
       setLoading(false);
     }
@@ -167,15 +115,10 @@ export default function NotificationsScreen() {
       setNotifications(notifications.map(n =>
         n.id === notification.id ? { ...n, read: true } : n
       ));
-      if (userId) {
-        try {
-          await supabase
-            .from('Notification')
-            .update({ isRead: true })
-            .eq('id', notification.id);
-        } catch (error) {
-          console.error('Failed to mark as read:', error);
-        }
+      try {
+        await api.put(`/api/v1/notifications/${notification.id}/read`);
+      } catch (error) {
+        console.error('Failed to mark as read:', error);
       }
     }
     if (notification.actionRoute) {

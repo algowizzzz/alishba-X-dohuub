@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, fontSize } from '../../../src/constants/theme';
+import { getReviewsByVendor, getVendorById } from '../../../src/lib/queries';
 
 const BEAUTY_PHOTOS = [
   'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=400&h=400&fit=crop',
@@ -21,11 +22,24 @@ const BEAUTY_PHOTOS = [
   'https://images.unsplash.com/photo-1571875257727-256c39da42af?w=400&h=400&fit=crop',
 ];
 
-const MOCK_REVIEWS = [
-  { name: 'Sophia L.', date: '2 days ago', rating: 5, comment: 'Absolutely amazing experience! The stylist was professional and the results exceeded my expectations.', service: 'Hairstyling', photos: ['https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=200&h=200&fit=crop','https://images.unsplash.com/photo-1560066984-138dadb4c035?w=200&h=200&fit=crop'] },
-  { name: 'Emma W.', date: '4 days ago', rating: 5, comment: 'Best makeup artist I have ever worked with. Made me look stunning for my event!', service: 'Makeup', photos: ['https://images.unsplash.com/photo-1487412947147-5cebf100ffc2?w=200&h=200&fit=crop','https://images.unsplash.com/photo-1519014816548-bf5fe059798b?w=200&h=200&fit=crop','https://images.unsplash.com/photo-1571875257727-256c39da42af?w=200&h=200&fit=crop'] },
-  { name: 'Mia J.', date: '1 week ago', rating: 4, comment: 'Great nail art, very creative designs. Will definitely come back.', service: 'Nail Art' },
-];
+function formatRelativeDate(iso: string): string {
+  const d = new Date(iso);
+  const diff = Date.now() - d.getTime();
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  if (days < 1) return 'Today';
+  if (days === 1) return 'Yesterday';
+  if (days < 7) return `${days} days ago`;
+  if (days < 14) return '1 week ago';
+  if (days < 30) return `${Math.floor(days / 7)} weeks ago`;
+  return d.toLocaleDateString();
+}
+
+function reviewerName(r: any): string {
+  const p = r?.User?.UserProfile;
+  if (p?.firstName) return `${p.firstName} ${p.lastName?.[0] ?? ''}.`.trim();
+  if (r?.User?.email) return r.User.email.split('@')[0];
+  return 'Anonymous';
+}
 
 export default function BeautyVendorProfileScreen() {
   const params = useLocalSearchParams<{
@@ -42,7 +56,16 @@ export default function BeautyVendorProfileScreen() {
   const rating = parseFloat(params.rating || '4.8');
   const reviewCount = parseInt(params.reviews || '500', 10);
   const servicesList = params.services ? params.services.split(',') : ['Makeup', 'Hairstyling', 'Skincare'];
-  const photoIndex = parseInt(params.id || '0', 10) % BEAUTY_PHOTOS.length;
+  const vendorId = params.id || '';
+  const photoIndex = Math.abs(vendorId.split('').reduce((a, c) => a + c.charCodeAt(0), 0)) % BEAUTY_PHOTOS.length;
+
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [vendor, setVendor] = useState<any>(null);
+  useEffect(() => {
+    if (!vendorId) return;
+    getReviewsByVendor(vendorId).then(setReviews).catch(() => setReviews([]));
+    getVendorById(vendorId).then(setVendor).catch(() => setVendor(null));
+  }, [vendorId]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -72,7 +95,7 @@ export default function BeautyVendorProfileScreen() {
             <Text style={styles.ratingText}>{rating}</Text>
             <Text style={styles.reviewCountText}>({reviewCount} reviews)</Text>
           </View>
-          <Text style={styles.locationText}>New York, NY • Beauty & Wellness</Text>
+          <Text style={styles.locationText}>{vendor?.city && vendor?.state ? `${vendor.city}, ${vendor.state}` : 'Location unavailable'} • Beauty & Wellness</Text>
         </View>
 
         <View style={styles.body}>
@@ -97,27 +120,33 @@ export default function BeautyVendorProfileScreen() {
 
           {/* Info */}
           <Text style={styles.sectionTitle}>Information</Text>
-          <View style={styles.infoCard}>
-            <Ionicons name="location" size={20} color={colors.primary} />
-            <View style={{ marginLeft: 12 }}>
-              <Text style={styles.infoLabel}>123 Beauty Avenue</Text>
-              <Text style={styles.infoSub}>New York, NY 10001</Text>
+          {vendor?.address && (
+            <View style={styles.infoCard}>
+              <Ionicons name="location" size={20} color={colors.primary} />
+              <View style={{ marginLeft: 12 }}>
+                <Text style={styles.infoLabel}>{vendor.address}</Text>
+                <Text style={styles.infoSub}>{[vendor.city, vendor.state, vendor.zipCode].filter(Boolean).join(', ')}</Text>
+              </View>
             </View>
-          </View>
-          <View style={styles.infoCard}>
-            <Ionicons name="time" size={20} color={colors.primary} />
-            <View style={{ marginLeft: 12 }}>
-              <Text style={styles.infoLabel}>Working Hours</Text>
-              <Text style={styles.infoSub}>9:00 AM – 8:00 PM, Mon – Sat</Text>
+          )}
+          {vendor?.hoursOfOperation && (
+            <View style={styles.infoCard}>
+              <Ionicons name="time" size={20} color={colors.primary} />
+              <View style={{ marginLeft: 12 }}>
+                <Text style={styles.infoLabel}>Working Hours</Text>
+                <Text style={styles.infoSub}>{vendor.hoursOfOperation}</Text>
+              </View>
             </View>
-          </View>
-          <View style={styles.infoCard}>
-            <Ionicons name="call" size={20} color={colors.primary} />
-            <View style={{ marginLeft: 12 }}>
-              <Text style={styles.infoLabel}>Contact</Text>
-              <Text style={styles.infoSub}>+1 (212) 555-0{100 + parseInt(params.id || '1', 10)}</Text>
+          )}
+          {vendor?.contactPhone && (
+            <View style={styles.infoCard}>
+              <Ionicons name="call" size={20} color={colors.primary} />
+              <View style={{ marginLeft: 12 }}>
+                <Text style={styles.infoLabel}>Contact</Text>
+                <Text style={styles.infoSub}>{vendor.contactPhone}</Text>
+              </View>
             </View>
-          </View>
+          )}
 
           {/* Ratings summary */}
           <View style={styles.reviewsHeader}>
@@ -145,16 +174,18 @@ export default function BeautyVendorProfileScreen() {
             </View>
           </View>
 
-          {MOCK_REVIEWS.map((review, i) => (
-            <View key={i} style={styles.reviewCard}>
+          {reviews.length === 0 ? (
+            <Text style={{ color: colors.text.secondary, fontSize: fontSize.sm, paddingVertical: 12 }}>No reviews yet.</Text>
+          ) : reviews.slice(0, 5).map((review: any) => (
+            <View key={review.id} style={styles.reviewCard}>
               <View style={styles.reviewTop}>
                 <View style={styles.reviewAvatar}>
                   <Ionicons name="person" size={18} color={colors.text.secondary} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <View style={styles.reviewNameRow}>
-                    <Text style={styles.reviewName}>{review.name}</Text>
-                    <Text style={styles.reviewDate}>{review.date}</Text>
+                    <Text style={styles.reviewName}>{reviewerName(review)}</Text>
+                    <Text style={styles.reviewDate}>{formatRelativeDate(review.createdAt)}</Text>
                   </View>
                   <View style={styles.starsRow}>
                     {[1,2,3,4,5].map(s => (
@@ -166,12 +197,11 @@ export default function BeautyVendorProfileScreen() {
               <Text style={styles.reviewComment}>{review.comment}</Text>
               {review.photos && review.photos.length > 0 && (
                 <View style={{ flexDirection: 'row', gap: 6, marginTop: 8, marginBottom: 4 }}>
-                  {review.photos.map((photo, i) => (
+                  {review.photos.map((photo: string, i: number) => (
                     <Image key={i} source={{ uri: photo }} style={{ width: 72, height: 72, borderRadius: 8, overflow: 'hidden' }} resizeMode="cover" />
                   ))}
                 </View>
               )}
-              <Text style={styles.reviewService}>Service: {review.service}</Text>
             </View>
           ))}
         </View>
