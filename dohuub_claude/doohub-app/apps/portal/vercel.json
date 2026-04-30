@@ -2,7 +2,7 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "framework": "vite",
-  "installCommand": "npm install --include=optional",
+  "installCommand": "npm install --include=optional --legacy-peer-deps --force",
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ]
