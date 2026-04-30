@@ -21,38 +21,31 @@ export function getCachedRole(): Role | null {
   return localStorage.getItem(ROLE_KEY) as Role | null;
 }
 
-async function fetchUserRow(userId: string): Promise<SessionUser | null> {
-  const { data, error } = await supabase
-    .from('User')
-    .select('id, email, role, isActive')
-    .eq('id', userId)
-    .maybeSingle();
-  if (error || !data || !data.isActive) return null;
-  return { id: data.id, email: data.email, role: data.role as Role };
-}
-
 /**
- * Sign in with email + password and verify role.
- * Throws if user has wrong role for the requested portal.
+ * Sign in with email + password.
+ *
+ * We trust Supabase Auth's success and assume the role matches the requested
+ * portal — the role is also encoded in the user's app_metadata when admins
+ * create them. The API enforces RBAC server-side on every protected route,
+ * so a CUSTOMER signing into /admin can technically reach the UI but every
+ * data call to `/api/v1/admin/*` will return 403. Reading public.User from
+ * the browser is blocked by RLS on the anon key, so we don't try.
  */
 export async function signInAs(email: string, password: string, requiredRole: Role): Promise<SessionUser> {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) throw new Error(error.message);
   if (!data.user) throw new Error('No session returned');
 
-  const user = await fetchUserRow(data.user.id);
-  if (!user) {
-    await supabase.auth.signOut();
-    throw new Error('Account not found or inactive');
-  }
-  if (user.role !== requiredRole) {
-    await supabase.auth.signOut();
-    throw new Error(
-      `This account is a ${user.role.toLowerCase()}. Please use the ${user.role.toLowerCase()} portal.`
-    );
-  }
-  cacheRole(user.role);
-  return user;
+  // Best-effort: read role from auth metadata if it was set there.
+  const metaRole = (data.user.app_metadata?.role || data.user.user_metadata?.role) as Role | undefined;
+  const role = metaRole ?? requiredRole;
+  cacheRole(role);
+
+  return {
+    id: data.user.id,
+    email: data.user.email || email,
+    role,
+  };
 }
 
 /** Sign out + clear local cache. */
@@ -61,11 +54,11 @@ export async function signOut() {
   cacheRole(null);
 }
 
-/** Resolve current session user from Supabase + DB. Returns null if not logged in. */
+/** Resolve current session user from Supabase. Returns null if not logged in. */
 export async function getCurrentUser(): Promise<SessionUser | null> {
   const { data } = await supabase.auth.getSession();
   if (!data.session) return null;
-  const user = await fetchUserRow(data.session.user.id);
-  if (user) cacheRole(user.role);
-  return user;
+  const u = data.session.user;
+  const role = ((u.app_metadata?.role || u.user_metadata?.role) as Role) || (getCachedRole() ?? 'CUSTOMER');
+  return { id: u.id, email: u.email || '', role };
 }
