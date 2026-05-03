@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 const API_BASE =
   (import.meta as any).env?.VITE_API_URL ||
   (typeof window !== 'undefined' && window.location.hostname !== 'localhost'
-    ? 'https://dohuubclaude-production.up.railway.app'
+    ? 'https://alishba-x-dohuub-production.up.railway.app'
     : 'http://localhost:3001');
 
 class ApiService {
