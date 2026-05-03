@@ -86,7 +86,7 @@ export function VendorOrders() {
       api.get<{ success: boolean; data: any[] }>("/api/v1/vendors/me/bookings?limit=200").catch(() => null),
       api.get<{ success: boolean; data: any[] }>("/api/v1/vendors/me/orders?limit=200").catch(() => null),
     ]).then(([bookingsRes, ordersRes]) => {
-      const fromBookings: Order[] = (bookingsRes?.data || []).map((b: any) => ({
+      const fromBookings: Order[] = ((bookingsRes?.data as any)?.data || []).map((b: any) => ({
         id: b.id,
         orderNumber: `BK-${b.id.slice(-6).toUpperCase()}`,
         storeName: b.vendor?.businessName || "Your Store",
@@ -109,7 +109,7 @@ export function VendorOrders() {
           specialInstructions: b.specialInstructions || "",
         },
       }));
-      const fromOrders: Order[] = (ordersRes?.data || []).map((o: any) => ({
+      const fromOrders: Order[] = ((ordersRes?.data as any)?.data || []).map((o: any) => ({
         id: o.id,
         orderNumber: `OR-${o.id.slice(-6).toUpperCase()}`,
         storeName: o.vendor?.businessName || "Your Store",

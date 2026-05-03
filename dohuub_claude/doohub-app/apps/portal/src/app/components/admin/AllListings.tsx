@@ -685,7 +685,7 @@ export function AllListings() {
   useEffect(() => {
     api.get<{ success: boolean; data: any[] }>("/api/v1/admin/listings?limit=200")
       .then((r) => {
-        const mapped: Listing[] = (r.data || []).map((l: any) => ({
+        const mapped: Listing[] = (r.data.data || []).map((l: any) => ({
           id: l.id,
           name: l.title || l.name,
           vendorId: l.vendorId,

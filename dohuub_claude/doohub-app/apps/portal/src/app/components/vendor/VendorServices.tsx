@@ -417,7 +417,7 @@ export function VendorServices() {
       .then((r) => {
         // Group listings into one synthetic "store" per category for now.
         const byCat = new Map<string, any[]>();
-        (r.data || []).forEach((l: any) => {
+        ((r.data as any)?.data || []).forEach((l: any) => {
           const cat = l.category || l.__type || "other";
           if (!byCat.has(cat)) byCat.set(cat, []);
           byCat.get(cat)!.push(l);

@@ -48,17 +48,20 @@ export function VendorDashboard() {
       api.get<{ success: boolean; data: any[] }>("/api/v1/vendors/listings").catch(() => null),
       api.get<{ success: boolean; data: any[] }>("/api/v1/vendors/me/bookings?limit=5").catch(() => null),
     ]).then(([analyticsRes, listingsRes, bookingsRes]) => {
-      if (analyticsRes?.data) {
+      const analytics = (analyticsRes?.data as any)?.data;
+      const listings = (listingsRes?.data as any)?.data;
+      const bookings = (bookingsRes?.data as any)?.data;
+      if (analytics) {
         setStats({
-          earnings: Number(analyticsRes.data.totalRevenue || 0),
-          orders: Number(analyticsRes.data.totalBookings || 0),
-          listings: listingsRes?.data?.length || 0,
+          earnings: Number(analytics.totalRevenue || 0),
+          orders: Number(analytics.totalBookings || 0),
+          listings: listings?.length || 0,
         });
-      } else if (listingsRes?.data) {
-        setStats((s) => ({ ...s, listings: listingsRes.data.length }));
+      } else if (listings) {
+        setStats((s) => ({ ...s, listings: listings.length }));
       }
-      if (bookingsRes?.data) {
-        setRecentOrders(bookingsRes.data.map((b: any) => ({
+      if (bookings) {
+        setRecentOrders(bookings.map((b: any) => ({
           id: b.id,
           orderNumber: `BK-${b.id.slice(-6).toUpperCase()}`,
           storeName: b.vendor?.businessName || "Your Store",

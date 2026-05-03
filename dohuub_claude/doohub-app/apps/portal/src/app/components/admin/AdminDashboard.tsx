@@ -4,12 +4,13 @@ import { AdminSidebarRetractable } from "./AdminSidebarRetractable";
 import { AdminTopNav } from "./AdminTopNav";
 import api from "../../../services/api";
 
+type Kpi = { value: number; change: number; trend?: 'up' | 'down' };
 type PlatformReport = {
-  metrics: {
-    revenue: { current: number; change: number };
-    bookings: { current: number; change: number };
-    newUsers: { current: number; change: number };
-    activeVendors: { current: number; change: number };
+  kpis: {
+    revenue: Kpi;
+    bookings: Kpi;
+    newUsers: Kpi;
+    activeVendors: Kpi;
   };
 };
 
@@ -62,7 +63,7 @@ export function AdminDashboard() {
 
   useEffect(() => {
     api.get<{ success: boolean; data: PlatformReport }>("/api/v1/admin/reports/platform?dateRange=month")
-      .then((r) => setReport(r.data))
+      .then((r) => setReport(r.data.data))
       .catch(() => setReport(null));
   }, []);
 
@@ -107,23 +108,23 @@ export function AdminDashboard() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
             <MetricCard
               label="New Users"
-              value={report ? fmt(report.metrics.newUsers.current) : "—"}
-              change={report ? formatChange(report.metrics.newUsers.change) : undefined}
-              isPositive={!report || report.metrics.newUsers.change >= 0}
+              value={report ? fmt(report.kpis.newUsers.value) : "—"}
+              change={report ? formatChange(report.kpis.newUsers.change) : undefined}
+              isPositive={!report || report.kpis.newUsers.change >= 0}
               icon={Users}
             />
             <MetricCard
               label="Active Vendors"
-              value={report ? fmt(report.metrics.activeVendors.current) : "—"}
-              change={report ? formatChange(report.metrics.activeVendors.change) : undefined}
-              isPositive={!report || report.metrics.activeVendors.change >= 0}
+              value={report ? fmt(report.kpis.activeVendors.value) : "—"}
+              change={report ? formatChange(report.kpis.activeVendors.change) : undefined}
+              isPositive={!report || report.kpis.activeVendors.change >= 0}
               icon={Store}
             />
             <MetricCard
               label="Revenue (This Month)"
-              value={report ? fmtMoney(report.metrics.revenue.current) : "—"}
-              change={report ? formatChange(report.metrics.revenue.change) : undefined}
-              isPositive={!report || report.metrics.revenue.change >= 0}
+              value={report ? fmtMoney(report.kpis.revenue.value) : "—"}
+              change={report ? formatChange(report.kpis.revenue.change) : undefined}
+              isPositive={!report || report.kpis.revenue.change >= 0}
               icon={DollarSign}
             />
           </div>
@@ -131,14 +132,14 @@ export function AdminDashboard() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <MetricCard
               label="Total Bookings"
-              value={report ? fmt(report.metrics.bookings.current) : "—"}
-              change={report ? formatChange(report.metrics.bookings.change) : undefined}
-              isPositive={!report || report.metrics.bookings.change >= 0}
+              value={report ? fmt(report.kpis.bookings.value) : "—"}
+              change={report ? formatChange(report.kpis.bookings.change) : undefined}
+              isPositive={!report || report.kpis.bookings.change >= 0}
               icon={ShoppingBag}
             />
             <MetricCard
               label="New Vendors"
-              value={report ? fmt(report.metrics.activeVendors.current) : "—"}
+              value={report ? fmt(report.kpis.activeVendors.value) : "—"}
               icon={UserPlus}
             />
           </div>
