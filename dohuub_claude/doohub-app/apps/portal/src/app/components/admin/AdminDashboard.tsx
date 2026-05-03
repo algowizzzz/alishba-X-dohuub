@@ -63,7 +63,7 @@ export function AdminDashboard() {
 
   useEffect(() => {
     api.get<{ success: boolean; data: PlatformReport }>("/api/v1/admin/reports/platform?dateRange=month")
-      .then((r) => setReport(r.data.data))
+      .then((r) => setReport(r.data))
       .catch(() => setReport(null));
   }, []);
 

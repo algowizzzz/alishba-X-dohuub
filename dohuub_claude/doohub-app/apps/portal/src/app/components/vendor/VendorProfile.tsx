@@ -47,7 +47,7 @@ export function VendorProfile() {
   useEffect(() => {
     api.get<{ success: boolean; data: any }>("/api/v1/vendors/me")
       .then((r) => {
-        const v = (r.data as any)?.data;
+        const v = (r as any)?.data;
         if (!v) return;
         setFormData((prev) => ({
           ...prev,

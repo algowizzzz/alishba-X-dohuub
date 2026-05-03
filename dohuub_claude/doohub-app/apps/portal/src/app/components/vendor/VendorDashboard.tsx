@@ -48,9 +48,9 @@ export function VendorDashboard() {
       api.get<{ success: boolean; data: any[] }>("/api/v1/vendors/listings").catch(() => null),
       api.get<{ success: boolean; data: any[] }>("/api/v1/vendors/me/bookings?limit=5").catch(() => null),
     ]).then(([analyticsRes, listingsRes, bookingsRes]) => {
-      const analytics = (analyticsRes?.data as any)?.data;
-      const listings = (listingsRes?.data as any)?.data;
-      const bookings = (bookingsRes?.data as any)?.data;
+      const analytics = (analyticsRes as any)?.data;
+      const listings = (listingsRes as any)?.data;
+      const bookings = (bookingsRes as any)?.data;
       if (analytics) {
         setStats({
           earnings: Number(analytics.totalRevenue || 0),

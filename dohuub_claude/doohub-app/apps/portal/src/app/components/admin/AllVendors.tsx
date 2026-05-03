@@ -549,7 +549,7 @@ export function AllVendors() {
   useEffect(() => {
     api.get<{ success: boolean; data: any[] }>("/api/v1/admin/vendors?limit=200")
       .then((r) => {
-        const mapped: Vendor[] = (r.data.data || []).map((v: any) => ({
+        const mapped: Vendor[] = (r.data || []).map((v: any) => ({
           id: v.id,
           businessName: v.businessName,
           logoUrl: v.logo || undefined,

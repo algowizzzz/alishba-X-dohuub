@@ -258,7 +258,7 @@ export function CustomerManagement() {
   useEffect(() => {
     api.get<{ success: boolean; data: any[] }>("/api/v1/admin/customers?limit=200")
       .then((r) => {
-        const mapped: Customer[] = (r.data.data || []).map((u: any) => ({
+        const mapped: Customer[] = (r.data || []).map((u: any) => ({
           id: u.id,
           name: u.profile ? `${u.profile.firstName ?? ""} ${u.profile.lastName ?? ""}`.trim() || u.email : u.email,
           email: u.email,

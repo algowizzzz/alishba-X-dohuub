@@ -141,10 +141,10 @@ export function MichelleOrders() {
     // Pull both bookings (services) + orders (e-commerce) and merge into the
     // unified Order shape this screen expects.
     Promise.all([
-      api.get<{ success: boolean; data: any[] }>("/api/v1/admin/bookings?limit=200").catch(() => ({ data: { data: [] } })),
-      api.get<{ success: boolean; data: any[] }>("/api/v1/admin/orders?limit=200").catch(() => ({ data: { data: [] } })),
+      api.get<{ success: boolean; data: any[] }>("/api/v1/admin/bookings?limit=200").catch(() => ({ data: [] })),
+      api.get<{ success: boolean; data: any[] }>("/api/v1/admin/orders?limit=200").catch(() => ({ data: [] })),
     ]).then(([bookingsRes, ordersRes]) => {
-      const bookings: Order[] = ((bookingsRes.data as any)?.data || []).map((b: any) => ({
+      const bookings: Order[] = ((bookingsRes as any).data || []).map((b: any) => ({
         id: b.id,
         orderNumber: `BK-${b.id.slice(-6).toUpperCase()}`,
         storeId: b.vendorId,
@@ -166,7 +166,7 @@ export function MichelleOrders() {
         specialInstructions: b.specialInstructions,
         pointsEarned: b.pointsEarned,
       }));
-      const orders: Order[] = ((ordersRes.data as any)?.data || []).map((o: any) => ({
+      const orders: Order[] = ((ordersRes as any).data || []).map((o: any) => ({
         id: o.id,
         orderNumber: `OR-${o.id.slice(-6).toUpperCase()}`,
         storeId: o.vendorId,
