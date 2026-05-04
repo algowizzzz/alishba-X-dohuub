@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import api from "../../../services/api";
 import {
   ArrowLeft,
   Plus,
@@ -171,7 +172,38 @@ export function GeographicRegions() {
   };
 
   // State
-  const [regions, setRegions] = useState<Region[]>(mockRegions);
+  const [regions, setRegions] = useState<Region[]>([]);
+  const [regionsLoading, setRegionsLoading] = useState(true);
+
+  useEffect(() => {
+    api
+      .get<{ success: boolean; data: any[] }>("/api/v1/admin/regions?limit=200")
+      .then((r) => {
+        const data = (r as any)?.data || [];
+        const mapped: Region[] = data.map((rg: any) => ({
+          id: rg.id,
+          name: `${rg.city || rg.name}${rg.state || rg.province ? `, ${rg.state || rg.province}` : ""}`,
+          countryCode: rg.countryCode || (rg.country === "Canada" ? "CA" : "US"),
+          countryName: rg.country || "United States",
+          countryFlag: rg.country === "Canada" ? "🇨🇦" : "🇺🇸",
+          isActive: rg.isActive ?? true,
+          activeProfiles: rg._count?.storeRegions ?? 0,
+          totalProfiles: rg._count?.storeRegions ?? 0,
+          profiles: [],
+          performance: {
+            bookings: 0,
+            bookingsTrend: 0,
+            revenue: 0,
+            revenueTrend: 0,
+            customers: 0,
+          },
+          notes: "",
+        }));
+        setRegions(mapped);
+      })
+      .catch(() => setRegions([]))
+      .finally(() => setRegionsLoading(false));
+  }, []);
   const [filter, setFilter] = useState("all");
   const [groupBy, setGroupBy] = useState("country");
   const [selectedRegion, setSelectedRegion] = useState<Region | null>(null);

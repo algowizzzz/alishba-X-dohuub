@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Save,
   Trash2,
@@ -11,6 +11,7 @@ import {
   EyeOff,
   CreditCard,
 } from "lucide-react";
+import api from "../../../services/api";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
@@ -188,6 +189,50 @@ export function PlatformSettings() {
     "sk_test_51234567890abcdef..."
   );
   const [showSecretKey, setShowSecretKey] = useState(false);
+
+  // Save state
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // Load settings from API on mount
+  useEffect(() => {
+    api
+      .get<{ success: boolean; data: any }>("/api/v1/admin/settings")
+      .then((r) => {
+        const settings = (r as any)?.data;
+        if (settings) {
+          if (settings.supportEmail) setSupportEmail(settings.supportEmail);
+          if (settings.supportEmail) {
+            setContactInfo((c) => ({ ...c, email: settings.supportEmail }));
+          }
+          if (settings.supportPhone) {
+            setContactInfo((c) => ({ ...c, phone: settings.supportPhone }));
+          }
+        }
+      })
+      .catch(() => {
+        // ignore — keep defaults
+      });
+  }, []);
+
+  const handleSaveSettings = async () => {
+    setSaveError(null);
+    setSaveSuccess(false);
+    setIsSaving(true);
+    try {
+      await api.put("/api/v1/admin/settings", {
+        supportEmail: supportEmail || contactInfo.email,
+        supportPhone: contactInfo.phone,
+      });
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (err: any) {
+      setSaveError(err?.response?.data?.error || err?.message || "Failed to save");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   // FAQ Functions
   const addFAQ = () => {
@@ -403,9 +448,19 @@ export function PlatformSettings() {
                     </div>
                   </div>
 
-                  <Button className="w-full sm:w-auto">
+                  {saveError && (
+                    <p className="text-sm text-[#DC2626] mb-2">{saveError}</p>
+                  )}
+                  {saveSuccess && (
+                    <p className="text-sm text-[#10B981] mb-2">Settings saved</p>
+                  )}
+                  <Button
+                    className="w-full sm:w-auto"
+                    onClick={handleSaveSettings}
+                    disabled={isSaving}
+                  >
                     <Save className="w-4 h-4 mr-2" />
-                    Save Changes
+                    {isSaving ? "Saving..." : "Save Changes"}
                   </Button>
                 </div>
               </TabsContent>
@@ -439,9 +494,9 @@ export function PlatformSettings() {
                       <Eye className="w-4 h-4 mr-2" />
                       Preview
                     </Button>
-                    <Button>
+                    <Button disabled>
                       <Save className="w-4 h-4 mr-2" />
-                      Save Changes
+                      Save (coming soon)
                     </Button>
                   </div>
                 </div>
@@ -476,9 +531,9 @@ export function PlatformSettings() {
                       <Eye className="w-4 h-4 mr-2" />
                       Preview
                     </Button>
-                    <Button>
+                    <Button disabled>
                       <Save className="w-4 h-4 mr-2" />
-                      Save Changes
+                      Save (coming soon)
                     </Button>
                   </div>
                 </div>
@@ -745,9 +800,19 @@ export function PlatformSettings() {
                     </div>
                   </div>
 
-                  <Button className="w-full sm:w-auto">
+                  {saveError && (
+                    <p className="text-sm text-[#DC2626] mb-2">{saveError}</p>
+                  )}
+                  {saveSuccess && (
+                    <p className="text-sm text-[#10B981] mb-2">Settings saved</p>
+                  )}
+                  <Button
+                    className="w-full sm:w-auto"
+                    onClick={handleSaveSettings}
+                    disabled={isSaving}
+                  >
                     <Save className="w-4 h-4 mr-2" />
-                    Save Changes
+                    {isSaving ? "Saving..." : "Save Changes"}
                   </Button>
                 </div>
               </TabsContent>
@@ -837,11 +902,11 @@ export function PlatformSettings() {
                   </div>
 
                   <div className="flex gap-3">
-                    <Button className="w-full sm:w-auto">
+                    <Button className="w-full sm:w-auto" disabled>
                       <Save className="w-4 h-4 mr-2" />
-                      Save API Keys
+                      Save (coming soon)
                     </Button>
-                    <Button variant="outline" className="w-full sm:w-auto">
+                    <Button variant="outline" className="w-full sm:w-auto" disabled>
                       Test Connection
                     </Button>
                   </div>

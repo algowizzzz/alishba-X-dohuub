@@ -14,6 +14,7 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Textarea } from "../ui/textarea";
+import api from "../../../services/api";
 import {
   Dialog,
   DialogContent,
@@ -54,6 +55,8 @@ export function PushNotifications() {
   // Form state
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
+  const [isSending, setIsSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
 
   const handleSidebarToggle = () => {
     if (typeof window !== "undefined" && window.innerWidth >= 1024) {
@@ -130,16 +133,29 @@ export function PushNotifications() {
     },
   ]);
 
-  const handleSend = () => {
-    // Mock send functionality
-    setShowSuccessModal(true);
-    // Reset form
-    setTimeout(() => {
-      setTitle("");
-      setMessage("");
-      setShowSuccessModal(false);
-      setActiveTab("history");
-    }, 2000);
+  const handleSend = async () => {
+    setSendError(null);
+    setIsSending(true);
+    try {
+      await api.post("/api/v1/admin/push-notifications", {
+        title,
+        body: message,
+        targetType: "ALL",
+      });
+      setShowSuccessModal(true);
+      setTimeout(() => {
+        setTitle("");
+        setMessage("");
+        setShowSuccessModal(false);
+        setActiveTab("history");
+      }, 2000);
+    } catch (err: any) {
+      setSendError(
+        err?.response?.data?.error || err?.message || "Failed to send notification"
+      );
+    } finally {
+      setIsSending(false);
+    }
   };
 
   const getAudienceCount = (audienceType: string) => {
@@ -273,14 +289,17 @@ export function PushNotifications() {
                       </div>
                     </div>
 
-                    <div className="flex gap-3 pt-4">
+                    <div className="flex flex-col gap-2 pt-4">
+                      {sendError && (
+                        <p className="text-sm text-[#DC2626]">{sendError}</p>
+                      )}
                       <Button
                         onClick={handleSend}
-                        disabled={!title || !message}
+                        disabled={!title || !message || isSending}
                         className="w-full bg-[#2E7AD9] hover:bg-[#1E5DB0] text-white"
                       >
                         <Send className="w-4 h-4 mr-2" />
-                        Send Notification
+                        {isSending ? "Sending..." : "Send Notification"}
                       </Button>
                     </div>
                   </div>
@@ -341,6 +360,9 @@ export function PushNotifications() {
             {/* History Tab */}
             <TabsContent value="history" className="m-0">
               <div className="bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] border-t-0 rounded-b-2xl">
+                <div className="px-6 py-3 bg-[#FEF3C7] border-b border-[#FDE68A] text-xs text-[#92400E]">
+                  Demo data &mdash; backend history endpoint pending
+                </div>
                 {/* Notifications List */}
                 <div className="divide-y divide-[rgba(46, 122, 217, 0.12)]">
                   {notifications.map((notif) => (

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
+import api from "../../../services/api";
 import {
   ArrowLeft,
   Upload,
@@ -114,6 +115,8 @@ export function CreateEditServiceListing() {
     { id: "4", name: "Houston, TX", isEnabled: false, price: 120 },
   ]);
   const [bookingSettingsExpanded, setBookingSettingsExpanded] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -135,9 +138,68 @@ export function CreateEditServiceListing() {
     setImages(images.filter(img => img.id !== id));
   };
 
-  const handleSave = (activate: boolean) => {
-    // Save logic here
-    navigate(`/admin/michelle-profiles/${profileId}/listings`);
+  const categoryToEndpoint = (cat: string): string | null => {
+    switch (cat) {
+      case "Cleaning Services":
+        return "/api/v1/services/cleaning";
+      case "Handyman Services":
+        return "/api/v1/services/handyman";
+      case "Beauty on DE Run":
+      case "Beauty Services":
+        return "/api/v1/services/beauty";
+      case "Caregiving Services":
+        return "/api/v1/services/caregiving";
+      case "Grocery":
+        return "/api/v1/services/groceries";
+      case "Rental Properties":
+        return "/api/v1/services/rentals";
+      default:
+        return null;
+    }
+  };
+
+  const handleSave = async (activate: boolean) => {
+    const endpoint = categoryToEndpoint(profileCategory);
+    if (!endpoint) {
+      setSaveError(`No backend endpoint for ${profileCategory}`);
+      return;
+    }
+    if (!serviceName || !basePrice) {
+      setSaveError("Service name and base price are required");
+      return;
+    }
+    setSaveError(null);
+    setIsSaving(true);
+    try {
+      // Map category-specific type field
+      const typeField =
+        profileCategory === "Cleaning Services"
+          ? { cleaningType: serviceType }
+          : profileCategory === "Handyman Services"
+          ? { handymanType: serviceType }
+          : profileCategory === "Beauty Services" || profileCategory === "Beauty on DE Run"
+          ? { beautyType: serviceType }
+          : profileCategory === "Caregiving Services"
+          ? { caregivingType: serviceType }
+          : profileCategory === "Rental Properties"
+          ? { rentalType: serviceType }
+          : {};
+
+      await api.post(endpoint, {
+        title: serviceName,
+        description,
+        basePrice: parseFloat(basePrice),
+        duration: 120,
+        images: images.map((i) => i.url),
+        status: activate ? "ACTIVE" : "DRAFT",
+        ...typeField,
+      });
+      navigate(`/admin/michelle-profiles/${profileId}/listings`);
+    } catch (err: any) {
+      setSaveError(err?.response?.data?.error || err?.message || "Failed to save listing");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const serviceTypes = SERVICE_TYPES_BY_CATEGORY[profileCategory] || [];
@@ -559,21 +621,28 @@ export function CreateEditServiceListing() {
                 Cancel
               </Button>
 
-              <div className="flex gap-3">
-                <Button
-                  variant="outline"
-                  onClick={() => handleSave(false)}
-                  className="h-11 px-8"
-                >
-                  Save Listing
-                </Button>
-                <Button
-                  onClick={() => handleSave(true)}
-                  className="h-11 px-8 bg-[#2E7AD9] hover:bg-[#1E5DB0] text-white font-semibold"
-                >
-                  <Check className="w-[18px] h-[18px] mr-2" />
-                  Save & Activate
-                </Button>
+              <div className="flex flex-col items-end gap-2">
+                {saveError && (
+                  <p className="text-sm text-[#DC2626]">{saveError}</p>
+                )}
+                <div className="flex gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={() => handleSave(false)}
+                    disabled={isSaving}
+                    className="h-11 px-8"
+                  >
+                    {isSaving ? "Saving..." : "Save Listing"}
+                  </Button>
+                  <Button
+                    onClick={() => handleSave(true)}
+                    disabled={isSaving}
+                    className="h-11 px-8 bg-[#2E7AD9] hover:bg-[#1E5DB0] text-white font-semibold"
+                  >
+                    <Check className="w-[18px] h-[18px] mr-2" />
+                    {isSaving ? "Saving..." : "Save & Activate"}
+                  </Button>
+                </div>
               </div>
             </div>
           </div>

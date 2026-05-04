@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams, useLocation } from "react-router-dom";
+import api from "../../../services/api";
 import {
   ArrowLeft,
   Pause,
@@ -2697,7 +2698,7 @@ export function VendorDetail() {
   };
 
   // State
-  const [vendor] = useState<VendorData>(() => {
+  const [vendor, setVendor] = useState<VendorData>(() => {
     if (id === "2") return mockHandymanVendor;
     if (id === "3") return mockGroceryVendor1; // Green Valley Grocers
     if (id === "4") return mockBeautyServicesVendor;
@@ -2734,6 +2735,68 @@ export function VendorDetail() {
     return mockVendor;
   });
   const [activeTab, setActiveTab] = useState("overview");
+  const [usingDemoData, setUsingDemoData] = useState(true);
+
+  useEffect(() => {
+    if (!id) return;
+    api
+      .get<{ success: boolean; data: any }>(`/api/v1/admin/vendors/${id}`)
+      .then((r) => {
+        const v = (r as any)?.data;
+        if (!v) return;
+        const profile = v.user?.profile;
+        const ownerName = profile
+          ? `${profile.firstName || ""} ${profile.lastName || ""}`.trim()
+          : v.user?.email?.split("@")[0] || "";
+        const status =
+          v.status === "SUSPENDED" ? "suspended"
+          : v.subscriptionStatus === "TRIAL" ? "trial"
+          : v.status === "PENDING" ? "pending"
+          : v.isActive ? "active" : "inactive";
+        const totalListings =
+          (v._count?.cleaningListings || 0) +
+          (v._count?.handymanListings || 0) +
+          (v._count?.beautyListings || 0) +
+          (v._count?.groceryListings || 0) +
+          (v._count?.rentalListings || 0) +
+          (v._count?.foodListings || 0) +
+          (v._count?.beautyProductListings || 0) +
+          (v._count?.rideAssistanceListings || 0) +
+          (v._count?.companionshipListings || 0);
+
+        setVendor((prev) => ({
+          ...prev,
+          id: v.id,
+          businessName: v.businessName || prev.businessName,
+          ownerName: ownerName || prev.ownerName,
+          email: v.user?.email || v.contactEmail || prev.email,
+          phone: v.user?.phone || v.contactPhone || prev.phone,
+          status: status as any,
+          joinedDate: v.createdAt || prev.joinedDate,
+          stats: {
+            totalRevenue: prev.stats.totalRevenue,
+            totalBookings: v._count?.bookings || 0,
+            avgRating: v.rating || 0,
+            reviewCount: v._count?.reviews || 0,
+          },
+          regions: Array.isArray(v.stores)
+            ? v.stores.flatMap((s: any) =>
+                (s.regions || []).map((sr: any) => ({
+                  name: sr.region
+                    ? `${sr.region.city || sr.region.name}${sr.region.state ? `, ${sr.region.state}` : ""}`
+                    : "",
+                  listingsCount: totalListings,
+                  isActive: sr.isActive ?? true,
+                }))
+              )
+            : prev.regions,
+        }));
+        setUsingDemoData(false);
+      })
+      .catch(() => {
+        // keep mock fallback
+      });
+  }, [id]);
 
   const statusColor = getStatusColor(vendor.status);
   
@@ -2786,6 +2849,11 @@ export function VendorDetail() {
               <span className="hidden sm:inline">Vendor Details: {vendor.businessName}</span>
               <span className="sm:hidden">Vendor Details</span>
             </h1>
+            {usingDemoData && (
+              <div className="bg-[#FEF3C7] border border-[#FDE68A] rounded-lg px-4 py-2 mt-3 text-xs text-[#92400E]">
+                Demo data &mdash; vendor record not yet synced from backend
+              </div>
+            )}
           </div>
 
           {/* Header Section */}

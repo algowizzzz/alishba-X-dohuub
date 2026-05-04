@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   AlertTriangle,
@@ -16,6 +16,7 @@ import {
 } from "../ui/dialog";
 import { AdminSidebarRetractable } from "./AdminSidebarRetractable";
 import { AdminTopNav } from "./AdminTopNav";
+import api from "../../../services/api";
 
 interface ListingReport {
   id: string;
@@ -193,7 +194,32 @@ export function ReportedListings() {
     }
   };
 
-  const [reports] = useState<ListingReport[]>(mockReports);
+  const [reports, setReports] = useState<ListingReport[]>([]);
+  const [reportsLoading, setReportsLoading] = useState(true);
+
+  useEffect(() => {
+    api
+      .get<{ success: boolean; data: any[] }>("/api/v1/admin/reports?status=PENDING&limit=100")
+      .then((r) => {
+        const data = (r as any)?.data || [];
+        const mapped: ListingReport[] = data.map((rep: any) => ({
+          id: rep.id,
+          listingName: rep.targetTitle || rep.listingName || rep.targetType || "Listing",
+          vendorId: rep.vendorId || rep.targetId || "",
+          vendorName: rep.vendorName || rep.targetVendorName || "Unknown vendor",
+          customerName:
+            rep.user?.profile?.firstName
+              ? `${rep.user.profile.firstName} ${rep.user.profile.lastName?.[0] || ""}.`
+              : rep.user?.email?.split("@")[0] || "Customer",
+          reportReason: rep.reason || rep.type || "Report",
+          reportExplanation: rep.description || rep.details || "No additional details provided.",
+          reportedAt: rep.createdAt || new Date().toISOString(),
+        }));
+        setReports(mapped.length > 0 ? mapped : []);
+      })
+      .catch(() => setReports([]))
+      .finally(() => setReportsLoading(false));
+  }, []);
 
   return (
     <div className="min-h-screen bg-[#F0F7FF]">

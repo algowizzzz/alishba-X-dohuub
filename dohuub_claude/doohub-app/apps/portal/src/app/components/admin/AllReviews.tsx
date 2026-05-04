@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Star,
@@ -12,6 +12,7 @@ import {
   Image as ImageIcon,
   ThumbsUp,
 } from "lucide-react";
+import api from "../../../services/api";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import {
@@ -366,7 +367,44 @@ export function AllReviews() {
     }
   };
 
-  const [reviews] = useState<Review[]>(mockReviews);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(true);
+
+  useEffect(() => {
+    api
+      .get<{ success: boolean; data: any[] }>("/api/v1/admin/reviews?limit=100")
+      .then((r) => {
+        const data = (r as any)?.data || [];
+        const mapped: Review[] = data.map((rv: any) => ({
+          id: rv.id,
+          rating: rv.rating || 0,
+          customerName: rv.user?.profile?.firstName
+            ? `${rv.user.profile.firstName} ${rv.user.profile.lastName?.[0] || ""}.`
+            : rv.user?.email?.split("@")[0] || "Customer",
+          customerId: rv.userId || rv.user?.id || "",
+          verified: true,
+          serviceName: rv.serviceName || "Service",
+          vendorName: rv.vendor?.businessName || "Vendor",
+          vendorId: rv.vendorId || "",
+          bookingId: rv.bookingId || rv.orderId || rv.id,
+          bookingDate: rv.createdAt,
+          reviewText: rv.comment || rv.text || "",
+          photos: Array.isArray(rv.photos) ? rv.photos : [],
+          vendorResponse: rv.vendorResponse
+            ? { text: rv.vendorResponse, respondedAt: rv.vendorResponseAt || rv.updatedAt }
+            : undefined,
+          helpfulCount: rv.helpfulCount || 0,
+          flagged: !!rv.flagged,
+          flagReason: rv.flagReason || undefined,
+          flaggedBy: rv.flaggedBy || undefined,
+          status: rv.flagged ? "flagged" : "published",
+          createdAt: rv.createdAt,
+        }));
+        setReviews(mapped);
+      })
+      .catch(() => setReviews([]))
+      .finally(() => setReviewsLoading(false));
+  }, []);
   const [searchQuery, setSearchQuery] = useState("");
   const [ratingFilter, setRatingFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");

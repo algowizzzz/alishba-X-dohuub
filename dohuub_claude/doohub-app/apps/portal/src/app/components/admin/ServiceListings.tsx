@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import api from "../../../services/api";
 import {
   ArrowLeft,
   Plus,
@@ -1286,7 +1287,7 @@ export function ServiceListings() {
   const isRideAssistanceProfile = profileId === "25" || profileId === "26" || profileId === "27";
   const isCompanionshipSupportProfile = profileId === "32" || profileId === "33" || profileId === "34";
   
-  const currentListings = isHandymanProfile
+  const fallbackListings = isHandymanProfile
     ? mockHandymanListings
     : isBeautyServicesProfile
     ? mockBeautyServicesListings
@@ -1300,9 +1301,6 @@ export function ServiceListings() {
     ? mockRentalPropertiesListings
     : isRideAssistanceProfile
     ? mockRideAssistanceListings.filter(listing => {
-        // Profile 25 (CareWheels) -> Listing 1
-        // Profile 26 (Senior Care Rides) -> Listing 2
-        // Profile 27 (SafeTransit Solutions) -> Listing 3
         if (profileId === "25") return listing.id === "1";
         if (profileId === "26") return listing.id === "2";
         if (profileId === "27") return listing.id === "3";
@@ -1310,15 +1308,55 @@ export function ServiceListings() {
       })
     : isCompanionshipSupportProfile
     ? mockCompanionshipSupportListings.filter(listing => {
-        // Profile 32 (Caring Companions) -> Listing 1
-        // Profile 33 (Senior Care Network) -> Listing 2
-        // Profile 34 (Compassionate Care) -> Listing 3
         if (profileId === "32") return listing.id === "1";
         if (profileId === "33") return listing.id === "2";
         if (profileId === "34") return listing.id === "3";
         return false;
       })
     : mockListings;
+
+  const [apiListings, setApiListings] = useState<ServiceListing[] | null>(null);
+  const [usingDemoData, setUsingDemoData] = useState(true);
+
+  useEffect(() => {
+    if (!profileId) return;
+    api
+      .get<{ success: boolean; data: any[] }>(`/api/v1/admin/michelle-profiles/${profileId}/listings?limit=100`)
+      .then((r) => {
+        const data = (r as any)?.data || [];
+        if (Array.isArray(data) && data.length > 0) {
+          const mapped: ServiceListing[] = data.map((l: any) => ({
+            id: l.id,
+            name: l.title || l.name || "Untitled",
+            shortDescription: l.shortDescription || l.description?.slice(0, 100) || "",
+            longDescription: l.description || "",
+            basePrice: Number(l.basePrice ?? l.price ?? 0),
+            pricingType: (l.pricingType as any) || "fixed",
+            thumbnail: Array.isArray(l.images) ? l.images[0] : undefined,
+            imageGallery: Array.isArray(l.images) ? l.images : [],
+            whatsIncluded: Array.isArray(l.includes) ? l.includes : [],
+            bookings: l._count?.bookings || 0,
+            bookingTrend: 0,
+            isActive: l.status === "ACTIVE",
+            regions: [],
+            rating: l.rating || undefined,
+            reviews: l.reviewCount || undefined,
+            status: l.status === "DRAFT" ? "draft" : "published",
+          }));
+          setApiListings(mapped);
+          setUsingDemoData(false);
+        } else {
+          setApiListings(null);
+          setUsingDemoData(true);
+        }
+      })
+      .catch(() => {
+        setApiListings(null);
+        setUsingDemoData(true);
+      });
+  }, [profileId]);
+
+  const currentListings = apiListings ?? fallbackListings;
   
   // Mock profile data
   const getProfileInfo = () => {
@@ -1390,6 +1428,12 @@ export function ServiceListings() {
           <h1 className="text-2xl sm:text-[28px] lg:text-[32px] font-bold text-[#1A1A2E] mb-4">
             Manage Listings: {profileName}
           </h1>
+
+          {usingDemoData && (
+            <div className="bg-[#FEF3C7] border border-[#FDE68A] rounded-lg px-4 py-2 mb-4 text-xs text-[#92400E]">
+              Demo data &mdash; this profile has no listings yet, showing sample data
+            </div>
+          )}
 
           {/* Profile Context */}
           <div className="bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] rounded-lg px-4 sm:px-5 py-4 mb-6 sm:mb-8 shadow-[0_4px_16px_rgba(46,122,217,0.18)]">

@@ -159,7 +159,7 @@ export function RewardsOverview() {
       >
         <div className="max-w-[1400px] mx-auto">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Rewards Program Overview</h1>
           <p className="text-muted-foreground">Monitor and manage the DoHuub rewards system</p>
@@ -182,6 +182,10 @@ export function RewardsOverview() {
             Configure Milestones
           </button>
         </div>
+      </div>
+
+      <div className="bg-[#FEF3C7] border border-[#FDE68A] rounded-lg px-4 py-2 mb-6 text-xs text-[#92400E]">
+        Demo data &mdash; backend rewards endpoint pending
       </div>
 
       {/* Stats Cards */}

@@ -4,6 +4,7 @@ import { VendorSidebar } from "./VendorSidebar";
 import { VendorTopNav } from "./VendorTopNav";
 import { Button } from "../ui/button";
 import { useNavigate, useParams } from "react-router-dom";
+import api from "../../../services/api";
 import { getCreateButtonText, isProductCategory, vendorBusinessInfo, storeDataMap as categoryDataMap } from "../../data/vendorBusinessData";
 import {
   Select,
@@ -609,26 +610,55 @@ export function VendorStoreListings() {
   // Get store data
   const storeData = storeDataMap[storeId || "1"] || storeDataMap[" 1"];
   const [listings, setListings] = useState(storeData.listings);
+  const [usingDemoData, setUsingDemoData] = useState(true);
 
-  // Load listings from localStorage and merge with mock data
+  // Load listings from API; fall back to localStorage / mock if empty
   useEffect(() => {
-    const savedListings = localStorage.getItem(`store-${storeId}-listings`);
-    if (savedListings) {
-      try {
-        const parsedListings = JSON.parse(savedListings);
-        // Merge saved listings with mock data, prioritizing saved listings
-        const mockListings = storeData.listings;
-        const mergedListings = [...parsedListings, ...mockListings.filter(
-          (mock) => !parsedListings.find((saved: Listing) => saved.id === mock.id)
-        )];
-        setListings(mergedListings);
-      } catch (error) {
-        console.error("Error loading listings from localStorage:", error);
+    api
+      .get<{ success: boolean; data: any[] }>("/api/v1/vendors/listings")
+      .then((r) => {
+        const data = (r as any)?.data || [];
+        if (Array.isArray(data) && data.length > 0) {
+          const mapped: Listing[] = data.map((l: any) => ({
+            id: l.id,
+            title: l.title || l.name || "Untitled",
+            description: l.description || "",
+            price: Number(l.basePrice ?? l.price ?? 0),
+            bookings: l._count?.bookings || 0,
+            bookingTrend: 0,
+            status: l.status === "ACTIVE" ? "active" : "inactive",
+            rating: l.rating || 0,
+            reviews: l.reviewCount || 0,
+            regions: 0,
+            whatsIncluded: Array.isArray(l.includes) ? l.includes : [],
+          }));
+          setListings(mapped);
+          setUsingDemoData(false);
+          return;
+        }
+
+        // Fallback to localStorage / mock
+        const savedListings = localStorage.getItem(`store-${storeId}-listings`);
+        if (savedListings) {
+          try {
+            const parsedListings = JSON.parse(savedListings);
+            const mockListings = storeData.listings;
+            const mergedListings = [...parsedListings, ...mockListings.filter(
+              (mock) => !parsedListings.find((saved: Listing) => saved.id === mock.id)
+            )];
+            setListings(mergedListings);
+          } catch {
+            setListings(storeData.listings);
+          }
+        } else {
+          setListings(storeData.listings);
+        }
+        setUsingDemoData(true);
+      })
+      .catch(() => {
         setListings(storeData.listings);
-      }
-    } else {
-      setListings(storeData.listings);
-    }
+        setUsingDemoData(true);
+      });
   }, [storeId]);
 
   // Calculate stats
@@ -686,6 +716,11 @@ export function VendorStoreListings() {
 
           {/* Page Header */}
           <div className="mb-6">
+            {usingDemoData && (
+              <div className="bg-[#FEF3C7] border border-[#FDE68A] rounded-lg px-4 py-2 mb-3 text-xs text-[#92400E]">
+                Demo data &mdash; no listings synced from backend yet
+              </div>
+            )}
             <h1 className="text-2xl sm:text-[28px] lg:text-[32px] font-bold text-[#1A1A2E] mb-3">
               Manage Listings: {storeData.name}
             </h1>

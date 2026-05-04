@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
+import api from "../../../services/api";
 import {
   ArrowLeft,
   Upload,
@@ -71,6 +72,8 @@ export function VendorStoreForm() {
   const [email, setEmail] = useState("");
   const [activateNow, setActivateNow] = useState("active");
   const [showRegionModal, setShowRegionModal] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const progress = (currentStep / 4) * 100;
 
@@ -113,9 +116,50 @@ export function VendorStoreForm() {
     }
   };
 
-  const handleSave = () => {
-    // Save logic here
-    navigate("/vendor/services");
+  const categoryToEnum = (cat: string): string | null => {
+    const map: Record<string, string> = {
+      "Cleaning Services": "CLEANING",
+      "Handyman Services": "HANDYMAN",
+      "Grocery": "GROCERIES",
+      "Beauty Services": "BEAUTY",
+      "Beauty Products": "BEAUTY_PRODUCTS",
+      "Food": "FOOD",
+      "Rental Properties": "RENTALS",
+      "Ride Assistance": "RIDE_ASSISTANCE",
+      "Companionship Support": "COMPANIONSHIP",
+    };
+    return map[cat] || null;
+  };
+
+  const handleSave = async () => {
+    if (!businessName || !category) {
+      setSaveError("Business name and category are required");
+      return;
+    }
+    const categoryEnum = categoryToEnum(category);
+    if (!categoryEnum) {
+      setSaveError(`Unknown category: ${category}`);
+      return;
+    }
+    setSaveError(null);
+    setIsSaving(true);
+    try {
+      await api.post("/api/v1/stores", {
+        name: businessName,
+        category: categoryEnum,
+        description,
+        logo: logoPreview || null,
+        phone,
+        email,
+        regionIds: regions.filter((r) => r.isActive).map((r) => r.id),
+        status: activateNow === "active" ? "ACTIVE" : "INACTIVE",
+      });
+      navigate("/vendor/services");
+    } catch (err: any) {
+      setSaveError(err?.response?.data?.error || err?.message || "Failed to save store");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const getStepTitle = () => {
@@ -536,22 +580,33 @@ export function VendorStoreForm() {
                   <ArrowLeft className="w-4 h-4 ml-2 rotate-180" />
                 </Button>
               ) : (
-                <div className="flex gap-3">
-                  {activateNow === "inactive" && (
-                    <Button
-                      variant="outline"
-                      onClick={handleSave}
-                      className="h-11 px-6"
-                    >
-                      Save Profile
-                    </Button>
+                <div className="flex flex-col items-end gap-2">
+                  {saveError && (
+                    <p className="text-sm text-[#DC2626]">{saveError}</p>
                   )}
-                  <Button
-                    onClick={handleSave}
-                    className="h-11 px-6 bg-[#2E7AD9] hover:bg-[#1E5DB0] text-white font-semibold"
-                  >
-                    {activateNow === "active" ? "Save & Activate" : "Save Profile"}
-                  </Button>
+                  <div className="flex gap-3">
+                    {activateNow === "inactive" && (
+                      <Button
+                        variant="outline"
+                        onClick={handleSave}
+                        disabled={isSaving}
+                        className="h-11 px-6"
+                      >
+                        {isSaving ? "Saving..." : "Save Profile"}
+                      </Button>
+                    )}
+                    <Button
+                      onClick={handleSave}
+                      disabled={isSaving}
+                      className="h-11 px-6 bg-[#2E7AD9] hover:bg-[#1E5DB0] text-white font-semibold"
+                    >
+                      {isSaving
+                        ? "Saving..."
+                        : activateNow === "active"
+                        ? "Save & Activate"
+                        : "Save Profile"}
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>

@@ -27,25 +27,6 @@ export function VendorSettings() {
     "sk_test_51234567890abcdef..."
   );
   const [showSecretKey, setShowSecretKey] = useState(false);
-  const [isTesting, setIsTesting] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-
-  const handleTestConnection = async () => {
-    setIsTesting(true);
-    // Simulate API call
-    setTimeout(() => {
-      setIsTesting(false);
-      alert("Connection successful!");
-    }, 1500);
-  };
-
-  const handleSavePaymentSettings = async () => {
-    setIsSaving(true);
-    // Simulate API call
-    setTimeout(() => {
-      setIsSaving(false);
-    }, 1000);
-  };
 
   return (
     <div className="min-h-screen bg-[#F0F7FF]">
@@ -84,6 +65,9 @@ export function VendorSettings() {
 
           {/* Payment Settings */}
           <div className="bg-white border border-[rgba(46,122,217,0.25)] rounded-2xl p-6 sm:p-8 shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
+            <div className="bg-[#FEF3C7] border border-[#FDE68A] rounded-lg px-4 py-2 mb-4 text-xs text-[#92400E]">
+              Demo data &mdash; vendor payment-settings endpoint pending
+            </div>
             <div className="flex items-center gap-3 mb-6">
               <div className="w-12 h-12 rounded-xl bg-[#2E7AD9] flex items-center justify-center shadow-[0_4px_12px_rgba(46,122,217,0.3)]">
                 <CreditCard className="w-6 h-6 text-white" />
@@ -168,21 +152,12 @@ export function VendorSettings() {
               </div>
 
               <div className="flex gap-3">
-                <Button
-                  onClick={handleSavePaymentSettings}
-                  disabled={isSaving}
-                  className="w-full sm:w-auto"
-                >
+                <Button disabled className="w-full sm:w-auto">
                   <Save className="w-4 h-4 mr-2" />
-                  {isSaving ? "Saving..." : "Save API Keys"}
+                  Save (coming soon)
                 </Button>
-                <Button
-                  variant="outline"
-                  onClick={handleTestConnection}
-                  disabled={isTesting}
-                  className="w-full sm:w-auto"
-                >
-                  {isTesting ? "Testing..." : "Test Connection"}
+                <Button variant="outline" disabled className="w-full sm:w-auto">
+                  Test Connection
                 </Button>
               </div>
             </div>
