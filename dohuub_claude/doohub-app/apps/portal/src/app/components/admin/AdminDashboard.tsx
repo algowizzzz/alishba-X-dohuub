@@ -62,7 +62,7 @@ export function AdminDashboard() {
   const [report, setReport] = useState<PlatformReport | null>(null);
 
   useEffect(() => {
-    api.get<{ success: boolean; data: PlatformReport }>("/api/v1/admin/reports/platform?dateRange=month")
+    api.get<{ success: boolean; data: PlatformReport }>("/api/v1/admin/reports/platform?dateRange=30days")
       .then((r) => setReport(r.data))
       .catch(() => setReport(null));
   }, []);
