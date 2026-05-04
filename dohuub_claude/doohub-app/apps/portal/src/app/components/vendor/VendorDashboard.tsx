@@ -52,9 +52,10 @@ export function VendorDashboard() {
       const listings = (listingsRes as any)?.data;
       const bookings = (bookingsRes as any)?.data;
       if (analytics) {
+        const m = analytics.metrics || analytics;
         setStats({
-          earnings: Number(analytics.totalRevenue || 0),
-          orders: Number(analytics.totalBookings || 0),
+          earnings: Number(m.totalRevenue || 0),
+          orders: Number(m.totalBookings || 0),
           listings: listings?.length || 0,
         });
       } else if (listings) {
