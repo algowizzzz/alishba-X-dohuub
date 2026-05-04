@@ -690,7 +690,7 @@ export function AllListings() {
           name: l.title || l.name,
           vendorId: l.vendorId,
           vendorName: l.vendor?.businessName || "—",
-          category: l.__type || l.category || "Other",
+          category: l.type || l.__type || l.category || "Other",
           status: (l.status || "ACTIVE").toLowerCase(),
           price: l.basePrice ? `$${l.basePrice}` : l.price ? `$${l.price}` : "—",
           regions: [],
