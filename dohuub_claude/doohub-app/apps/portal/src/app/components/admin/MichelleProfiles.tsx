@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import api from "../../../services/api";
 import { Link, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -646,7 +647,30 @@ function EmptyState() {
 export function MichelleProfiles() {
   const navigate = useNavigate();
   const [filter, setFilter] = useState("all");
-  const [profiles] = useState(mockProfiles);
+  const [profiles, setProfiles] = useState<VendorProfile[]>([]);
+
+  useEffect(() => {
+    api.get<{ success: boolean; data: any[] }>("/api/v1/admin/michelle-profiles?limit=200")
+      .then((r) => {
+        const arr = (r as any)?.data || [];
+        const mapped: VendorProfile[] = arr.map((v: any) => ({
+          id: v.id,
+          businessName: v.businessName || "Unnamed Store",
+          category: v.categories?.[0]?.category || "Other",
+          status: v.isActive ? "active" : "inactive",
+          regions: v._count?.serviceAreas ?? v.serviceAreas?.length ?? 0,
+          bookings: v._count?.bookings ?? 0,
+          bookingTrend: 0,
+          rating: v.rating ?? 0,
+          reviews: v.reviewCount ?? 0,
+          revenue: 0,
+          revenueTrend: 0,
+          logoUrl: v.logo || undefined,
+        }));
+        setProfiles(mapped);
+      })
+      .catch(() => setProfiles([]));
+  }, []);
 
   // Sidebar state
   const [sidebarOpen, setSidebarOpen] = useState(false);

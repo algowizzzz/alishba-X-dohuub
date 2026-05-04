@@ -28,6 +28,7 @@ import { RadioGroup, RadioGroupItem } from "../ui/radio-group";
 import { AdminSidebarRetractable } from "./AdminSidebarRetractable";
 import { AdminTopNav } from "./AdminTopNav";
 import { CountryRegionModal } from "./CountryRegionModal";
+import api from "../../../services/api";
 
 interface RegionWithCountry {
   id: string;
@@ -114,9 +115,45 @@ export function CreateEditProfile() {
     }
   };
 
-  const handleSave = () => {
-    // Save logic here
-    navigate("/admin/michelle-profiles");
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+
+  const handleSave = async () => {
+    setSaveError("");
+    if (!businessName.trim()) {
+      setSaveError("Business name is required");
+      setCurrentStep(1);
+      return;
+    }
+    if (!email.trim()) {
+      setSaveError("Email is required");
+      setCurrentStep(3);
+      return;
+    }
+    setIsSaving(true);
+    try {
+      if (isEditing) {
+        await api.put(`/api/v1/admin/michelle-profiles/${id}`, {
+          businessName,
+          description,
+          phone,
+          logo: logoPreview || undefined,
+        });
+      } else {
+        await api.post("/api/v1/admin/michelle-profiles", {
+          email,
+          businessName,
+          description,
+          phone,
+          logo: logoPreview || undefined,
+        });
+      }
+      navigate("/admin/michelle-profiles");
+    } catch (e: any) {
+      setSaveError(e?.response?.data?.error || e?.message || "Save failed");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const getStepTitle = () => {
@@ -571,22 +608,29 @@ export function CreateEditProfile() {
                   <ArrowLeft className="w-4 h-4 ml-2 rotate-180" />
                 </Button>
               ) : (
-                <div className="flex gap-3">
-                  {activateNow === "inactive" && (
-                    <Button
-                      variant="outline"
-                      onClick={handleSave}
-                      className="h-11 px-6"
-                    >
-                      Save Profile
-                    </Button>
+                <div className="flex flex-col items-end gap-2">
+                  {saveError && (
+                    <p className="text-sm text-red-600">{saveError}</p>
                   )}
-                  <Button
-                    onClick={handleSave}
-                    className="h-11 px-6 bg-[#2E7AD9] hover:bg-[#1E5DB0] text-white font-semibold"
-                  >
-                    {activateNow === "active" ? "Save & Activate" : "Save Profile"}
-                  </Button>
+                  <div className="flex gap-3">
+                    {activateNow === "inactive" && (
+                      <Button
+                        variant="outline"
+                        onClick={handleSave}
+                        disabled={isSaving}
+                        className="h-11 px-6"
+                      >
+                        {isSaving ? "Saving..." : "Save Profile"}
+                      </Button>
+                    )}
+                    <Button
+                      onClick={handleSave}
+                      disabled={isSaving}
+                      className="h-11 px-6 bg-[#2E7AD9] hover:bg-[#1E5DB0] text-white font-semibold"
+                    >
+                      {isSaving ? "Saving..." : activateNow === "active" ? "Save & Activate" : "Save Profile"}
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>
