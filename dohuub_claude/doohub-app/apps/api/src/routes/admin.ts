@@ -35,6 +35,7 @@ router.get('/michelle-profiles', authenticate, requireAdmin, async (req: AuthReq
     const profiles = await prisma.vendor.findMany({
       where,
       include: {
+        categories: true,
         user: {
           select: {
             id: true,
@@ -94,7 +95,7 @@ router.get('/michelle-profiles', authenticate, requireAdmin, async (req: AuthReq
 // Create Michelle profile
 router.post('/michelle-profiles', authenticate, requireAdmin, async (req: AuthRequest, res) => {
   try {
-    const { email, firstName, lastName, businessName, description, logo, phone } = req.body;
+    const { email, firstName, lastName, businessName, description, logo, phone, category } = req.body;
 
     if (!email || !businessName) {
       return res.status(400).json({ error: 'email and businessName are required' });
@@ -148,6 +149,12 @@ router.post('/michelle-profiles', authenticate, requireAdmin, async (req: AuthRe
           },
         },
       });
+
+      if (category) {
+        await tx.vendorCategory.create({
+          data: { vendorId: vendor.id, category },
+        });
+      }
 
       return vendor;
     });
@@ -215,7 +222,7 @@ router.get('/michelle-profiles/:id', authenticate, requireAdmin, async (req: Aut
 router.put('/michelle-profiles/:id', authenticate, requireAdmin, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
-    const { businessName, description, logo, phone, status, firstName, lastName } = req.body;
+    const { businessName, description, logo, phone, status, firstName, lastName, category } = req.body;
 
     const existing = await prisma.vendor.findFirst({
       where: { id, isMichelle: true },
@@ -250,6 +257,12 @@ router.put('/michelle-profiles/:id', authenticate, requireAdmin, async (req: Aut
             ...(lastName !== undefined && { lastName }),
           },
         });
+      }
+
+      // Replace category if provided
+      if (category) {
+        await tx.vendorCategory.deleteMany({ where: { vendorId: vendor.id } });
+        await tx.vendorCategory.create({ data: { vendorId: vendor.id, category } });
       }
 
       return vendor;

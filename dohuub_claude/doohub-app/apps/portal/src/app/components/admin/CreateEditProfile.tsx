@@ -118,6 +118,18 @@ export function CreateEditProfile() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
 
+  const CATEGORY_TO_ENUM: Record<string, string> = {
+    "Cleaning Services": "CLEANING",
+    "Handyman Services": "HANDYMAN",
+    "Grocery": "GROCERIES",
+    "Beauty Services": "BEAUTY",
+    "Beauty Products": "BEAUTY_PRODUCTS",
+    "Food": "FOOD",
+    "Rental Properties": "RENTALS",
+    "Ride Assistance": "RIDE_ASSISTANCE",
+    "Companionship Support": "COMPANIONSHIP",
+  };
+
   const handleSave = async () => {
     setSaveError("");
     if (!businessName.trim()) {
@@ -132,12 +144,14 @@ export function CreateEditProfile() {
     }
     setIsSaving(true);
     try {
+      const categoryEnum = CATEGORY_TO_ENUM[category];
       if (isEditing) {
         await api.put(`/api/v1/admin/michelle-profiles/${id}`, {
           businessName,
           description,
           phone,
           logo: logoPreview || undefined,
+          category: categoryEnum,
         });
       } else {
         await api.post("/api/v1/admin/michelle-profiles", {
@@ -146,6 +160,7 @@ export function CreateEditProfile() {
           description,
           phone,
           logo: logoPreview || undefined,
+          category: categoryEnum,
         });
       }
       navigate("/admin/michelle-profiles");

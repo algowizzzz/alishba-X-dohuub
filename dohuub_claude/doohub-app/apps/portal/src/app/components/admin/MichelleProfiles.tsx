@@ -649,24 +649,39 @@ export function MichelleProfiles() {
   const [filter, setFilter] = useState("all");
   const [profiles, setProfiles] = useState<VendorProfile[]>([]);
 
+  const ENUM_TO_CATEGORY: Record<string, string> = {
+    CLEANING: "Cleaning Services",
+    HANDYMAN: "Handyman Services",
+    GROCERIES: "Grocery",
+    BEAUTY: "Beauty Services",
+    BEAUTY_PRODUCTS: "Beauty Products",
+    FOOD: "Food",
+    RENTALS: "Rental Properties",
+    RIDE_ASSISTANCE: "Ride Assistance",
+    COMPANIONSHIP: "Companionship Support",
+  };
+
   useEffect(() => {
     api.get<{ success: boolean; data: any[] }>("/api/v1/admin/michelle-profiles?limit=200")
       .then((r) => {
         const arr = (r as any)?.data || [];
-        const mapped: VendorProfile[] = arr.map((v: any) => ({
-          id: v.id,
-          businessName: v.businessName || "Unnamed Store",
-          category: v.categories?.[0]?.category || "Other",
-          status: v.isActive ? "active" : "inactive",
-          regions: v._count?.serviceAreas ?? v.serviceAreas?.length ?? 0,
-          bookings: v._count?.bookings ?? 0,
-          bookingTrend: 0,
-          rating: v.rating ?? 0,
-          reviews: v.reviewCount ?? 0,
-          revenue: 0,
-          revenueTrend: 0,
-          logoUrl: v.logo || undefined,
-        }));
+        const mapped: VendorProfile[] = arr.map((v: any) => {
+          const rawCategory = v.categories?.[0]?.category;
+          return {
+            id: v.id,
+            businessName: v.businessName || "Unnamed Store",
+            category: rawCategory ? (ENUM_TO_CATEGORY[rawCategory] || rawCategory) : "Other",
+            status: v.isActive ? "active" : "inactive",
+            regions: v._count?.serviceAreas ?? v.serviceAreas?.length ?? 0,
+            bookings: v._count?.bookings ?? 0,
+            bookingTrend: 0,
+            rating: v.rating ?? 0,
+            reviews: v.reviewCount ?? 0,
+            revenue: 0,
+            revenueTrend: 0,
+            logoUrl: v.logo || undefined,
+          };
+        });
         setProfiles(mapped);
       })
       .catch(() => setProfiles([]));
