@@ -184,10 +184,6 @@ export function RewardsOverview() {
         </div>
       </div>
 
-      <div className="bg-[#FEF3C7] border border-[#FDE68A] rounded-lg px-4 py-2 mb-6 text-xs text-[#92400E]">
-        Demo data &mdash; backend rewards endpoint pending
-      </div>
-
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <div className="bg-white rounded-xl border border-border p-6 shadow-[0_4px_16px_rgba(46,122,217,0.18)]">

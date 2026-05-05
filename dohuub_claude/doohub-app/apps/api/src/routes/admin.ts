@@ -95,7 +95,7 @@ router.get('/michelle-profiles', authenticate, requireAdmin, async (req: AuthReq
 // Create Michelle profile
 router.post('/michelle-profiles', authenticate, requireAdmin, async (req: AuthRequest, res) => {
   try {
-    const { email, firstName, lastName, businessName, description, logo, phone, category } = req.body;
+    const { email, firstName, lastName, businessName, description, logo, phone, category, regions } = req.body;
 
     if (!email || !businessName) {
       return res.status(400).json({ error: 'email and businessName are required' });
@@ -154,6 +154,24 @@ router.post('/michelle-profiles', authenticate, requireAdmin, async (req: AuthRe
         await tx.vendorCategory.create({
           data: { vendorId: vendor.id, category },
         });
+      }
+
+      if (Array.isArray(regions) && regions.length > 0) {
+        for (const r of regions) {
+          if (!r?.name) continue;
+          // Try to derive city/state from "City, ST" format if present.
+          const [city = r.name, state = ''] = String(r.name).split(',').map((s: string) => s.trim());
+          await tx.vendorServiceArea.create({
+            data: {
+              vendorId: vendor.id,
+              name: r.name,
+              city: city || r.name,
+              state: state || '',
+              zipCodes: [],
+              isActive: r.isActive !== false,
+            },
+          });
+        }
       }
 
       return vendor;
@@ -222,7 +240,7 @@ router.get('/michelle-profiles/:id', authenticate, requireAdmin, async (req: Aut
 router.put('/michelle-profiles/:id', authenticate, requireAdmin, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
-    const { businessName, description, logo, phone, status, firstName, lastName, category } = req.body;
+    const { businessName, description, logo, phone, status, firstName, lastName, category, regions } = req.body;
 
     const existing = await prisma.vendor.findFirst({
       where: { id, isMichelle: true },
@@ -240,7 +258,7 @@ router.put('/michelle-profiles/:id', authenticate, requireAdmin, async (req: Aut
           ...(businessName && { businessName }),
           ...(description !== undefined && { description }),
           ...(logo !== undefined && { logo }),
-          ...(phone !== undefined && { phone }),
+          ...(phone !== undefined && { contactPhone: phone }),
           ...(status && { status }),
         },
         include: {
@@ -263,6 +281,25 @@ router.put('/michelle-profiles/:id', authenticate, requireAdmin, async (req: Aut
       if (category) {
         await tx.vendorCategory.deleteMany({ where: { vendorId: vendor.id } });
         await tx.vendorCategory.create({ data: { vendorId: vendor.id, category } });
+      }
+
+      // Replace service areas (regions) if provided
+      if (Array.isArray(regions)) {
+        await tx.vendorServiceArea.deleteMany({ where: { vendorId: vendor.id } });
+        for (const r of regions) {
+          if (!r?.name) continue;
+          const [city = r.name, state = ''] = String(r.name).split(',').map((s: string) => s.trim());
+          await tx.vendorServiceArea.create({
+            data: {
+              vendorId: vendor.id,
+              name: r.name,
+              city: city || r.name,
+              state: state || '',
+              zipCodes: [],
+              isActive: r.isActive !== false,
+            },
+          });
+        }
       }
 
       return vendor;
@@ -1758,6 +1795,10 @@ router.put('/settings', authenticate, requireAdmin, async (req: AuthRequest, res
       supportPhone,
       termsUrl,
       privacyUrl,
+      termsContent,
+      privacyContent,
+      stripePublishableKey,
+      stripeSecretKey,
       maintenanceMode,
       features,
     } = req.body;
@@ -1795,6 +1836,10 @@ router.put('/settings', authenticate, requireAdmin, async (req: AuthRequest, res
           ...(supportPhone !== undefined && { supportPhone }),
           ...(termsUrl !== undefined && { termsUrl }),
           ...(privacyUrl !== undefined && { privacyUrl }),
+          ...(termsContent !== undefined && { termsContent }),
+          ...(privacyContent !== undefined && { privacyContent }),
+          ...(stripePublishableKey !== undefined && { stripePublishableKey }),
+          ...(stripeSecretKey !== undefined && { stripeSecretKey }),
           ...(maintenanceMode !== undefined && { maintenanceMode }),
           ...(features !== undefined && { features }),
         },

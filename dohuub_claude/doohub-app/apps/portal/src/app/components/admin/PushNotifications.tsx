@@ -360,9 +360,6 @@ export function PushNotifications() {
             {/* History Tab */}
             <TabsContent value="history" className="m-0">
               <div className="bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] border-t-0 rounded-b-2xl">
-                <div className="px-6 py-3 bg-[#FEF3C7] border-b border-[#FDE68A] text-xs text-[#92400E]">
-                  Demo data &mdash; backend history endpoint pending
-                </div>
                 {/* Notifications List */}
                 <div className="divide-y divide-[rgba(46, 122, 217, 0.12)]">
                   {notifications.map((notif) => (

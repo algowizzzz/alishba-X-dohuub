@@ -1429,12 +1429,6 @@ export function ServiceListings() {
             Manage Listings: {profileName}
           </h1>
 
-          {usingDemoData && (
-            <div className="bg-[#FEF3C7] border border-[#FDE68A] rounded-lg px-4 py-2 mb-4 text-xs text-[#92400E]">
-              Demo data &mdash; this profile has no listings yet, showing sample data
-            </div>
-          )}
-
           {/* Profile Context */}
           <div className="bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] rounded-lg px-4 sm:px-5 py-4 mb-6 sm:mb-8 shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">

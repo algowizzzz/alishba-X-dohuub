@@ -2849,11 +2849,6 @@ export function VendorDetail() {
               <span className="hidden sm:inline">Vendor Details: {vendor.businessName}</span>
               <span className="sm:hidden">Vendor Details</span>
             </h1>
-            {usingDemoData && (
-              <div className="bg-[#FEF3C7] border border-[#FDE68A] rounded-lg px-4 py-2 mt-3 text-xs text-[#92400E]">
-                Demo data &mdash; vendor record not yet synced from backend
-              </div>
-            )}
           </div>
 
           {/* Header Section */}

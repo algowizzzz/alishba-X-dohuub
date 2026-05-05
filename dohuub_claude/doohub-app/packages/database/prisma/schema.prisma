@@ -247,6 +247,8 @@ model Vendor {
   trialStartedAt     DateTime           @default(now())
   trialEndsAt        DateTime?
   stripeAccountId    String?
+  stripePublishableKey String?
+  stripeSecretKey    String?
   rating             Float              @default(0)
   reviewCount        Int                @default(0)
   isActive           Boolean            @default(true)    // Kept for backward compatibility
@@ -1052,6 +1054,10 @@ model PlatformSettings {
   supportPhone          String   @default("+1-800-DOOHUB")
   termsUrl              String   @default("https://doohub.com/terms")
   privacyUrl            String   @default("https://doohub.com/privacy")
+  termsContent          String?
+  privacyContent        String?
+  stripePublishableKey  String?
+  stripeSecretKey       String?
   maintenanceMode       Boolean  @default(false)
   features              Json     @default("{}")
   createdAt             DateTime @default(now())

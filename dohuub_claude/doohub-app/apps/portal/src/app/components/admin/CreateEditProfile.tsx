@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import {
   ArrowLeft,
@@ -12,6 +12,9 @@ import {
   Star,
   Check,
 } from "lucide-react";
+import { toast } from "sonner";
+import axios from "axios";
+import { supabase } from "../../../lib/supabase";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
@@ -63,11 +66,8 @@ export function CreateEditProfile() {
   const [category, setCategory] = useState("");
   const [description, setDescription] = useState("");
   const [logoPreview, setLogoPreview] = useState("");
-  const [regions, setRegions] = useState<RegionWithCountry[]>([
-    { id: "1", name: "New York, NY", countryCode: "US", countryName: "United States", countryFlag: "🇺🇸", isActive: true },
-    { id: "2", name: "Los Angeles, CA", countryCode: "US", countryName: "United States", countryFlag: "🇺🇸", isActive: true },
-    { id: "3", name: "Chicago, IL", countryCode: "US", countryName: "United States", countryFlag: "🇺🇸", isActive: false },
-  ]);
+  const [logoUrl, setLogoUrl] = useState("");
+  const [regions, setRegions] = useState<RegionWithCountry[]>([]);
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [showBadge, setShowBadge] = useState(true);
@@ -76,14 +76,112 @@ export function CreateEditProfile() {
 
   const progress = (currentStep / 4) * 100;
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Load existing profile when editing
+  useEffect(() => {
+    if (!id) return;
+    api
+      .get<{ success: boolean; data: any }>(`/api/v1/admin/michelle-profiles/${id}`)
+      .then((r) => {
+        const v = (r as any)?.data;
+        if (!v) return;
+        setBusinessName(v.businessName || "");
+        setDescription(v.description || "");
+        setPhone(v.contactPhone || v.phone || "");
+        setEmail(v?.user?.email || v.contactEmail || "");
+        if (v.logo) {
+          setLogoPreview(v.logo);
+          setLogoUrl(v.logo);
+        }
+        // Map vendor category enum back to label
+        if (Array.isArray(v.categories) && v.categories.length > 0) {
+          const enumVal = v.categories[0]?.category;
+          const label = Object.entries({
+            "Cleaning Services": "CLEANING",
+            "Handyman Services": "HANDYMAN",
+            "Grocery": "GROCERIES",
+            "Beauty Services": "BEAUTY",
+            "Beauty Products": "BEAUTY_PRODUCTS",
+            "Food": "FOOD",
+            "Rental Properties": "RENTALS",
+            "Ride Assistance": "RIDE_ASSISTANCE",
+            "Companionship Support": "COMPANIONSHIP",
+          }).find(([, v2]) => v2 === enumVal)?.[0];
+          if (label) setCategory(label);
+        }
+        // Hydrate service areas as regions
+        if (Array.isArray(v.serviceAreas)) {
+          setRegions(
+            v.serviceAreas.map((sa: any) => ({
+              id: sa.id,
+              name: sa.name || `${sa.city || ""}${sa.state ? ", " + sa.state : ""}`.trim(),
+              countryCode: "US",
+              countryName: "United States",
+              countryFlag: "🇺🇸",
+              isActive: sa.isActive !== false,
+            }))
+          );
+        }
+        if (v.status === "SUSPENDED" || v.status === "INACTIVE") {
+          setActivateNow("inactive");
+        }
+      })
+      .catch(() => {
+        // ignore
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
+  const [isUploading, setIsUploading] = useState(false);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setLogoPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+
+    // Show local preview immediately
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setLogoPreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+
+    // Upload to Supabase Storage in background
+    setIsUploading(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+
+      const API_BASE =
+        (import.meta as any).env?.VITE_API_URL ||
+        (typeof window !== "undefined" && window.location.hostname !== "localhost"
+          ? "https://alishba-x-dohuub-production.up.railway.app"
+          : "http://localhost:3001");
+
+      const form = new FormData();
+      form.append("image", file);
+
+      const resp = await axios.post(
+        `${API_BASE}/api/v1/upload/image?type=vendor-logo`,
+        form,
+        {
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        }
+      );
+
+      const url = resp?.data?.data?.url;
+      if (url) {
+        setLogoUrl(url);
+        toast.success("Logo uploaded");
+      } else {
+        toast.error("Upload completed but no URL returned");
+      }
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.error || err?.message || "Failed to upload image";
+      toast.error(msg);
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -145,27 +243,45 @@ export function CreateEditProfile() {
     setIsSaving(true);
     try {
       const categoryEnum = CATEGORY_TO_ENUM[category];
+      // Only send a stored URL (not a base64 data URL) to the logo column.
+      const logoToSend =
+        logoUrl && /^https?:\/\//i.test(logoUrl) ? logoUrl : undefined;
+      const regionsPayload = regions.map((r) => ({
+        name: r.name,
+        countryCode: r.countryCode,
+        countryName: r.countryName,
+        isActive: r.isActive,
+      }));
+      const status = activateNow === "active" ? "APPROVED" : "SUSPENDED";
+
       if (isEditing) {
         await api.put(`/api/v1/admin/michelle-profiles/${id}`, {
           businessName,
           description,
           phone,
-          logo: logoPreview || undefined,
+          logo: logoToSend,
           category: categoryEnum,
+          regions: regionsPayload,
+          status,
         });
+        toast.success("Store updated");
       } else {
         await api.post("/api/v1/admin/michelle-profiles", {
           email,
           businessName,
           description,
           phone,
-          logo: logoPreview || undefined,
+          logo: logoToSend,
           category: categoryEnum,
+          regions: regionsPayload,
         });
+        toast.success("Store created");
       }
       navigate("/admin/michelle-profiles");
     } catch (e: any) {
-      setSaveError(e?.response?.data?.error || e?.message || "Save failed");
+      const msg = e?.response?.data?.error || e?.message || "Save failed";
+      setSaveError(msg);
+      toast.error(msg);
     } finally {
       setIsSaving(false);
     }
@@ -331,10 +447,16 @@ export function CreateEditProfile() {
                         <Button
                           variant="ghost"
                           className="h-10 text-[#DC2626] hover:text-[#DC2626]"
-                          onClick={() => setLogoPreview("")}
+                          onClick={() => {
+                            setLogoPreview("");
+                            setLogoUrl("");
+                          }}
                         >
                           Remove
                         </Button>
+                      )}
+                      {isUploading && (
+                        <p className="text-xs text-[#2E7AD9] mt-2">Uploading...</p>
                       )}
                       <p className="text-xs text-[#6B7280] mt-2">
                         Recommended: 512x512px<br />Max 5MB, JPG or PNG

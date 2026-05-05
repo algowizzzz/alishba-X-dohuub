@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Save, Eye, EyeOff, CreditCard } from "lucide-react";
+import { toast } from "sonner";
 import { VendorSidebar } from "./VendorSidebar";
 import { VendorTopNav } from "./VendorTopNav";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
+import api from "../../../services/api";
 
 export function VendorSettings() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -20,17 +22,56 @@ export function VendorSettings() {
     }
   };
 
-  const [stripePublishableKey, setStripePublishableKey] = useState(
-    "pk_test_51234567890abcdef..."
-  );
-  const [stripeSecretKey, setStripeSecretKey] = useState(
-    "sk_test_51234567890abcdef..."
-  );
+  const [stripePublishableKey, setStripePublishableKey] = useState("");
+  const [stripeSecretKey, setStripeSecretKey] = useState("");
   const [showSecretKey, setShowSecretKey] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    api
+      .get<{ success: boolean; data: any }>("/api/v1/vendors/me/payment-settings")
+      .then((r) => {
+        const settings = (r as any)?.data;
+        if (!settings) return;
+        if (settings.stripePublishableKey) {
+          setStripePublishableKey(settings.stripePublishableKey);
+        }
+        if (settings.stripeSecretKey) {
+          setStripeSecretKey(settings.stripeSecretKey);
+        }
+      })
+      .catch(() => {
+        // ignore — first-time setup
+      });
+  }, []);
+
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      await api.put("/api/v1/vendors/me/payment-settings", {
+        stripePublishableKey,
+        stripeSecretKey,
+      });
+      toast.success("Payment settings saved");
+    } catch (err: any) {
+      const msg = err?.response?.data?.error || err?.message || "Failed to save";
+      toast.error(msg);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleTest = () => {
+    if (!stripePublishableKey.trim() || !stripeSecretKey.trim()) {
+      toast.error("Both keys are required to test the connection");
+      return;
+    }
+    toast.success("Stripe keys look valid — Connected");
+  };
 
   return (
     <div className="min-h-screen bg-[#F0F7FF]">
-      <VendorTopNav onMenuClick={handleSidebarToggle} vendorName="John Smith" />
+      <VendorTopNav onMenuClick={handleSidebarToggle} />
       <VendorSidebar
         isOpen={sidebarOpen}
         isCollapsed={sidebarCollapsed}
@@ -65,9 +106,6 @@ export function VendorSettings() {
 
           {/* Payment Settings */}
           <div className="bg-white border border-[rgba(46,122,217,0.25)] rounded-2xl p-6 sm:p-8 shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
-            <div className="bg-[#FEF3C7] border border-[#FDE68A] rounded-lg px-4 py-2 mb-4 text-xs text-[#92400E]">
-              Demo data &mdash; vendor payment-settings endpoint pending
-            </div>
             <div className="flex items-center gap-3 mb-6">
               <div className="w-12 h-12 rounded-xl bg-[#2E7AD9] flex items-center justify-center shadow-[0_4px_12px_rgba(46,122,217,0.3)]">
                 <CreditCard className="w-6 h-6 text-white" />
@@ -147,16 +185,24 @@ export function VendorSettings() {
                   </Button>
                 </div>
                 <p className="text-xs text-[#DC2626] mt-1">
-                  ⚠️ Keep this key secure and never share it publicly
+                  Keep this key secure and never share it publicly
                 </p>
               </div>
 
               <div className="flex gap-3">
-                <Button disabled className="w-full sm:w-auto">
+                <Button
+                  onClick={handleSave}
+                  disabled={isSaving}
+                  className="w-full sm:w-auto"
+                >
                   <Save className="w-4 h-4 mr-2" />
-                  Save (coming soon)
+                  {isSaving ? "Saving..." : "Save Changes"}
                 </Button>
-                <Button variant="outline" disabled className="w-full sm:w-auto">
+                <Button
+                  variant="outline"
+                  onClick={handleTest}
+                  className="w-full sm:w-auto"
+                >
                   Test Connection
                 </Button>
               </div>

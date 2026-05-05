@@ -683,7 +683,7 @@ export function VendorStoreListings() {
 
   return (
     <div className="min-h-screen bg-[#F0F7FF]">
-      <VendorTopNav onMenuClick={handleSidebarToggle} vendorName="John Smith" />
+      <VendorTopNav onMenuClick={handleSidebarToggle} />
       <VendorSidebar
         isOpen={sidebarOpen}
         isCollapsed={sidebarCollapsed}
@@ -716,11 +716,6 @@ export function VendorStoreListings() {
 
           {/* Page Header */}
           <div className="mb-6">
-            {usingDemoData && (
-              <div className="bg-[#FEF3C7] border border-[#FDE68A] rounded-lg px-4 py-2 mb-3 text-xs text-[#92400E]">
-                Demo data &mdash; no listings synced from backend yet
-              </div>
-            )}
             <h1 className="text-2xl sm:text-[28px] lg:text-[32px] font-bold text-[#1A1A2E] mb-3">
               Manage Listings: {storeData.name}
             </h1>

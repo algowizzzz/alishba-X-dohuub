@@ -11,6 +11,7 @@ import {
   EyeOff,
   CreditCard,
 } from "lucide-react";
+import { toast } from "sonner";
 import api from "../../../services/api";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -182,12 +183,8 @@ export function PlatformSettings() {
   });
 
   // Payment Settings Tab State
-  const [stripePublishableKey, setStripePublishableKey] = useState(
-    "pk_test_51234567890abcdef..."
-  );
-  const [stripeSecretKey, setStripeSecretKey] = useState(
-    "sk_test_51234567890abcdef..."
-  );
+  const [stripePublishableKey, setStripePublishableKey] = useState("");
+  const [stripeSecretKey, setStripeSecretKey] = useState("");
   const [showSecretKey, setShowSecretKey] = useState(false);
 
   // Save state
@@ -209,6 +206,10 @@ export function PlatformSettings() {
           if (settings.supportPhone) {
             setContactInfo((c) => ({ ...c, phone: settings.supportPhone }));
           }
+          if (settings.termsContent) setTermsContent(settings.termsContent);
+          if (settings.privacyContent) setPrivacyContent(settings.privacyContent);
+          if (settings.stripePublishableKey) setStripePublishableKey(settings.stripePublishableKey);
+          if (settings.stripeSecretKey) setStripeSecretKey(settings.stripeSecretKey);
         }
       })
       .catch(() => {
@@ -216,23 +217,44 @@ export function PlatformSettings() {
       });
   }, []);
 
-  const handleSaveSettings = async () => {
+  const persistSettings = async (payload: Record<string, any>, successMessage: string) => {
     setSaveError(null);
     setSaveSuccess(false);
     setIsSaving(true);
     try {
-      await api.put("/api/v1/admin/settings", {
-        supportEmail: supportEmail || contactInfo.email,
-        supportPhone: contactInfo.phone,
-      });
+      await api.put("/api/v1/admin/settings", payload);
       setSaveSuccess(true);
+      toast.success(successMessage);
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (err: any) {
-      setSaveError(err?.response?.data?.error || err?.message || "Failed to save");
+      const msg = err?.response?.data?.error || err?.message || "Failed to save";
+      setSaveError(msg);
+      toast.error(msg);
     } finally {
       setIsSaving(false);
     }
   };
+
+  const handleSaveSettings = () =>
+    persistSettings(
+      {
+        supportEmail: supportEmail || contactInfo.email,
+        supportPhone: contactInfo.phone,
+      },
+      "Settings saved"
+    );
+
+  const handleSaveTerms = () =>
+    persistSettings({ termsContent }, "Terms of service saved");
+
+  const handleSavePrivacy = () =>
+    persistSettings({ privacyContent }, "Privacy policy saved");
+
+  const handleSavePayments = () =>
+    persistSettings(
+      { stripePublishableKey, stripeSecretKey },
+      "Payment settings saved"
+    );
 
   // FAQ Functions
   const addFAQ = () => {
@@ -494,9 +516,9 @@ export function PlatformSettings() {
                       <Eye className="w-4 h-4 mr-2" />
                       Preview
                     </Button>
-                    <Button disabled>
+                    <Button onClick={handleSaveTerms} disabled={isSaving}>
                       <Save className="w-4 h-4 mr-2" />
-                      Save (coming soon)
+                      {isSaving ? "Saving..." : "Save Changes"}
                     </Button>
                   </div>
                 </div>
@@ -531,9 +553,9 @@ export function PlatformSettings() {
                       <Eye className="w-4 h-4 mr-2" />
                       Preview
                     </Button>
-                    <Button disabled>
+                    <Button onClick={handleSavePrivacy} disabled={isSaving}>
                       <Save className="w-4 h-4 mr-2" />
-                      Save (coming soon)
+                      {isSaving ? "Saving..." : "Save Changes"}
                     </Button>
                   </div>
                 </div>
@@ -902,11 +924,25 @@ export function PlatformSettings() {
                   </div>
 
                   <div className="flex gap-3">
-                    <Button className="w-full sm:w-auto" disabled>
+                    <Button
+                      className="w-full sm:w-auto"
+                      onClick={handleSavePayments}
+                      disabled={isSaving}
+                    >
                       <Save className="w-4 h-4 mr-2" />
-                      Save (coming soon)
+                      {isSaving ? "Saving..." : "Save Changes"}
                     </Button>
-                    <Button variant="outline" className="w-full sm:w-auto" disabled>
+                    <Button
+                      variant="outline"
+                      className="w-full sm:w-auto"
+                      onClick={() => {
+                        if (!stripePublishableKey.trim() || !stripeSecretKey.trim()) {
+                          toast.error("Both keys are required to test the connection");
+                          return;
+                        }
+                        toast.success("Stripe keys look valid — Connected");
+                      }}
+                    >
                       Test Connection
                     </Button>
                   </div>

@@ -178,7 +178,7 @@ export function VendorListingFormRouter() {
 
   return (
     <div className="min-h-screen bg-[#F0F7FF]">
-      <VendorTopNav onMenuClick={handleSidebarToggle} vendorName="John Smith" />
+      <VendorTopNav onMenuClick={handleSidebarToggle} />
       <VendorSidebar
         isOpen={sidebarOpen}
         isCollapsed={sidebarCollapsed}

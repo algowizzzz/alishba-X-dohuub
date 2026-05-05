@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Toaster } from 'sonner';
 import { PortalSelection } from './components/PortalSelection';
 import { AdminLogin } from './components/admin/AdminLogin';
 import { PasswordReset } from './components/admin/PasswordReset';
@@ -44,6 +45,7 @@ import { VendorSettings } from './components/vendor/VendorSettings';
 export default function App() {
   return (
     <BrowserRouter>
+      <Toaster position="top-right" richColors closeButton />
       <Routes>
         {/* Portal Selection */}
         <Route path="/" element={<PortalSelection />} />

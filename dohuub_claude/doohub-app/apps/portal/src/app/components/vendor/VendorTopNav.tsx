@@ -1,15 +1,47 @@
 import { Menu, User, ChevronDown, AlertTriangle, Settings, LogOut } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useVendorSuspension } from "../../contexts/VendorSuspensionContext";
+import api from "../../../services/api";
 
 interface VendorTopNavProps {
   onMenuClick: () => void;
-  vendorName?: string;
+  vendorName?: string; // legacy prop, ignored
 }
 
-export function VendorTopNav({ onMenuClick, vendorName = "John Smith" }: VendorTopNavProps) {
+export function VendorTopNav({ onMenuClick }: VendorTopNavProps) {
   const [showDropdown, setShowDropdown] = useState(false);
   const { isSuspended, toggleSuspension } = useVendorSuspension();
+  const [displayName, setDisplayName] = useState<string>("Vendor");
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .get<{ success: boolean; data: any }>("/api/v1/vendors/me")
+      .then((r) => {
+        if (cancelled) return;
+        const v = (r as any)?.data;
+        if (!v) return;
+        const profile = v?.user?.profile;
+        const first = profile?.firstName?.trim() || "";
+        const last = profile?.lastName?.trim() || "";
+        const fullName = `${first} ${last}`.trim();
+        if (fullName) {
+          setDisplayName(fullName);
+        } else if (v?.businessName) {
+          setDisplayName(v.businessName);
+        } else if (v?.user?.email) {
+          setDisplayName(v.user.email);
+        } else if (v?.contactEmail) {
+          setDisplayName(v.contactEmail);
+        }
+      })
+      .catch(() => {
+        // ignore — keep default
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <header className="fixed top-0 left-0 right-0 h-[72px] bg-white border-b border-[rgba(46,122,217,0.25)] z-50">
@@ -46,7 +78,7 @@ export function VendorTopNav({ onMenuClick, vendorName = "John Smith" }: VendorT
             className="flex items-center gap-3 hover:bg-[#F8FAFF] rounded-lg p-2 transition-colors"
           >
             <div className="hidden sm:block text-right">
-              <p className="text-sm font-semibold text-[#1A1A2E]">{vendorName}</p>
+              <p className="text-sm font-semibold text-[#1A1A2E]">{displayName}</p>
               <p className="text-xs text-[#6B7280]">Vendor</p>
             </div>
             <div className="w-10 h-10 rounded-full bg-[#F0F7FF] flex items-center justify-center">
@@ -59,11 +91,11 @@ export function VendorTopNav({ onMenuClick, vendorName = "John Smith" }: VendorT
           {showDropdown && (
             <>
               {/* Backdrop */}
-              <div 
-                className="fixed inset-0 z-40" 
+              <div
+                className="fixed inset-0 z-40"
                 onClick={() => setShowDropdown(false)}
               />
-              
+
               {/* Menu */}
               <div className="absolute right-0 top-full mt-2 w-64 bg-white border border-[rgba(46,122,217,0.25)] rounded-xl shadow-lg z-50 overflow-hidden">
                 <div className="p-2">

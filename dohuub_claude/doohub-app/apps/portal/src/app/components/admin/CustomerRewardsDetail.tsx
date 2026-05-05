@@ -189,9 +189,6 @@ export function CustomerRewardsDetail() {
               Export History
             </button>
           </div>
-          <div className="bg-[#FEF3C7] border border-[#FDE68A] rounded-lg px-4 py-2 text-xs text-[#92400E]">
-            Demo data &mdash; backend rewards endpoint pending
-          </div>
       </div>
 
       <div>

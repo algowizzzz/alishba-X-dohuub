@@ -159,6 +159,9 @@ router.get('/me', authenticate, async (req: AuthRequest, res) => {
         categories: true,
         serviceAreas: true,
         availability: true,
+        user: {
+          select: { id: true, email: true, phone: true, profile: true },
+        },
       },
     });
 
@@ -590,6 +593,54 @@ router.put('/me', authenticate, async (req: AuthRequest, res) => {
   } catch (error) {
     console.error('Update vendor error:', error);
     res.status(500).json({ error: 'Failed to update vendor profile' });
+  }
+});
+
+// Get vendor payment settings
+router.get('/me/payment-settings', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const vendor = await prisma.vendor.findFirst({
+      where: { userId: req.user!.id },
+      select: { id: true, stripePublishableKey: true, stripeSecretKey: true, stripeAccountId: true } as any,
+    });
+
+    if (!vendor) {
+      return res.status(404).json({ error: 'Vendor profile not found' });
+    }
+
+    res.json({ success: true, data: vendor });
+  } catch (error) {
+    console.error('Get vendor payment settings error:', error);
+    res.status(500).json({ error: 'Failed to get payment settings' });
+  }
+});
+
+// Update vendor payment settings
+router.put('/me/payment-settings', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const vendor = await prisma.vendor.findFirst({
+      where: { userId: req.user!.id },
+    });
+
+    if (!vendor) {
+      return res.status(403).json({ error: 'Vendor profile not found' });
+    }
+
+    const { stripePublishableKey, stripeSecretKey } = req.body;
+
+    const updated = await prisma.vendor.update({
+      where: { id: vendor.id },
+      data: {
+        ...(stripePublishableKey !== undefined && { stripePublishableKey }),
+        ...(stripeSecretKey !== undefined && { stripeSecretKey }),
+      } as any,
+      select: { id: true, stripePublishableKey: true, stripeSecretKey: true } as any,
+    });
+
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    console.error('Update vendor payment settings error:', error);
+    res.status(500).json({ error: 'Failed to update payment settings' });
   }
 });
 
