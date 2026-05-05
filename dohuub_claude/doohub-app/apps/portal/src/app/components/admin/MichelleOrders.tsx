@@ -400,10 +400,10 @@ export function MichelleOrders() {
             </div>
 
             {/* Filters */}
-            <div className="bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] border-t-0 rounded-b-xl sm:rounded-t-none p-4 sm:p-6 mb-6">
+            <div className="bg-white border border-[rgba(46,122,217,0.30)] rounded-xl shadow-[0_4px_16px_rgba(46,122,217,0.10)] p-4 sm:p-6 mb-6">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <Label htmlFor="store-filter" className="text-sm font-medium text-[#1A1A2E] mb-2">
+                  <Label htmlFor="store-filter" className="block text-sm font-semibold text-[#1A1A2E] mb-2">
                     Filter by Store
                   </Label>
                   <Select value={selectedStore} onValueChange={setSelectedStore}>
@@ -429,7 +429,7 @@ export function MichelleOrders() {
                 </div>
 
                 <div>
-                  <Label htmlFor="search" className="text-sm font-medium text-[#1A1A2E] mb-2">
+                  <Label htmlFor="search" className="block text-sm font-semibold text-[#1A1A2E] mb-2">
                     Search Orders
                   </Label>
                   <div className="relative">
@@ -446,7 +446,7 @@ export function MichelleOrders() {
                 </div>
 
                 <div>
-                  <Label htmlFor="date-filter" className="text-sm font-medium text-[#1A1A2E] mb-2">
+                  <Label htmlFor="date-filter" className="block text-sm font-semibold text-[#1A1A2E] mb-2">
                     Filter by Date
                   </Label>
                   <DateRangePicker
