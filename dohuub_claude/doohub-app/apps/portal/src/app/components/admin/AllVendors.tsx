@@ -503,19 +503,27 @@ function VendorCard({ vendor }: { vendor: Vendor }) {
               <Button
                 variant="outline"
                 size="sm"
+                disabled={statusUpdating === vendor.id}
+                onClick={() => {
+                  if (window.confirm(`Suspend ${vendor.businessName}?`)) {
+                    setVendorStatus(vendor.id, "SUSPENDED");
+                  }
+                }}
                 className="text-[#DC2626] border-[#FEE2E2] hover:bg-[#FEE2E2] hover:text-[#DC2626] flex-1 sm:flex-none"
               >
                 <Pause className="w-4 h-4 mr-2" />
-                Suspend
+                {statusUpdating === vendor.id ? "Suspending..." : "Suspend"}
               </Button>
             ) : vendor.status === "suspended" ? (
               <Button
                 variant="outline"
                 size="sm"
+                disabled={statusUpdating === vendor.id}
+                onClick={() => setVendorStatus(vendor.id, "APPROVED")}
                 className="text-[#10B981] border-[#D1FAE5] hover:bg-[#D1FAE5] hover:text-[#10B981] flex-1 sm:flex-none"
               >
                 <Play className="w-4 h-4 mr-2" />
-                Unsuspend
+                {statusUpdating === vendor.id ? "Restoring..." : "Unsuspend"}
               </Button>
             ) : null}
           </div>
@@ -545,6 +553,25 @@ export function AllVendors() {
   // State
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [vendorsLoading, setVendorsLoading] = useState(true);
+  const [statusUpdating, setStatusUpdating] = useState<string | null>(null);
+
+  const setVendorStatus = async (vendorId: string, newStatus: "APPROVED" | "SUSPENDED") => {
+    setStatusUpdating(vendorId);
+    try {
+      await api.patch(`/api/v1/admin/vendors/${vendorId}/status`, { status: newStatus });
+      setVendors((prev) =>
+        prev.map((v) =>
+          v.id === vendorId
+            ? { ...v, status: newStatus === "SUSPENDED" ? "suspended" : "active" }
+            : v
+        )
+      );
+    } catch (e: any) {
+      alert(e?.response?.data?.error || e?.message || "Failed to update vendor status");
+    } finally {
+      setStatusUpdating(null);
+    }
+  };
 
   useEffect(() => {
     api.get<{ success: boolean; data: any[] }>("/api/v1/admin/vendors?limit=200")
