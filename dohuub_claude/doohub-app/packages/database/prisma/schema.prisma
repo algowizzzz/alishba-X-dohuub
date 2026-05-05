@@ -156,6 +156,13 @@ model User {
   chatConversations ChatConversation[]
   vendor            Vendor?
 
+  rewardsWallet      RewardsWallet?
+  userStreak         UserStreak?
+  categoryMilestones CategoryMilestone[]
+  pointsTransactions PointsTransaction[]
+  referralsMade      Referral[]          @relation("Referrer")
+  referralsReceived  Referral[]          @relation("Referee")
+
   @@index([email])
   @@index([firebaseUid])
   @@index([status])
@@ -1064,3 +1071,87 @@ model PlatformSettings {
   updatedAt             DateTime @updatedAt
 }
 
+
+// ============================================
+// REWARDS / LOYALTY
+// ============================================
+
+model RewardsWallet {
+  id              String    @id @default(dbgenerated("(gen_random_uuid())::text"))
+  userId          String    @unique
+  totalPoints     Int       @default(0)
+  pendingPoints   Int       @default(0)
+  expiringPoints  Int       @default(0)
+  expiringDate    DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model UserStreak {
+  id              String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  userId          String   @unique
+  currentStreak   Int      @default(0)
+  longestStreak   Int      @default(0)
+  lastActiveWeek  String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model CategoryMilestone {
+  id               String    @id @default(dbgenerated("(gen_random_uuid())::text"))
+  userId           String
+  category         String
+  orderCount       Int       @default(0)
+  targetMilestone  Int
+  pointsEarned     Int       @default(0)
+  achieved         Boolean   @default(false)
+  achievedDate     DateTime?
+  createdAt        DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, category])
+}
+
+model PointsTransaction {
+  id          String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  userId      String
+  type        String
+  amount      Int
+  description String?
+  bookingId   String?
+  orderId     String?
+  vendorName  String?
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([type])
+}
+
+model Referral {
+  id              String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  referrerUserId  String
+  refereeUserId   String?
+  referralCode    String   @unique
+  referralLink    String?
+  status          String   @default("pending")
+  pointsEarned    Int      @default(0)
+  createdAt       DateTime @default(now())
+
+  referrer User  @relation("Referrer", fields: [referrerUserId], references: [id], onDelete: Cascade)
+  referee  User? @relation("Referee",  fields: [refereeUserId],  references: [id], onDelete: SetNull)
+
+  @@index([referrerUserId])
+  @@index([referralCode])
+}

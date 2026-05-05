@@ -1853,4 +1853,135 @@ router.put('/settings', authenticate, requireAdmin, async (req: AuthRequest, res
   }
 });
 
+// ========================================
+// REWARDS / LOYALTY (admin)
+// ========================================
+
+// Aggregate rewards stats for the admin overview page.
+router.get('/rewards/summary', authenticate, requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const [walletAgg, txAgg, streakAgg, milestonesAchieved, referralsAgg, topEarnersRaw] =
+      await Promise.all([
+        prisma.rewardsWallet.aggregate({
+          _sum: { totalPoints: true, pendingPoints: true, expiringPoints: true },
+          _count: { _all: true },
+        }),
+        prisma.pointsTransaction.groupBy({
+          by: ['type'],
+          _sum: { amount: true },
+          _count: { _all: true },
+        }),
+        prisma.userStreak.aggregate({
+          _avg: { currentStreak: true, longestStreak: true },
+          _max: { longestStreak: true },
+          _count: { _all: true },
+        }),
+        prisma.categoryMilestone.count({ where: { achieved: true } }),
+        prisma.referral.groupBy({
+          by: ['status'],
+          _count: { _all: true },
+        }),
+        prisma.rewardsWallet.findMany({
+          orderBy: { totalPoints: 'desc' },
+          take: 10,
+          include: {
+            user: {
+              select: {
+                id: true,
+                email: true,
+                profile: { select: { firstName: true, lastName: true, avatar: true } },
+              },
+            },
+          },
+        }),
+      ]);
+
+    const earnRow = txAgg.find((r) => r.type === 'EARN' || r.type === 'earn');
+    const redeemRow = txAgg.find((r) => r.type === 'REDEEM' || r.type === 'redeem');
+
+    res.json({
+      success: true,
+      data: {
+        wallet: {
+          activeWallets: walletAgg._count._all,
+          totalPoints: walletAgg._sum.totalPoints ?? 0,
+          pendingPoints: walletAgg._sum.pendingPoints ?? 0,
+          expiringPoints: walletAgg._sum.expiringPoints ?? 0,
+        },
+        transactions: {
+          totalEarned: earnRow?._sum.amount ?? 0,
+          totalRedeemed: redeemRow?._sum.amount ?? 0,
+          earnEvents: earnRow?._count._all ?? 0,
+          redeemEvents: redeemRow?._count._all ?? 0,
+        },
+        streaks: {
+          tracked: streakAgg._count._all,
+          avgCurrent: Number(streakAgg._avg.currentStreak ?? 0),
+          avgLongest: Number(streakAgg._avg.longestStreak ?? 0),
+          maxLongest: streakAgg._max.longestStreak ?? 0,
+        },
+        milestones: {
+          achieved: milestonesAchieved,
+        },
+        referrals: {
+          byStatus: referralsAgg.map((r) => ({ status: r.status, count: r._count._all })),
+        },
+        topEarners: topEarnersRaw.map((w) => ({
+          userId: w.userId,
+          email: w.user.email,
+          name: w.user.profile
+            ? `${w.user.profile.firstName ?? ''} ${w.user.profile.lastName ?? ''}`.trim()
+            : w.user.email,
+          avatar: w.user.profile?.avatar ?? null,
+          totalPoints: w.totalPoints,
+        })),
+      },
+    });
+  } catch (error: any) {
+    console.error('Get rewards summary error:', error);
+    res.status(500).json({ error: 'Failed to get rewards summary' });
+  }
+});
+
+// Per-customer rewards detail for the admin "customer rewards" page.
+router.get('/customers/:id/rewards', authenticate, requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const [user, wallet, streak, milestones, transactions, referralsMade] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          email: true,
+          phone: true,
+          createdAt: true,
+          profile: { select: { firstName: true, lastName: true, avatar: true } },
+        },
+      }),
+      prisma.rewardsWallet.findUnique({ where: { userId: id } }),
+      prisma.userStreak.findUnique({ where: { userId: id } }),
+      prisma.categoryMilestone.findMany({ where: { userId: id }, orderBy: { category: 'asc' } }),
+      prisma.pointsTransaction.findMany({
+        where: { userId: id },
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+      }),
+      prisma.referral.findMany({
+        where: { referrerUserId: id },
+        orderBy: { createdAt: 'desc' },
+      }),
+    ]);
+
+    if (!user) return res.status(404).json({ error: 'Customer not found' });
+
+    res.json({
+      success: true,
+      data: { user, wallet, streak, milestones, transactions, referrals: referralsMade },
+    });
+  } catch (error: any) {
+    console.error('Get customer rewards error:', error);
+    res.status(500).json({ error: 'Failed to get customer rewards' });
+  }
+});
+
 export default router;

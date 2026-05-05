@@ -1,8 +1,9 @@
 import { Gift, TrendingUp, TrendingDown, Users, Clock, ArrowUpRight, ArrowDownRight, Settings } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AdminSidebarRetractable } from './AdminSidebarRetractable';
 import { AdminTopNav } from './AdminTopNav';
+import api from '../../../services/api';
 
 interface PointsTransaction {
   id: string;
@@ -41,15 +42,41 @@ export function RewardsOverview() {
     }
   };
 
-  // Mock data
-  const stats = {
-    totalPointsIssued: 156430,
-    totalPointsRedeemed: 42150,
-    activeParticipants: 3421,
-    expiringPoints: 8200,
-    issueGrowth: 12.5,
-    redemptionGrowth: 8.2
-  };
+  const [stats, setStats] = useState({
+    totalPointsIssued: 0,
+    totalPointsRedeemed: 0,
+    activeParticipants: 0,
+    expiringPoints: 0,
+    issueGrowth: 0,
+    redemptionGrowth: 0,
+  });
+  const [topEarners, setTopEarners] = useState<TopEarner[]>([]);
+
+  useEffect(() => {
+    api.get<{ success: boolean; data: any }>("/api/v1/admin/rewards/summary")
+      .then((r) => {
+        const d = (r as any)?.data;
+        if (!d) return;
+        setStats({
+          totalPointsIssued: d.transactions?.totalEarned ?? 0,
+          totalPointsRedeemed: d.transactions?.totalRedeemed ?? 0,
+          activeParticipants: d.wallet?.activeWallets ?? 0,
+          expiringPoints: d.wallet?.expiringPoints ?? 0,
+          issueGrowth: 0,
+          redemptionGrowth: 0,
+        });
+        setTopEarners(
+          (d.topEarners || []).map((e: any) => ({
+            id: e.userId,
+            name: e.name || e.email,
+            email: e.email,
+            pointsThisMonth: 0,
+            lifetimePoints: e.totalPoints,
+          }))
+        );
+      })
+      .catch(() => {});
+  }, []);
 
   const recentTransactions: PointsTransaction[] = [
     {
@@ -102,13 +129,6 @@ export function RewardsOverview() {
     }
   ];
 
-  const topEarners: TopEarner[] = [
-    { id: 'cust-001', name: 'John Smith', email: 'john@example.com', pointsThisMonth: 1250, lifetimePoints: 8500 },
-    { id: 'cust-002', name: 'Sarah Jones', email: 'sarah@example.com', pointsThisMonth: 980, lifetimePoints: 6200 },
-    { id: 'cust-003', name: 'Mike Brown', email: 'mike@example.com', pointsThisMonth: 875, lifetimePoints: 5100 },
-    { id: 'cust-004', name: 'Emily Davis', email: 'emily@example.com', pointsThisMonth: 720, lifetimePoints: 4800 },
-    { id: 'cust-005', name: 'Chris Wilson', email: 'chris@example.com', pointsThisMonth: 650, lifetimePoints: 3900 }
-  ];
 
   const getTransactionIcon = (type: string) => {
     switch (type) {

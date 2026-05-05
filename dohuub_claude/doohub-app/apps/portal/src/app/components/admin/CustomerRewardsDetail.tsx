@@ -1,8 +1,9 @@
 import { ArrowLeft, Gift, TrendingUp, TrendingDown, Clock, Users, Filter, Download, Search } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AdminSidebarRetractable } from './AdminSidebarRetractable';
 import { AdminTopNav } from './AdminTopNav';
+import api from '../../../services/api';
 
 interface PointsTransaction {
   id: string;
@@ -42,26 +43,6 @@ const mockCustomer = {
   pendingReferrals: 2,
 };
 
-const mockTransactions: PointsTransaction[] = [
-  { id: '1', type: 'earned', amount: 125, description: 'Home Deep Cleaning', date: '2025-01-20', orderId: 'ORD-2025-0120', vendorName: 'DoHuub Cleaning', category: 'Cleaning Services' },
-  { id: '2', type: 'redeemed', amount: 500, description: 'Points Redemption', date: '2025-01-15', orderId: 'ORD-2025-0115' },
-  { id: '3', type: 'referral_bonus', amount: 60, description: 'Referral: Sarah M.', date: '2025-01-10' },
-  { id: '4', type: 'earned', amount: 89, description: 'Thai Cuisine Order', date: '2025-01-08', orderId: 'ORD-2025-0108', vendorName: 'Bangkok Kitchen', category: 'Food Delivery' },
-  { id: '5', type: 'milestone_bonus', amount: 50, description: '10 Orders Milestone - Cleaning', date: '2025-01-05', category: 'Cleaning Services' },
-  { id: '6', type: 'earned', amount: 156, description: 'Handyman Service', date: '2025-01-03', orderId: 'ORD-2025-0103', vendorName: 'DoHuub Handyman', category: 'Handyman Services' },
-  { id: '7', type: 'expired', amount: 150, description: 'Points Expired (12-month limit)', date: '2024-12-31' },
-  { id: '8', type: 'earned', amount: 75, description: 'Grocery Order', date: '2024-12-28', orderId: 'ORD-2024-1228', vendorName: 'Fresh Market', category: 'Grocery Delivery' },
-  { id: '9', type: 'redeemed', amount: 250, description: 'Points Redemption', date: '2024-12-20', orderId: 'ORD-2024-1220' },
-  { id: '10', type: 'signup_bonus', amount: 35, description: 'New User Signup Bonus', date: '2024-06-15' },
-];
-
-const mockReferrals: Referral[] = [
-  { id: '1', name: 'Sarah Mitchell', email: 's.mitchell@email.com', status: 'completed', pointsEarned: 60, date: '2025-01-10' },
-  { id: '2', name: 'Mike Johnson', email: 'm.johnson@email.com', status: 'pending', pointsEarned: 0, date: '2025-01-18' },
-  { id: '3', name: 'Emily Chen', email: 'e.chen@email.com', status: 'completed', pointsEarned: 60, date: '2024-12-15' },
-  { id: '4', name: 'David Kim', email: 'd.kim@email.com', status: 'pending', pointsEarned: 0, date: '2025-01-22' },
-  { id: '5', name: 'Lisa Brown', email: 'l.brown@email.com', status: 'completed', pointsEarned: 60, date: '2024-11-20' },
-];
 
 type FilterType = 'all' | 'earned' | 'redeemed' | 'expired' | 'bonus';
 
@@ -71,6 +52,63 @@ export function CustomerRewardsDetail() {
   const [activeTab, setActiveTab] = useState<'transactions' | 'referrals'>('transactions');
   const [filter, setFilter] = useState<FilterType>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [customer, setCustomer] = useState<any>(mockCustomer);
+  const [transactions, setTransactions] = useState<PointsTransaction[]>([]);
+  const [referrals, setReferrals] = useState<Referral[]>([]);
+
+  useEffect(() => {
+    if (!id) return;
+    api.get<{ success: boolean; data: any }>(`/api/v1/admin/customers/${id}/rewards`)
+      .then((r) => {
+        const d = (r as any)?.data;
+        if (!d) return;
+        const u = d.user;
+        const w = d.wallet || {};
+        const refMade = d.referrals || [];
+        setCustomer({
+          id: u.id,
+          name: u.profile ? `${u.profile.firstName ?? ''} ${u.profile.lastName ?? ''}`.trim() || u.email : u.email,
+          email: u.email,
+          phone: u.phone || '—',
+          joinDate: u.createdAt,
+          currentBalance: w.totalPoints ?? 0,
+          lifetimeEarned: 0,
+          lifetimeRedeemed: 0,
+          pendingPoints: w.pendingPoints ?? 0,
+          expiringPoints: w.expiringPoints ?? 0,
+          expiringDate: w.expiringDate,
+          referralCode: refMade[0]?.referralCode || '—',
+          totalReferrals: refMade.length,
+          pendingReferrals: refMade.filter((r: any) => r.status === 'pending').length,
+        });
+        const txMap = (d.transactions || []).map((t: any) => ({
+          id: t.id,
+          type: String(t.type || '').toLowerCase().includes('redeem') ? 'redeemed'
+            : String(t.type || '').toLowerCase().includes('expire') ? 'expired'
+            : String(t.type || '').toLowerCase().includes('refer') ? 'referral_bonus'
+            : String(t.type || '').toLowerCase().includes('milestone') ? 'milestone_bonus'
+            : String(t.type || '').toLowerCase().includes('signup') ? 'signup_bonus'
+            : 'earned',
+          amount: Math.abs(t.amount),
+          description: t.description || '—',
+          date: t.createdAt,
+          orderId: t.orderId || t.bookingId || undefined,
+          vendorName: t.vendorName || undefined,
+        }));
+        setTransactions(txMap);
+        setReferrals(
+          refMade.map((r: any) => ({
+            id: r.id,
+            name: r.refereeUserId || r.referralCode,
+            email: '—',
+            status: (r.status === 'completed' ? 'completed' : 'pending'),
+            pointsEarned: r.pointsEarned || 0,
+            date: r.createdAt,
+          }))
+        );
+      })
+      .catch(() => {});
+  }, [id]);
 
   // Sidebar state
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -86,7 +124,7 @@ export function CustomerRewardsDetail() {
     }
   };
 
-  const filteredTransactions = mockTransactions.filter(tx => {
+  const filteredTransactions = transactions.filter(tx => {
     if (filter === 'all') return true;
     if (filter === 'earned') return tx.type === 'earned';
     if (filter === 'redeemed') return tx.type === 'redeemed';
@@ -182,7 +220,7 @@ export function CustomerRewardsDetail() {
             </button>
             <div className="flex-1">
               <h1 className="text-xl font-bold text-foreground">Customer Rewards</h1>
-              <p className="text-sm text-muted-foreground">{mockCustomer.name} - {mockCustomer.email}</p>
+              <p className="text-sm text-muted-foreground">{customer.name} - {customer.email}</p>
             </div>
             <button className="flex items-center gap-2 px-4 py-2 border border-border rounded-lg hover:bg-secondary transition-colors">
               <Download className="w-4 h-4" />
@@ -199,8 +237,8 @@ export function CustomerRewardsDetail() {
               <Gift className="w-5 h-5" />
               <span className="text-sm font-medium opacity-90">Current Balance</span>
             </div>
-            <p className="text-3xl font-bold">{mockCustomer.currentBalance.toLocaleString()}</p>
-            <p className="text-sm opacity-80 mt-1">= ${(mockCustomer.currentBalance * 0.01).toFixed(2)} value</p>
+            <p className="text-3xl font-bold">{customer.currentBalance.toLocaleString()}</p>
+            <p className="text-sm opacity-80 mt-1">= ${(customer.currentBalance * 0.01).toFixed(2)} value</p>
           </div>
 
           <div className="bg-white rounded-xl border border-border p-5 shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
@@ -208,7 +246,7 @@ export function CustomerRewardsDetail() {
               <TrendingUp className="w-5 h-5 text-green-600" />
               <span className="text-sm font-medium text-muted-foreground">Lifetime Earned</span>
             </div>
-            <p className="text-3xl font-bold text-foreground">{mockCustomer.lifetimeEarned.toLocaleString()}</p>
+            <p className="text-3xl font-bold text-foreground">{customer.lifetimeEarned.toLocaleString()}</p>
             <p className="text-sm text-muted-foreground mt-1">pts</p>
           </div>
 
@@ -217,8 +255,8 @@ export function CustomerRewardsDetail() {
               <TrendingDown className="w-5 h-5 text-blue-600" />
               <span className="text-sm font-medium text-muted-foreground">Lifetime Redeemed</span>
             </div>
-            <p className="text-3xl font-bold text-foreground">{mockCustomer.lifetimeRedeemed.toLocaleString()}</p>
-            <p className="text-sm text-muted-foreground mt-1">pts (${(mockCustomer.lifetimeRedeemed * 0.01).toFixed(2)} saved)</p>
+            <p className="text-3xl font-bold text-foreground">{customer.lifetimeRedeemed.toLocaleString()}</p>
+            <p className="text-sm text-muted-foreground mt-1">pts (${(customer.lifetimeRedeemed * 0.01).toFixed(2)} saved)</p>
           </div>
 
           <div className="bg-white rounded-xl border border-border p-5 shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
@@ -226,8 +264,8 @@ export function CustomerRewardsDetail() {
               <Clock className="w-5 h-5 text-red-500" />
               <span className="text-sm font-medium text-muted-foreground">Expiring Soon</span>
             </div>
-            <p className="text-3xl font-bold text-foreground">{mockCustomer.expiringPoints.toLocaleString()}</p>
-            <p className="text-sm text-red-500 mt-1">by {new Date(mockCustomer.expiringDate).toLocaleDateString()}</p>
+            <p className="text-3xl font-bold text-foreground">{customer.expiringPoints.toLocaleString()}</p>
+            <p className="text-sm text-red-500 mt-1">by {new Date(customer.expiringDate).toLocaleDateString()}</p>
           </div>
         </div>
 
@@ -237,12 +275,12 @@ export function CustomerRewardsDetail() {
             <div className="flex items-center gap-3">
               <Users className="w-5 h-5 text-blue-600" />
               <div>
-                <p className="text-sm font-medium text-blue-800">Referral Code: <span className="font-mono">{mockCustomer.referralCode}</span></p>
-                <p className="text-xs text-blue-600">{mockCustomer.totalReferrals} successful referrals ({mockCustomer.pendingReferrals} pending)</p>
+                <p className="text-sm font-medium text-blue-800">Referral Code: <span className="font-mono">{customer.referralCode}</span></p>
+                <p className="text-xs text-blue-600">{customer.totalReferrals} successful referrals ({customer.pendingReferrals} pending)</p>
               </div>
             </div>
             <div className="text-right">
-              <p className="text-lg font-bold text-blue-800">+{mockCustomer.totalReferrals * 60} pts</p>
+              <p className="text-lg font-bold text-blue-800">+{customer.totalReferrals * 60} pts</p>
               <p className="text-xs text-blue-600">from referrals</p>
             </div>
           </div>
@@ -269,7 +307,7 @@ export function CustomerRewardsDetail() {
                   : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
               }`}
             >
-              Referrals ({mockReferrals.length})
+              Referrals ({referrals.length})
             </button>
           </div>
 
@@ -361,7 +399,7 @@ export function CustomerRewardsDetail() {
 
           {activeTab === 'referrals' && (
             <div className="divide-y divide-gray-100">
-              {mockReferrals.map((referral) => (
+              {referrals.map((referral) => (
                 <div key={referral.id} className="px-6 py-4 hover:bg-secondary transition-colors">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
