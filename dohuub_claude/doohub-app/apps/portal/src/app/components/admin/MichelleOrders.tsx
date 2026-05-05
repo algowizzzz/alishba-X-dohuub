@@ -62,6 +62,7 @@ interface BaseOrder {
   date: string;
   time: string;
   status: OrderStatus;
+  rawStatus?: string; // raw backend status for badges (e.g. CANCELLED, OUT_FOR_DELIVERY)
   category: OrderCategory;
   // Rewards
   pointsEarned?: number;
@@ -130,9 +131,12 @@ export function MichelleOrders() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: parseISO("2026-01-01"),
-    to: parseISO("2026-01-31"),
+  // Default to "last 12 months" so seeded bookings/orders are visible.
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(() => {
+    const to = new Date();
+    const from = new Date();
+    from.setFullYear(from.getFullYear() - 1);
+    return { from, to };
   });
 
   const [orders, setOrders] = useState<Order[]>([]);
@@ -144,6 +148,12 @@ export function MichelleOrders() {
       api.get<{ success: boolean; data: any[] }>("/api/v1/admin/bookings?limit=200").catch(() => ({ data: [] })),
       api.get<{ success: boolean; data: any[] }>("/api/v1/admin/orders?limit=200").catch(() => ({ data: [] })),
     ]).then(([bookingsRes, ordersRes]) => {
+      const mapBackendStatus = (s: string | undefined): "accepted" | "in-progress" | "completed" => {
+        const v = String(s || "").toUpperCase();
+        if (v === "IN_PROGRESS" || v === "OUT_FOR_DELIVERY") return "in-progress";
+        if (v === "COMPLETED" || v === "CANCELLED" || v === "DECLINED") return "completed";
+        return "accepted"; // PENDING + ACCEPTED + anything else
+      };
       const bookings: Order[] = ((bookingsRes as any).data || []).map((b: any) => ({
         id: b.id,
         orderNumber: `BK-${b.id.slice(-6).toUpperCase()}`,
@@ -155,7 +165,8 @@ export function MichelleOrders() {
         total: Number(b.total || 0),
         date: b.scheduledDate || b.createdAt,
         time: b.scheduledTime || "—",
-        status: (b.status || "ACCEPTED").toLowerCase().replace("_", "-") as any,
+        status: mapBackendStatus(b.status),
+        rawStatus: b.status,
         category: "service",
         serviceName: b.beautyListing?.title || b.cleaningListing?.title || b.handymanListing?.title || b.category,
         serviceType: b.category,
@@ -168,16 +179,17 @@ export function MichelleOrders() {
       }));
       const orders: Order[] = ((ordersRes as any).data || []).map((o: any) => ({
         id: o.id,
-        orderNumber: `OR-${o.id.slice(-6).toUpperCase()}`,
+        orderNumber: o.orderNumber || `OR-${o.id.slice(-6).toUpperCase()}`,
         storeId: o.vendorId,
         storeName: o.vendor?.businessName || "Unknown",
-        customerName: o.user?.email || "Customer",
+        customerName: o.user?.profile ? `${o.user.profile.firstName ?? ""} ${o.user.profile.lastName ?? ""}`.trim() || o.user.email : o.user?.email || "Customer",
         customerEmail: o.user?.email || "",
         customerPhone: o.user?.phone || "",
         total: Number(o.total || 0),
         date: o.createdAt,
         time: "—",
-        status: (o.status || "ACCEPTED").toLowerCase().replace("_", "-") as any,
+        status: mapBackendStatus(o.status),
+        rawStatus: o.status,
         category: "grocery",
         items: (o.items || []).map((i: any) => ({ name: i.name || "Item", quantity: i.quantity, price: Number(i.price || 0) })),
         itemCount: o.items?.length ?? 0,
