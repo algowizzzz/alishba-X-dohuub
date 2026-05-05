@@ -9,7 +9,7 @@ const getApiUrl = () => {
 
   // In production, use Railway API
   if (process.env.NODE_ENV === 'production') {
-    return 'https://dohuubclaude-production.up.railway.app';
+    return 'https://alishba-x-dohuub-production.up.railway.app';
   }
 
   // For local development - localhost works for iOS simulator and web
