@@ -686,18 +686,51 @@ export function AllListings() {
   // State
   const [listings, setListings] = useState<Listing[]>([]);
 
-  const handleListingStatusChange = async (listingId: string, category: string, next: "active" | "inactive") => {
-    const typeUrl = String(category || "")
+  const toTypeUrl = (category: string) =>
+    String(category || "")
       .toUpperCase()
       .replace(/^BEAUTY_PRODUCTS$/, "BEAUTY_PRODUCT")
       .replace(/^GROCERIES$/, "GROCERY")
       .replace(/^RENTALS$/, "RENTAL");
+
+  const handleListingStatusChange = async (listingId: string, category: string, next: "active" | "inactive") => {
     const apiStatus = next === "active" ? "ACTIVE" : "PAUSED";
     try {
-      await api.patch(`/api/v1/admin/listings/${typeUrl}/${listingId}/status`, { status: apiStatus });
+      await api.patch(`/api/v1/admin/listings/${toTypeUrl(category)}/${listingId}/status`, { status: apiStatus });
       setListings((prev) => prev.map((l) => (l.id === listingId ? { ...l, status: next } : l)));
     } catch (e: any) {
       alert(e?.response?.data?.error || e?.message || "Failed to update listing status");
+    }
+  };
+
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const handleBulkStatusChange = async (next: "active" | "inactive") => {
+    if (selectedListings.length === 0) return;
+    if (next === "inactive" && !window.confirm(`Deactivate ${selectedListings.length} listing(s)?`)) return;
+    setBulkBusy(true);
+    const apiStatus = next === "active" ? "ACTIVE" : "PAUSED";
+    const targets = listings.filter((l) => selectedListings.includes(l.id));
+    const failures: string[] = [];
+    await Promise.all(
+      targets.map(async (l) => {
+        try {
+          await api.patch(`/api/v1/admin/listings/${toTypeUrl(l.category)}/${l.id}/status`, { status: apiStatus });
+        } catch {
+          failures.push(l.name || l.id);
+        }
+      })
+    );
+    setListings((prev) =>
+      prev.map((l) =>
+        selectedListings.includes(l.id) && !failures.includes(l.name || l.id)
+          ? { ...l, status: next }
+          : l
+      )
+    );
+    setSelectedListings([]);
+    setBulkBusy(false);
+    if (failures.length > 0) {
+      alert(`Failed to update ${failures.length} listing(s): ${failures.slice(0, 5).join(", ")}${failures.length > 5 ? "..." : ""}`);
     }
   };
 
@@ -1051,13 +1084,13 @@ export function AllListings() {
                   {selectedListings.length} listing{selectedListings.length > 1 ? "s" : ""} selected
                 </p>
                 <div className="flex flex-wrap items-center gap-2">
-                  <Button size="sm" className="bg-[#10B981] hover:bg-[#059669] text-white">
+                  <Button size="sm" disabled={bulkBusy} onClick={() => handleBulkStatusChange("active")} className="bg-[#10B981] hover:bg-[#059669] text-white">
                     <Play className="w-4 h-4 mr-2" />
-                    Activate Selected
+                    {bulkBusy ? "Working..." : "Activate Selected"}
                   </Button>
-                  <Button size="sm" variant="outline" className="text-[#9CA3AF] border-[rgba(46,122,217,0.25)]">
+                  <Button size="sm" disabled={bulkBusy} onClick={() => handleBulkStatusChange("inactive")} variant="outline" className="text-[#9CA3AF] border-[rgba(46,122,217,0.25)]">
                     <Pause className="w-4 h-4 mr-2" />
-                    Deactivate Selected
+                    {bulkBusy ? "Working..." : "Deactivate Selected"}
                   </Button>
                   <Button size="sm" variant="outline" className="text-[#F59E0B] border-[#FED7AA]">
                     <Flag className="w-4 h-4 mr-2" />
