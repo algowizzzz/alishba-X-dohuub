@@ -66,19 +66,35 @@ const mockReports: ListingReport[] = [
   },
 ];
 
-function ReportCard({ report }: { report: ListingReport }) {
+function ReportCard({ report, onResolved }: { report: ListingReport; onResolved: (id: string) => void }) {
   const navigate = useNavigate();
   const [showActionModal, setShowActionModal] = useState(false);
   const [actionType, setActionType] = useState<"ignore" | "suspend" | null>(null);
+  const [busy, setBusy] = useState(false);
 
   const handleAction = (action: "ignore" | "suspend") => {
     setActionType(action);
     setShowActionModal(true);
   };
 
-  const confirmAction = () => {
-    // Handle action confirmation
-    setShowActionModal(false);
+  const confirmAction = async () => {
+    setBusy(true);
+    try {
+      if (actionType === "suspend" && report.vendorId) {
+        await api.patch(`/api/v1/admin/vendors/${report.vendorId}/status`, { status: "SUSPENDED" });
+      }
+      // Mark the report as reviewed/dismissed in either case
+      await api.patch(`/api/v1/admin/reports/${report.id}/status`, {
+        status: "REVIEWED",
+        resolution: actionType === "suspend" ? `Vendor suspended` : `Report dismissed`,
+      });
+      onResolved(report.id);
+    } catch (e: any) {
+      alert(e?.response?.data?.error || e?.message || "Failed to apply action");
+    } finally {
+      setBusy(false);
+      setShowActionModal(false);
+    }
   };
 
   return (
@@ -168,9 +184,10 @@ function ReportCard({ report }: { report: ListingReport }) {
             </Button>
             <Button
               className={actionType === "suspend" ? "bg-[#DC2626] hover:bg-[#B91C1C]" : ""}
+              disabled={busy}
               onClick={confirmAction}
             >
-              {actionType === "suspend" ? "Suspend Vendor" : "Ignore Report"}
+              {busy ? "Working..." : actionType === "suspend" ? "Suspend Vendor" : "Ignore Report"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -268,7 +285,7 @@ export function ReportedListings() {
           ) : (
             <div>
               {reports.map((report) => (
-                <ReportCard key={report.id} report={report} />
+                <ReportCard key={report.id} report={report} onResolved={(id) => setReports((prev) => prev.filter((r) => r.id !== id))} />
               ))}
             </div>
           )}

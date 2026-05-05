@@ -2799,7 +2799,23 @@ export function VendorDetail() {
   }, [id]);
 
   const statusColor = getStatusColor(vendor.status);
-  
+
+  const [statusBusy, setStatusBusy] = useState(false);
+  const handleStatusChange = async (next: "active" | "suspended") => {
+    if (!id) return;
+    if (next === "suspended" && !window.confirm(`Suspend ${vendor.businessName}?`)) return;
+    const apiStatus = next === "suspended" ? "SUSPENDED" : "APPROVED";
+    setStatusBusy(true);
+    try {
+      await api.patch(`/api/v1/admin/vendors/${id}/status`, { status: apiStatus });
+      setVendor((prev) => ({ ...prev, status: next }));
+    } catch (e: any) {
+      alert(e?.response?.data?.error || e?.message || "Failed to update vendor status");
+    } finally {
+      setStatusBusy(false);
+    }
+  };
+
   // Determine if this vendor is a handyman or beauty services category
   const isHandymanVendor = vendor.category === "Handyman Services";
   const isBeautyServicesVendor = vendor.category === "Beauty Services";
@@ -2908,18 +2924,22 @@ export function VendorDetail() {
                   {!isMichelleStore && (vendor.status === "active" || vendor.status === "trial" ? (
                     <Button
                       variant="outline"
+                      disabled={statusBusy}
+                      onClick={() => handleStatusChange("suspended")}
                       className="flex-1 sm:flex-none h-11 text-[#DC2626] border-[#FEE2E2] hover:bg-[#FEE2E2] hover:text-[#DC2626]"
                     >
                       <Pause className="w-4 h-4 mr-2" />
-                      Suspend
+                      {statusBusy ? "Suspending..." : "Suspend"}
                     </Button>
                   ) : vendor.status === "suspended" ? (
                     <Button
                       variant="outline"
+                      disabled={statusBusy}
+                      onClick={() => handleStatusChange("active")}
                       className="flex-1 sm:flex-none h-11 text-[#10B981] border-[#D1FAE5] hover:bg-[#D1FAE5] hover:text-[#10B981]"
                     >
                       <Play className="w-4 h-4 mr-2" />
-                      Unsuspend
+                      {statusBusy ? "Restoring..." : "Unsuspend"}
                     </Button>
                   ) : null)}
                 </div>

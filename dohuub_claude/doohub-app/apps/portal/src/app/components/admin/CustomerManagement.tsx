@@ -134,7 +134,13 @@ const mockCustomers: Customer[] = [
   },
 ];
 
-function CustomerCard({ customer }: { customer: Customer }) {
+function CustomerCard({ customer, onStatusChange }: { customer: Customer; onStatusChange: (id: string, status: "active" | "suspended") => Promise<void> }) {
+  const [busy, setBusy] = useState(false);
+  const handleSuspendClick = async (next: "active" | "suspended") => {
+    if (next === "suspended" && !window.confirm(`Suspend ${customer.name}?`)) return;
+    setBusy(true);
+    try { await onStatusChange(customer.id, next); } finally { setBusy(false); }
+  };
   const navigate = useNavigate();
 
   return (
@@ -220,14 +226,14 @@ function CustomerCard({ customer }: { customer: Customer }) {
           View Rewards
         </Button>
         {customer.status === "active" ? (
-          <Button size="sm" variant="outline" className="text-[#DC2626] border-[#FECACA]">
+          <Button size="sm" variant="outline" disabled={busy} onClick={() => handleSuspendClick("suspended")} className="text-[#DC2626] border-[#FECACA]">
             <Ban className="w-4 h-4 mr-2" />
-            Suspend
+            {busy ? "..." : "Suspend"}
           </Button>
         ) : customer.status === "suspended" ? (
-          <Button size="sm" variant="outline" className="text-[#10B981] border-[#D1FAE5]">
+          <Button size="sm" variant="outline" disabled={busy} onClick={() => handleSuspendClick("active")} className="text-[#10B981] border-[#D1FAE5]">
             <CheckCircle className="w-4 h-4 mr-2" />
-            Activate
+            {busy ? "..." : "Activate"}
           </Button>
         ) : null}
       </div>
@@ -254,6 +260,17 @@ export function CustomerManagement() {
   };
 
   const [customers, setCustomers] = useState<Customer[]>([]);
+
+  const handleCustomerStatusChange = async (customerId: string, next: "active" | "suspended") => {
+    try {
+      await api.patch(`/api/v1/admin/customers/${customerId}/status`, {
+        status: next === "suspended" ? "SUSPENDED" : "ACTIVE",
+      });
+      setCustomers((prev) => prev.map((c) => (c.id === customerId ? { ...c, status: next } : c)));
+    } catch (e: any) {
+      alert(e?.response?.data?.error || e?.message || "Failed to update customer status");
+    }
+  };
 
   useEffect(() => {
     api.get<{ success: boolean; data: any[] }>("/api/v1/admin/customers?limit=200")
@@ -406,12 +423,12 @@ export function CustomerManagement() {
                     Send Message
                   </Button>
                   {customer.status === "active" ? (
-                    <Button size="sm" variant="outline" className="text-[#DC2626]">
+                    <Button size="sm" variant="outline" onClick={() => { if (window.confirm(`Suspend ${customer.name}?`)) handleCustomerStatusChange(customer.id, "suspended"); }} className="text-[#DC2626]">
                       <Ban className="w-4 h-4 mr-2" />
                       Suspend
                     </Button>
                   ) : (
-                    <Button size="sm" variant="outline" className="text-[#10B981]">
+                    <Button size="sm" variant="outline" onClick={() => handleCustomerStatusChange(customer.id, "active")} className="text-[#10B981]">
                       <CheckCircle className="w-4 h-4 mr-2" />
                       Activate
                     </Button>
@@ -703,7 +720,7 @@ export function CustomerManagement() {
               <p className="text-[15px] text-[#6B7280]">No customers match your search filters</p>
             </div>
           ) : (
-            filteredCustomers.map((customer) => <CustomerCard key={customer.id} customer={customer} />)
+            filteredCustomers.map((customer) => <CustomerCard key={customer.id} customer={customer} onStatusChange={handleCustomerStatusChange} />)
           )}
         </div>
       </main>

@@ -340,22 +340,26 @@ function ListingCard({
   isSelected,
   onSelect,
   isBulkMode,
+  onStatusChange,
 }: {
   listing: Listing;
   isSelected: boolean;
   onSelect: (id: string) => void;
   isBulkMode: boolean;
+  onStatusChange: (id: string, category: string, next: "active" | "inactive") => Promise<void>;
 }) {
   const navigate = useNavigate();
   const [showFlagModal, setShowFlagModal] = useState(false);
   const [flagReason, setFlagReason] = useState("");
   const [flagDetails, setFlagDetails] = useState("");
+  const [busy, setBusy] = useState(false);
 
   const statusConfig = getStatusConfig(listing.status);
 
-  const handleToggleStatus = () => {
-    // Toggle status logic
-    console.log("Toggle status:", listing.id);
+  const handleToggleStatus = async () => {
+    const next = listing.status === "active" ? "inactive" : "active";
+    setBusy(true);
+    try { await onStatusChange(listing.id, listing.category, next); } finally { setBusy(false); }
   };
 
   const handleFlag = () => {
@@ -681,6 +685,21 @@ export function AllListings() {
 
   // State
   const [listings, setListings] = useState<Listing[]>([]);
+
+  const handleListingStatusChange = async (listingId: string, category: string, next: "active" | "inactive") => {
+    const typeUrl = String(category || "")
+      .toUpperCase()
+      .replace(/^BEAUTY_PRODUCTS$/, "BEAUTY_PRODUCT")
+      .replace(/^GROCERIES$/, "GROCERY")
+      .replace(/^RENTALS$/, "RENTAL");
+    const apiStatus = next === "active" ? "ACTIVE" : "PAUSED";
+    try {
+      await api.patch(`/api/v1/admin/listings/${typeUrl}/${listingId}/status`, { status: apiStatus });
+      setListings((prev) => prev.map((l) => (l.id === listingId ? { ...l, status: next } : l)));
+    } catch (e: any) {
+      alert(e?.response?.data?.error || e?.message || "Failed to update listing status");
+    }
+  };
 
   useEffect(() => {
     api.get<{ success: boolean; data: any[] }>("/api/v1/admin/listings?limit=200")
@@ -1087,6 +1106,7 @@ export function AllListings() {
                   isSelected={selectedListings.includes(listing.id)}
                   onSelect={handleSelectListing}
                   isBulkMode={bulkMode}
+                  onStatusChange={handleListingStatusChange}
                 />
               ))}
 
