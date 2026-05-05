@@ -391,9 +391,16 @@ const getStatusLabel = (status: string) => {
   return labels[status] || status;
 };
 
-function VendorCard({ vendor }: { vendor: Vendor }) {
+function VendorCard({ vendor, onStatusChange }: { vendor: Vendor; onStatusChange: (id: string, next: "APPROVED" | "SUSPENDED") => Promise<void> }) {
   const navigate = useNavigate();
   const statusColor = getStatusColor(vendor.status);
+  const [statusUpdating, setStatusUpdating] = useState<string | null>(null);
+
+  const setVendorStatus = async (vendorId: string, newStatus: "APPROVED" | "SUSPENDED") => {
+    setStatusUpdating(vendorId);
+    try { await onStatusChange(vendorId, newStatus); }
+    finally { setStatusUpdating(null); }
+  };
 
   return (
     <div className="bg-white border border-[rgba(46,122,217,0.25)] rounded-xl p-5 sm:p-6 lg:p-7 mb-5 hover:border-[#2E7AD9] hover:shadow-[0_4px_16px_rgba(46,122,217,0.20)] transition-all">
@@ -553,10 +560,8 @@ export function AllVendors() {
   // State
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [vendorsLoading, setVendorsLoading] = useState(true);
-  const [statusUpdating, setStatusUpdating] = useState<string | null>(null);
 
-  const setVendorStatus = async (vendorId: string, newStatus: "APPROVED" | "SUSPENDED") => {
-    setStatusUpdating(vendorId);
+  const handleVendorStatusChange = async (vendorId: string, newStatus: "APPROVED" | "SUSPENDED") => {
     try {
       await api.patch(`/api/v1/admin/vendors/${vendorId}/status`, { status: newStatus });
       setVendors((prev) =>
@@ -568,8 +573,7 @@ export function AllVendors() {
       );
     } catch (e: any) {
       alert(e?.response?.data?.error || e?.message || "Failed to update vendor status");
-    } finally {
-      setStatusUpdating(null);
+      throw e;
     }
   };
 
@@ -863,7 +867,7 @@ export function AllVendors() {
           ) : (
             <>
               {paginatedVendors.map((vendor) => (
-                <VendorCard key={vendor.id} vendor={vendor} />
+                <VendorCard key={vendor.id} vendor={vendor} onStatusChange={handleVendorStatusChange} />
               ))}
 
               {/* Pagination */}
