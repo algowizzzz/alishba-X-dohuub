@@ -1048,9 +1048,38 @@ router.get('/reports', authenticate, requireAdmin, async (req: AuthRequest, res)
 
     const total = await prisma.report.count({ where });
 
+    // Resolve each report's listing → vendor so the moderation UI can show
+    // the vendor name and call the suspend endpoint.
+    const enriched = await Promise.all(
+      reports.map(async (rep) => {
+        const include = { vendor: { select: { id: true, businessName: true } } };
+        const lt = String(rep.listingType || '').toLowerCase();
+        try {
+          let listing: any = null;
+          if (lt === 'cleaning')      listing = await prisma.cleaningListing.findUnique({ where: { id: rep.listingId }, include });
+          else if (lt === 'handyman') listing = await prisma.handymanListing.findUnique({ where: { id: rep.listingId }, include });
+          else if (lt === 'beauty')   listing = await prisma.beautyListing.findUnique({ where: { id: rep.listingId }, include });
+          else if (lt === 'grocery' || lt === 'groceries') listing = await prisma.groceryListing.findUnique({ where: { id: rep.listingId }, include });
+          else if (lt === 'food')     listing = await prisma.foodListing.findUnique({ where: { id: rep.listingId }, include });
+          else if (lt === 'rental' || lt === 'rentals') listing = await prisma.rentalListing.findUnique({ where: { id: rep.listingId }, include });
+          else if (lt === 'beauty_product' || lt === 'beauty_products') listing = await prisma.beautyProductListing.findUnique({ where: { id: rep.listingId }, include });
+          else if (lt === 'ride_assistance') listing = await prisma.rideAssistanceListing.findUnique({ where: { id: rep.listingId }, include });
+          else if (lt === 'companionship')   listing = await prisma.companionshipListing.findUnique({ where: { id: rep.listingId }, include });
+          return {
+            ...rep,
+            targetTitle: listing?.title ?? null,
+            vendorId: listing?.vendor?.id ?? null,
+            vendorName: listing?.vendor?.businessName ?? null,
+          };
+        } catch {
+          return { ...rep, targetTitle: null, vendorId: null, vendorName: null };
+        }
+      })
+    );
+
     res.json({
       success: true,
-      data: reports,
+      data: enriched,
       pagination: {
         page: pageNum,
         limit: limitNum,
