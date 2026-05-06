@@ -520,7 +520,7 @@ export function CompanionshipSupportForm() {
                     {languages.map((lang) => (
                       <div
                         key={lang}
-                        className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] rounded-lg shadow-[0_4px_16px_rgba(46,122,217,0.18)]"
+                        className="inline-flex items-center gap-2 px-3 py-1.5 bg-white border border-[rgba(46,122,217,0.25)] rounded-lg shadow-[0_4px_16px_rgba(46,122,217,0.18)]"
                       >
                         <span className="text-sm text-[#1A1A2E]">{lang}</span>
                         <button

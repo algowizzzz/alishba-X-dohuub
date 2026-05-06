@@ -348,7 +348,7 @@ export function ProfileAnalytics() {
           </div>
 
           {/* Filter & Control Bar */}
-          <div className="bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] rounded-lg p-4 sm:p-5 mb-6 sm:mb-8 shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
+          <div className="bg-white border border-[rgba(46,122,217,0.25)] rounded-lg p-4 sm:p-5 mb-6 sm:mb-8 shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
             <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
               <div className="flex flex-col sm:flex-row gap-3 flex-1">
                 <div className="flex-1 sm:flex-none">
@@ -523,7 +523,7 @@ export function ProfileAnalytics() {
             <div className="hidden lg:block bg-white border border-[rgba(46,122,217,0.25)] rounded-xl overflow-hidden shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className="bg-[#F8FAFF] border-b border-[rgba(46,122,217,0.25)]">
+                  <thead className="bg-white border-b border-[rgba(46,122,217,0.25)]">
                     <tr>
                       <th
                         className="px-6 py-4 text-left text-xs font-semibold text-[#6B7280] uppercase tracking-wider cursor-pointer hover:bg-[#F0F7FF]"
@@ -591,7 +591,7 @@ export function ProfileAnalytics() {
                     {sortedProfiles.map((profile) => (
                       <tr
                         key={profile.id}
-                        className="hover:bg-[#F8FAFF] transition-colors cursor-pointer"
+                        className="hover:bg-white transition-colors cursor-pointer"
                       >
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
@@ -715,7 +715,7 @@ export function ProfileAnalytics() {
                       </tr>
                     ))}
                   </tbody>
-                  <tfoot className="bg-[#F8FAFF] border-t border-[rgba(46,122,217,0.25)]">
+                  <tfoot className="bg-white border-t border-[rgba(46,122,217,0.25)]">
                     <tr>
                       <td className="px-6 py-4 text-sm font-semibold text-[#1A1A2E]">
                         Totals

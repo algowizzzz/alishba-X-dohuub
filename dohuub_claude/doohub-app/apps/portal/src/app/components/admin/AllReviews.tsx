@@ -200,7 +200,7 @@ function ReviewCard({ review }: { review: Review }) {
         {/* Review Text */}
         <div className="mb-3">
           <p className="text-sm font-semibold text-[#1A1A2E] mb-1">Review:</p>
-          <div className="bg-[#F8FAFF] border-l-4 border-[#2E7AD9] px-4 py-3 rounded">
+          <div className="bg-white border-l-4 border-[#2E7AD9] px-4 py-3 rounded">
             <p className="text-sm text-[#4B5563] italic">"{review.reviewText}"</p>
           </div>
         </div>
@@ -312,7 +312,7 @@ function ReviewCard({ review }: { review: Review }) {
 
             <div>
               <p className="text-sm font-semibold mb-2">Review Content:</p>
-              <div className="bg-[#F8FAFF] p-4 rounded-lg">
+              <div className="bg-white p-4 rounded-lg">
                 <p className="text-sm text-[#4B5563]">{review.reviewText}</p>
               </div>
             </div>

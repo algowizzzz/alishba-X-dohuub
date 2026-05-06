@@ -371,7 +371,7 @@ export function GeographicRegions() {
             {groupedRegions.map((country) => (
               <div key={country.code}>
                 {/* Country Header */}
-                <div className="bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] rounded-lg px-4 sm:px-6 py-3 sm:py-4 mb-3 sm:mb-4 flex items-center justify-between shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
+                <div className="bg-white border border-[rgba(46,122,217,0.25)] rounded-lg px-4 sm:px-6 py-3 sm:py-4 mb-3 sm:mb-4 flex items-center justify-between shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
                   <div className="flex items-center gap-2 sm:gap-3">
                     <span className="text-2xl sm:text-[32px]">{country.flag}</span>
                     <div>
@@ -583,7 +583,7 @@ export function GeographicRegions() {
                 </h3>
                 <div className="space-y-3">
                   {selectedRegion.profiles.filter(p => p.isActive).map((profile) => (
-                    <div key={profile.id} className="bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] rounded-lg p-4 shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
+                    <div key={profile.id} className="bg-white border border-[rgba(46,122,217,0.25)] rounded-lg p-4 shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
                       <div className="flex items-start gap-3">
                         <Check className="w-5 h-5 text-[#10B981] flex-shrink-0 mt-0.5" />
                         <div className="flex-1">
@@ -613,19 +613,19 @@ export function GeographicRegions() {
                   Performance Summary
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="bg-[#F8FAFF] rounded-lg p-4">
+                  <div className="bg-white rounded-lg p-4">
                     <p className="text-sm text-[#6B7280] mb-2">Total Bookings</p>
                     <p className="text-2xl font-bold text-[#1A1A2E]">
                       {selectedRegion.performance.bookings}
                     </p>
                   </div>
-                  <div className="bg-[#F8FAFF] rounded-lg p-4">
+                  <div className="bg-white rounded-lg p-4">
                     <p className="text-sm text-[#6B7280] mb-2">Total Revenue</p>
                     <p className="text-2xl font-bold text-[#1A1A2E]">
                       ${selectedRegion.performance.revenue.toLocaleString()}
                     </p>
                   </div>
-                  <div className="bg-[#F8FAFF] rounded-lg p-4">
+                  <div className="bg-white rounded-lg p-4">
                     <p className="text-sm text-[#6B7280] mb-2">Total Customers</p>
                     <p className="text-2xl font-bold text-[#1A1A2E]">
                       {selectedRegion.performance.customers}

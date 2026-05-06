@@ -221,7 +221,7 @@ export function PushNotifications() {
 
           {/* Main Content Tabs */}
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "compose" | "history")}>
-            <TabsList className="w-full justify-start bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] rounded-t-2xl h-[52px] p-0 mb-0">
+            <TabsList className="w-full justify-start bg-white border border-[rgba(46,122,217,0.25)] rounded-t-2xl h-[52px] p-0 mb-0">
               <TabsTrigger
                 value="compose"
                 className="h-full px-6 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-[#2E7AD9] data-[state=active]:text-[#2E7AD9] data-[state=active]:bg-white"
@@ -240,7 +240,7 @@ export function PushNotifications() {
 
             {/* Compose Tab */}
             <TabsContent value="compose" className="m-0">
-              <div className="bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] border-t-0 rounded-b-2xl p-6">
+              <div className="bg-white border border-[rgba(46,122,217,0.25)] border-t-0 rounded-b-2xl p-6">
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                   {/* Form Section */}
                   <div className="lg:col-span-2 space-y-6">
@@ -283,7 +283,7 @@ export function PushNotifications() {
                       <Label htmlFor="audience" className="text-sm font-medium text-[#1A1A2E] mb-2">
                         Target Audience
                       </Label>
-                      <div className="h-11 px-4 rounded-lg border border-[rgba(46,122,217,0.25)] bg-[#F8FAFF] flex items-center text-[#6B7280] shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
+                      <div className="h-11 px-4 rounded-lg border border-[rgba(46,122,217,0.25)] bg-white flex items-center text-[#6B7280] shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
                         <Users className="w-4 h-4 mr-2" />
                         <span>All Customers ({getAudienceCount("all").toLocaleString()})</span>
                       </div>
@@ -359,11 +359,11 @@ export function PushNotifications() {
 
             {/* History Tab */}
             <TabsContent value="history" className="m-0">
-              <div className="bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] border-t-0 rounded-b-2xl">
+              <div className="bg-white border border-[rgba(46,122,217,0.25)] border-t-0 rounded-b-2xl">
                 {/* Notifications List */}
                 <div className="divide-y divide-[rgba(46, 122, 217, 0.12)]">
                   {notifications.map((notif) => (
-                    <div key={notif.id} className="p-6 hover:bg-[#F8FAFF] transition-colors">
+                    <div key={notif.id} className="p-6 hover:bg-white transition-colors">
                       <div className="flex items-start gap-3">
                         <div className="w-10 h-10 rounded-xl bg-[#2E7AD9] flex items-center justify-center shrink-0">
                           <Bell className="w-5 h-5 text-white" />

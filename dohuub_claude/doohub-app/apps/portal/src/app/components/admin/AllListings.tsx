@@ -371,7 +371,7 @@ function ListingCard({
   return (
     <>
       <div
-        className={`bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] border-l-4 ${statusConfig.borderLeft} rounded-xl p-4 sm:p-5 lg:p-6 mb-5 hover:border-[#2E7AD9] hover:shadow-[0_8px_24px_rgba(46,122,217,0.25)] transition-all relative`}
+        className={`bg-white border border-[rgba(46,122,217,0.25)] border-l-4 ${statusConfig.borderLeft} rounded-xl p-4 sm:p-5 lg:p-6 mb-5 hover:border-[#2E7AD9] hover:shadow-[0_8px_24px_rgba(46,122,217,0.25)] transition-all relative`}
       >
         {/* Bulk Select Checkbox */}
         {isBulkMode && (
@@ -397,7 +397,7 @@ function ListingCard({
                 }}
               />
             ) : (
-              <div className="w-full h-[180px] lg:w-[160px] lg:h-[120px] rounded-lg bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] flex items-center justify-center shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
+              <div className="w-full h-[180px] lg:w-[160px] lg:h-[120px] rounded-lg bg-white border border-[rgba(46,122,217,0.25)] flex items-center justify-center shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
                 <span className="text-4xl">{getCategoryIcon(listing.category)}</span>
               </div>
             )}
@@ -1112,7 +1112,7 @@ export function AllListings() {
           {/* Listing Cards */}
           {paginatedListings.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20">
-              <div className="w-[120px] h-[120px] rounded-full bg-[#F8FAFF] flex items-center justify-center mb-6">
+              <div className="w-[120px] h-[120px] rounded-full bg-white flex items-center justify-center mb-6">
                 <Package className="w-16 h-16 text-[#9CA3AF]" />
               </div>
               <h3 className="text-2xl font-bold text-[#1A1A2E] mb-2">No listings found</h3>

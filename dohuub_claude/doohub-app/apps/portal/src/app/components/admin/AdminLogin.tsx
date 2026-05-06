@@ -57,7 +57,7 @@ export function AdminLogin() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFF] flex items-center justify-center p-6">
+    <div className="min-h-screen bg-white flex items-center justify-center p-6">
       <div className="w-full max-w-[480px]">
         {/* Back to Portal Selection */}
         <Link

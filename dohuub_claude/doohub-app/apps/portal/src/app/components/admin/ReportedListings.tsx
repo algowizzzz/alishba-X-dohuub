@@ -137,7 +137,7 @@ function ReportCard({ report, onResolved }: { report: ListingReport; onResolved:
         {/* Report Explanation */}
         <div className="mb-4">
           <p className="text-sm font-semibold text-[#1A1A2E] mb-2">Explanation:</p>
-          <div className="bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] px-4 py-3 rounded-lg shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
+          <div className="bg-white border border-[rgba(46,122,217,0.25)] px-4 py-3 rounded-lg shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
             <p className="text-sm text-[#4B5563]">{report.reportExplanation}</p>
           </div>
         </div>

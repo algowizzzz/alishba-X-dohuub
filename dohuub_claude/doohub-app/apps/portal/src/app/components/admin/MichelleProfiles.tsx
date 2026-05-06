@@ -500,7 +500,7 @@ function VendorProfileCard({ profile }: { profile: VendorProfile }) {
               className="w-full sm:w-[140px] h-[140px] rounded-xl object-cover"
             />
           ) : (
-            <div className="w-full sm:w-[140px] h-[140px] rounded-xl bg-[#F8FAFF] border-2 border-dashed border-[rgba(46,122,217,0.25)] flex items-center justify-center">
+            <div className="w-full sm:w-[140px] h-[140px] rounded-xl bg-white border-2 border-dashed border-[rgba(46,122,217,0.25)] flex items-center justify-center">
               <Building2 className="w-12 h-12 text-[#9CA3AF]" />
             </div>
           )}
@@ -626,7 +626,7 @@ function EmptyState() {
   
   return (
     <div className="flex flex-col items-center justify-center py-20">
-      <div className="w-[120px] h-[120px] rounded-full bg-[#F8FAFF] flex items-center justify-center mb-6">
+      <div className="w-[120px] h-[120px] rounded-full bg-white flex items-center justify-center mb-6">
         <Building2 className="w-16 h-16 text-[#9CA3AF]" />
       </div>
       <h3 className="text-2xl font-bold text-[#1A1A2E] mb-2">No Vendor Profiles Yet</h3>

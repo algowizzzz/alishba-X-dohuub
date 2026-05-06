@@ -378,7 +378,7 @@ export function CreateEditServiceWizard() {
                     </button>
                   </div>
                 ) : (
-                  <label className="w-full h-[240px] border-2 border-dashed border-[rgba(46,122,217,0.25)] rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-[#2E7AD9] hover:bg-[#F8FAFF] transition-all">
+                  <label className="w-full h-[240px] border-2 border-dashed border-[rgba(46,122,217,0.25)] rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-[#2E7AD9] hover:bg-white transition-all">
                     <Upload className="w-10 h-10 text-[#9CA3AF] mb-3" />
                     <p className="text-base font-semibold text-[#1A1A2E] mb-1">
                       Click to upload or drag and drop
@@ -401,7 +401,7 @@ export function CreateEditServiceWizard() {
                 <Label htmlFor="shopName" className="text-base font-semibold text-[#1A1A2E] mb-3 block">
                   Shop Name
                 </Label>
-                <div className="h-12 px-4 border border-[rgba(46,122,217,0.25)] rounded-lg bg-[#F8FAFF] flex items-center text-[#1A1A2E] shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
+                <div className="h-12 px-4 border border-[rgba(46,122,217,0.25)] rounded-lg bg-white flex items-center text-[#1A1A2E] shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
                   {profileName}
                 </div>
                 <p className="text-sm text-[#6B7280] mt-2">
@@ -565,7 +565,7 @@ export function CreateEditServiceWizard() {
                           {index > 0 && (
                             <button
                               onClick={() => moveImage(index, 'up')}
-                              className="w-8 h-8 bg-white text-[#1A1A2E] rounded-full flex items-center justify-center hover:bg-[#F8FAFF]"
+                              className="w-8 h-8 bg-white text-[#1A1A2E] rounded-full flex items-center justify-center hover:bg-white"
                               title="Move left"
                             >
                               <GripVertical className="w-4 h-4 rotate-90" />
@@ -574,7 +574,7 @@ export function CreateEditServiceWizard() {
                           {index < imageGallery.length - 1 && (
                             <button
                               onClick={() => moveImage(index, 'down')}
-                              className="w-8 h-8 bg-white text-[#1A1A2E] rounded-full flex items-center justify-center hover:bg-[#F8FAFF]"
+                              className="w-8 h-8 bg-white text-[#1A1A2E] rounded-full flex items-center justify-center hover:bg-white"
                               title="Move right"
                             >
                               <GripVertical className="w-4 h-4 -rotate-90" />
@@ -599,7 +599,7 @@ export function CreateEditServiceWizard() {
 
                 {/* Upload Button */}
                 {imageGallery.length < 5 && (
-                  <label className="w-full h-[120px] border-2 border-dashed border-[rgba(46,122,217,0.25)] rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-[#2E7AD9] hover:bg-[#F8FAFF] transition-all">
+                  <label className="w-full h-[120px] border-2 border-dashed border-[rgba(46,122,217,0.25)] rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-[#2E7AD9] hover:bg-white transition-all">
                     <ImageIcon className="w-8 h-8 text-[#9CA3AF] mb-2" />
                     <p className="text-sm font-semibold text-[#1A1A2E]">
                       Add Images ({imageGallery.length}/5)
@@ -642,7 +642,7 @@ export function CreateEditServiceWizard() {
                     </button>
                   </div>
                 ) : (
-                  <label className="w-full h-[240px] border-2 border-dashed border-[rgba(46,122,217,0.25)] rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-[#2E7AD9] hover:bg-[#F8FAFF] transition-all">
+                  <label className="w-full h-[240px] border-2 border-dashed border-[rgba(46,122,217,0.25)] rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-[#2E7AD9] hover:bg-white transition-all">
                     <Upload className="w-10 h-10 text-[#9CA3AF] mb-3" />
                     <p className="text-base font-semibold text-[#1A1A2E] mb-1">
                       Click to upload or drag and drop
@@ -665,7 +665,7 @@ export function CreateEditServiceWizard() {
                 <Label htmlFor="shopName" className="text-base font-semibold text-[#1A1A2E] mb-3 block">
                   Shop Name
                 </Label>
-                <div className="h-12 px-4 border border-[rgba(46,122,217,0.25)] rounded-lg bg-[#F8FAFF] flex items-center text-[#1A1A2E] shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
+                <div className="h-12 px-4 border border-[rgba(46,122,217,0.25)] rounded-lg bg-white flex items-center text-[#1A1A2E] shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
                   {profileName}
                 </div>
                 <p className="text-sm text-[#6B7280] mt-2">
@@ -837,7 +837,7 @@ export function CreateEditServiceWizard() {
                           {index > 0 && (
                             <button
                               onClick={() => moveImage(index, 'up')}
-                              className="w-8 h-8 bg-white text-[#1A1A2E] rounded-full flex items-center justify-center hover:bg-[#F8FAFF]"
+                              className="w-8 h-8 bg-white text-[#1A1A2E] rounded-full flex items-center justify-center hover:bg-white"
                               title="Move left"
                             >
                               <GripVertical className="w-4 h-4 rotate-90" />
@@ -846,7 +846,7 @@ export function CreateEditServiceWizard() {
                           {index < imageGallery.length - 1 && (
                             <button
                               onClick={() => moveImage(index, 'down')}
-                              className="w-8 h-8 bg-white text-[#1A1A2E] rounded-full flex items-center justify-center hover:bg-[#F8FAFF]"
+                              className="w-8 h-8 bg-white text-[#1A1A2E] rounded-full flex items-center justify-center hover:bg-white"
                               title="Move right"
                             >
                               <GripVertical className="w-4 h-4 -rotate-90" />
@@ -871,7 +871,7 @@ export function CreateEditServiceWizard() {
 
                 {/* Upload Button */}
                 {imageGallery.length < 5 && (
-                  <label className="w-full h-[120px] border-2 border-dashed border-[rgba(46,122,217,0.25)] rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-[#2E7AD9] hover:bg-[#F8FAFF] transition-all">
+                  <label className="w-full h-[120px] border-2 border-dashed border-[rgba(46,122,217,0.25)] rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-[#2E7AD9] hover:bg-white transition-all">
                     <ImageIcon className="w-8 h-8 text-[#9CA3AF] mb-2" />
                     <p className="text-sm font-semibold text-[#1A1A2E]">
                       Add Images ({imageGallery.length}/5)
@@ -914,7 +914,7 @@ export function CreateEditServiceWizard() {
                     </button>
                   </div>
                 ) : (
-                  <label className="w-full h-[240px] border-2 border-dashed border-[rgba(46,122,217,0.25)] rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-[#2E7AD9] hover:bg-[#F8FAFF] transition-all">
+                  <label className="w-full h-[240px] border-2 border-dashed border-[rgba(46,122,217,0.25)] rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-[#2E7AD9] hover:bg-white transition-all">
                     <Upload className="w-10 h-10 text-[#9CA3AF] mb-3" />
                     <p className="text-base font-semibold text-[#1A1A2E] mb-1">
                       Click to upload or drag and drop
@@ -937,7 +937,7 @@ export function CreateEditServiceWizard() {
                 <Label htmlFor="shopName" className="text-base font-semibold text-[#1A1A2E] mb-3 block">
                   Restaurant/Kitchen Name
                 </Label>
-                <div className="h-12 px-4 border border-[rgba(46,122,217,0.25)] rounded-lg bg-[#F8FAFF] flex items-center text-[#1A1A2E] shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
+                <div className="h-12 px-4 border border-[rgba(46,122,217,0.25)] rounded-lg bg-white flex items-center text-[#1A1A2E] shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
                   {profileName}
                 </div>
                 <p className="text-sm text-[#6B7280] mt-2">
@@ -1187,7 +1187,7 @@ export function CreateEditServiceWizard() {
                           {index > 0 && (
                             <button
                               onClick={() => moveImage(index, 'up')}
-                              className="w-8 h-8 bg-white text-[#1A1A2E] rounded-full flex items-center justify-center hover:bg-[#F8FAFF]"
+                              className="w-8 h-8 bg-white text-[#1A1A2E] rounded-full flex items-center justify-center hover:bg-white"
                               title="Move left"
                             >
                               <GripVertical className="w-4 h-4 rotate-90" />
@@ -1196,7 +1196,7 @@ export function CreateEditServiceWizard() {
                           {index < imageGallery.length - 1 && (
                             <button
                               onClick={() => moveImage(index, 'down')}
-                              className="w-8 h-8 bg-white text-[#1A1A2E] rounded-full flex items-center justify-center hover:bg-[#F8FAFF]"
+                              className="w-8 h-8 bg-white text-[#1A1A2E] rounded-full flex items-center justify-center hover:bg-white"
                               title="Move right"
                             >
                               <GripVertical className="w-4 h-4 -rotate-90" />
@@ -1221,7 +1221,7 @@ export function CreateEditServiceWizard() {
 
                 {/* Upload Button */}
                 {imageGallery.length < 5 && (
-                  <label className="w-full h-[120px] border-2 border-dashed border-[rgba(46,122,217,0.25)] rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-[#2E7AD9] hover:bg-[#F8FAFF] transition-all">
+                  <label className="w-full h-[120px] border-2 border-dashed border-[rgba(46,122,217,0.25)] rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-[#2E7AD9] hover:bg-white transition-all">
                     <ImageIcon className="w-8 h-8 text-[#9CA3AF] mb-2" />
                     <p className="text-sm font-semibold text-[#1A1A2E]">
                       Add Images ({imageGallery.length}/5)
@@ -1264,7 +1264,7 @@ export function CreateEditServiceWizard() {
                     </button>
                   </div>
                 ) : (
-                  <label className="w-full h-[240px] border-2 border-dashed border-[rgba(46,122,217,0.25)] rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-[#2E7AD9] hover:bg-[#F8FAFF] transition-all">
+                  <label className="w-full h-[240px] border-2 border-dashed border-[rgba(46,122,217,0.25)] rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-[#2E7AD9] hover:bg-white transition-all">
                     <Upload className="w-10 h-10 text-[#9CA3AF] mb-3" />
                     <p className="text-base font-semibold text-[#1A1A2E] mb-1">
                       Click to upload or drag and drop
@@ -1733,7 +1733,7 @@ export function CreateEditServiceWizard() {
                 <p className="text-sm text-[#6B7280] mb-4">
                   Select dates when the property is unavailable for booking
                 </p>
-                <div className="bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] rounded-[16px] p-6 w-fit">
+                <div className="bg-white border border-[rgba(46,122,217,0.25)] rounded-[16px] p-6 w-fit">
                   <Calendar
                     mode="multiple"
                     selected={unavailableDates}
@@ -1799,7 +1799,7 @@ export function CreateEditServiceWizard() {
                           {index > 0 && (
                             <button
                               onClick={() => moveImage(index, 'up')}
-                              className="w-8 h-8 bg-white text-[#1A1A2E] rounded-full flex items-center justify-center hover:bg-[#F8FAFF]"
+                              className="w-8 h-8 bg-white text-[#1A1A2E] rounded-full flex items-center justify-center hover:bg-white"
                               title="Move left"
                             >
                               <GripVertical className="w-4 h-4 rotate-90" />
@@ -1808,7 +1808,7 @@ export function CreateEditServiceWizard() {
                           {index < imageGallery.length - 1 && (
                             <button
                               onClick={() => moveImage(index, 'down')}
-                              className="w-8 h-8 bg-white text-[#1A1A2E] rounded-full flex items-center justify-center hover:bg-[#F8FAFF]"
+                              className="w-8 h-8 bg-white text-[#1A1A2E] rounded-full flex items-center justify-center hover:bg-white"
                               title="Move right"
                             >
                               <GripVertical className="w-4 h-4 -rotate-90" />
@@ -1833,7 +1833,7 @@ export function CreateEditServiceWizard() {
 
                 {/* Upload Button */}
                 {imageGallery.length < 5 && (
-                  <label className="w-full h-[120px] border-2 border-dashed border-[rgba(46,122,217,0.25)] rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-[#2E7AD9] hover:bg-[#F8FAFF] transition-all">
+                  <label className="w-full h-[120px] border-2 border-dashed border-[rgba(46,122,217,0.25)] rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-[#2E7AD9] hover:bg-white transition-all">
                     <ImageIcon className="w-8 h-8 text-[#9CA3AF] mb-2" />
                     <p className="text-sm font-semibold text-[#1A1A2E]">
                       Add Images ({imageGallery.length}/5)
@@ -1876,7 +1876,7 @@ export function CreateEditServiceWizard() {
                     </button>
                   </div>
                 ) : (
-                  <label className="w-full h-[240px] border-2 border-dashed border-[rgba(46,122,217,0.25)] rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-[#2E7AD9] hover:bg-[#F8FAFF] transition-all">
+                  <label className="w-full h-[240px] border-2 border-dashed border-[rgba(46,122,217,0.25)] rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-[#2E7AD9] hover:bg-white transition-all">
                     <Upload className="w-10 h-10 text-[#9CA3AF] mb-3" />
                     <p className="text-base font-semibold text-[#1A1A2E] mb-1">
                       Click to upload or drag and drop
@@ -1903,7 +1903,7 @@ export function CreateEditServiceWizard() {
                   id="shopName"
                   value={profileName}
                   disabled
-                  className="h-12 text-base bg-[#F8FAFF] cursor-not-allowed"
+                  className="h-12 text-base bg-white cursor-not-allowed"
                 />
                 <p className="text-sm text-[#6B7280] mt-2">
                   Auto-populated from your business profile
@@ -2103,7 +2103,7 @@ export function CreateEditServiceWizard() {
                           {index > 0 && (
                             <button
                               onClick={() => moveImage(index, 'up')}
-                              className="w-8 h-8 bg-white text-[#1A1A2E] rounded-full flex items-center justify-center hover:bg-[#F8FAFF]"
+                              className="w-8 h-8 bg-white text-[#1A1A2E] rounded-full flex items-center justify-center hover:bg-white"
                               title="Move left"
                             >
                               <GripVertical className="w-4 h-4 rotate-90" />
@@ -2112,7 +2112,7 @@ export function CreateEditServiceWizard() {
                           {index < imageGallery.length - 1 && (
                             <button
                               onClick={() => moveImage(index, 'down')}
-                              className="w-8 h-8 bg-white text-[#1A1A2E] rounded-full flex items-center justify-center hover:bg-[#F8FAFF]"
+                              className="w-8 h-8 bg-white text-[#1A1A2E] rounded-full flex items-center justify-center hover:bg-white"
                               title="Move right"
                             >
                               <GripVertical className="w-4 h-4 -rotate-90" />
@@ -2137,7 +2137,7 @@ export function CreateEditServiceWizard() {
 
                 {/* Upload Button */}
                 {imageGallery.length < 5 && (
-                  <label className="w-full h-[120px] border-2 border-dashed border-[rgba(46,122,217,0.25)] rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-[#2E7AD9] hover:bg-[#F8FAFF] transition-all">
+                  <label className="w-full h-[120px] border-2 border-dashed border-[rgba(46,122,217,0.25)] rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-[#2E7AD9] hover:bg-white transition-all">
                     <ImageIcon className="w-8 h-8 text-[#9CA3AF] mb-2" />
                     <p className="text-sm font-semibold text-[#1A1A2E]">
                       Add Images ({imageGallery.length}/5)
@@ -2180,7 +2180,7 @@ export function CreateEditServiceWizard() {
                     </button>
                   </div>
                 ) : (
-                  <label className="w-full h-[240px] border-2 border-dashed border-[rgba(46,122,217,0.25)] rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-[#2E7AD9] hover:bg-[#F8FAFF] transition-all">
+                  <label className="w-full h-[240px] border-2 border-dashed border-[rgba(46,122,217,0.25)] rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-[#2E7AD9] hover:bg-white transition-all">
                     <Upload className="w-10 h-10 text-[#9CA3AF] mb-3" />
                     <p className="text-base font-semibold text-[#1A1A2E] mb-1">
                       Click to upload or drag and drop
@@ -2265,7 +2265,7 @@ export function CreateEditServiceWizard() {
                           {index > 0 && (
                             <button
                               onClick={() => moveImage(index, 'up')}
-                              className="w-8 h-8 bg-white text-[#1A1A2E] rounded-full flex items-center justify-center hover:bg-[#F8FAFF]"
+                              className="w-8 h-8 bg-white text-[#1A1A2E] rounded-full flex items-center justify-center hover:bg-white"
                               title="Move left"
                             >
                               <GripVertical className="w-4 h-4 rotate-90" />
@@ -2274,7 +2274,7 @@ export function CreateEditServiceWizard() {
                           {index < imageGallery.length - 1 && (
                             <button
                               onClick={() => moveImage(index, 'down')}
-                              className="w-8 h-8 bg-white text-[#1A1A2E] rounded-full flex items-center justify-center hover:bg-[#F8FAFF]"
+                              className="w-8 h-8 bg-white text-[#1A1A2E] rounded-full flex items-center justify-center hover:bg-white"
                               title="Move right"
                             >
                               <GripVertical className="w-4 h-4 -rotate-90" />
@@ -2299,7 +2299,7 @@ export function CreateEditServiceWizard() {
 
                 {/* Upload Button */}
                 {imageGallery.length < 5 && (
-                  <label className="w-full h-[120px] border-2 border-dashed border-[rgba(46,122,217,0.25)] rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-[#2E7AD9] hover:bg-[#F8FAFF] transition-all">
+                  <label className="w-full h-[120px] border-2 border-dashed border-[rgba(46,122,217,0.25)] rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-[#2E7AD9] hover:bg-white transition-all">
                     <ImageIcon className="w-8 h-8 text-[#9CA3AF] mb-2" />
                     <p className="text-sm font-semibold text-[#1A1A2E]">
                       Add Images ({imageGallery.length}/5)
@@ -2348,11 +2348,11 @@ export function CreateEditServiceWizard() {
                       Pricing Type
                     </Label>
                     {isCleaningProfile ? (
-                      <div className="h-12 px-4 border border-[rgba(46,122,217,0.25)] rounded-lg bg-[#F8FAFF] flex items-center text-[#1A1A2E] shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
+                      <div className="h-12 px-4 border border-[rgba(46,122,217,0.25)] rounded-lg bg-white flex items-center text-[#1A1A2E] shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
                         Fixed Pricing
                       </div>
                     ) : isBeautyServicesProfile ? (
-                      <div className="h-12 px-4 border border-[rgba(46,122,217,0.25)] rounded-lg bg-[#F8FAFF] flex items-center text-[#1A1A2E] shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
+                      <div className="h-12 px-4 border border-[rgba(46,122,217,0.25)] rounded-lg bg-white flex items-center text-[#1A1A2E] shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
                         Hourly Rate
                       </div>
                     ) : (

@@ -387,23 +387,23 @@ export function OrderManagement() {
           {/* Summary Stats */}
           {!id && (
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 sm:gap-4 mb-6">
-              <div className="bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] rounded-lg p-4 text-center shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
+              <div className="bg-white border border-[rgba(46,122,217,0.25)] rounded-lg p-4 text-center shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
                 <p className="text-sm text-[#6B7280] mb-1">Total</p>
                 <p className="text-2xl font-bold text-[#1A1A2E]">{totalOrders}</p>
               </div>
-              <div className="bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] rounded-lg p-4 text-center shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
+              <div className="bg-white border border-[rgba(46,122,217,0.25)] rounded-lg p-4 text-center shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
                 <p className="text-sm text-[#6B7280] mb-1">Active</p>
                 <p className="text-2xl font-bold text-[#2E7AD9]">{activeOrders}</p>
               </div>
-              <div className="bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] rounded-lg p-4 text-center shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
+              <div className="bg-white border border-[rgba(46,122,217,0.25)] rounded-lg p-4 text-center shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
                 <p className="text-sm text-[#6B7280] mb-1">Completed</p>
                 <p className="text-2xl font-bold text-[#10B981]">{completedOrders}</p>
               </div>
-              <div className="bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] rounded-lg p-4 text-center shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
+              <div className="bg-white border border-[rgba(46,122,217,0.25)] rounded-lg p-4 text-center shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
                 <p className="text-sm text-[#6B7280] mb-1">Cancelled</p>
                 <p className="text-2xl font-bold text-[#6B7280]">{cancelledOrders}</p>
               </div>
-              <div className="bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] rounded-lg p-4 text-center shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
+              <div className="bg-white border border-[rgba(46,122,217,0.25)] rounded-lg p-4 text-center shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
                 <p className="text-sm text-[#6B7280] mb-1">Disputed</p>
                 <p className="text-2xl font-bold text-[#DC2626]">{disputedOrders}</p>
               </div>

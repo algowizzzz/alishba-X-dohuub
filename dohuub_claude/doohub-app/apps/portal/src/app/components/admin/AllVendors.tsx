@@ -414,7 +414,7 @@ function VendorCard({ vendor, onStatusChange }: { vendor: Vendor; onStatusChange
               className="w-16 h-16 lg:w-20 lg:h-20 rounded-lg object-cover"
             />
           ) : (
-            <div className="w-16 h-16 lg:w-20 lg:h-20 rounded-lg bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] flex items-center justify-center shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
+            <div className="w-16 h-16 lg:w-20 lg:h-20 rounded-lg bg-white border border-[rgba(46,122,217,0.25)] flex items-center justify-center shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
               <Building2 className="w-8 h-8 lg:w-10 lg:h-10 text-[#9CA3AF]" />
             </div>
           )}
@@ -740,7 +740,7 @@ export function AllVendors() {
           </div>
 
           {/* Quick Stats Bar */}
-          <div className="bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] rounded-lg p-4 sm:p-5 mb-6 shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
+          <div className="bg-white border border-[rgba(46,122,217,0.25)] rounded-lg p-4 sm:p-5 mb-6 shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="flex items-center gap-2">
                 <span className="text-sm text-[#6B7280]">Total:</span>
@@ -845,7 +845,7 @@ export function AllVendors() {
           {/* Vendor Cards */}
           {paginatedVendors.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20">
-              <div className="w-[120px] h-[120px] rounded-full bg-[#F8FAFF] flex items-center justify-center mb-6">
+              <div className="w-[120px] h-[120px] rounded-full bg-white flex items-center justify-center mb-6">
                 <Building2 className="w-16 h-16 text-[#9CA3AF]" />
               </div>
               <h3 className="text-2xl font-bold text-[#1A1A2E] mb-2">No vendors found</h3>

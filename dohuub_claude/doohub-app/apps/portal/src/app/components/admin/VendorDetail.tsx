@@ -2313,7 +2313,7 @@ function VendorListingCard({ listing, isProductListing, isRentalProperty, isRide
                 className="w-[180px] h-[180px] rounded-lg object-cover"
               />
             ) : (
-              <div className="w-[180px] h-[180px] rounded-lg bg-[#F8FAFF] flex items-center justify-center">
+              <div className="w-[180px] h-[180px] rounded-lg bg-white flex items-center justify-center">
                 <Building2 className="w-12 h-12 text-[#9CA3AF]" />
               </div>
             )}
@@ -2367,7 +2367,7 @@ function VendorListingCard({ listing, isProductListing, isRentalProperty, isRide
                   {listing.whatsIncluded.slice(0, 3).map((item, index) => (
                     <span
                       key={index}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 bg-[#F8FAFF] text-[#1A1A2E] text-xs rounded-lg"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 bg-white text-[#1A1A2E] text-xs rounded-lg"
                     >
                       <CheckCircle2 className="w-3 h-3 text-[#10B981]" />
                       {item}
@@ -2438,7 +2438,7 @@ function VendorListingCard({ listing, isProductListing, isRentalProperty, isRide
                   />
                 </div>
               ) : (
-                <div className="w-full h-[300px] rounded-xl bg-[#F8FAFF] flex items-center justify-center">
+                <div className="w-full h-[300px] rounded-xl bg-white flex items-center justify-center">
                   <Building2 className="w-24 h-24 text-[#9CA3AF]" />
                 </div>
               )}
@@ -2457,7 +2457,7 @@ function VendorListingCard({ listing, isProductListing, isRentalProperty, isRide
 
               {/* Key Metrics */}
               <div className="grid grid-cols-3 gap-4">
-                <div className="bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] rounded-lg p-4 shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
+                <div className="bg-white border border-[rgba(46,122,217,0.25)] rounded-lg p-4 shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
                   <div className="flex items-center gap-2 text-[#6B7280] text-sm mb-2">
                     <DollarSign className="w-4 h-4" />
                     <span>Price</span>
@@ -2469,7 +2469,7 @@ function VendorListingCard({ listing, isProductListing, isRentalProperty, isRide
                   )}
                 </div>
                 
-                <div className="bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] rounded-lg p-4 shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
+                <div className="bg-white border border-[rgba(46,122,217,0.25)] rounded-lg p-4 shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
                   <div className="flex items-center gap-2 text-[#6B7280] text-sm mb-2">
                     <Calendar className="w-4 h-4" />
                     <span>Bookings</span>
@@ -2482,7 +2482,7 @@ function VendorListingCard({ listing, isProductListing, isRentalProperty, isRide
                   )}
                 </div>
 
-                <div className="bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] rounded-lg p-4 shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
+                <div className="bg-white border border-[rgba(46,122,217,0.25)] rounded-lg p-4 shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
                   <div className="flex items-center gap-2 text-[#6B7280] text-sm mb-2">
                     <Star className="w-4 h-4" />
                     <span>Rating</span>
@@ -2510,7 +2510,7 @@ function VendorListingCard({ listing, isProductListing, isRentalProperty, isRide
                   <h4 className="text-lg font-bold text-[#1A1A2E] mb-4">Property Details</h4>
                   <div className="grid grid-cols-2 gap-3">
                     {listing.bedrooms !== undefined && (
-                      <div className="flex items-center gap-3 px-4 py-3 bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] rounded-lg shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
+                      <div className="flex items-center gap-3 px-4 py-3 bg-white border border-[rgba(46,122,217,0.25)] rounded-lg shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
                         <Bed className="w-5 h-5 text-[#1A1A2E] flex-shrink-0" />
                         <div>
                           <p className="text-lg font-bold text-[#1A1A2E]">{listing.bedrooms}</p>
@@ -2520,7 +2520,7 @@ function VendorListingCard({ listing, isProductListing, isRentalProperty, isRide
                     )}
                     
                     {listing.bathrooms !== undefined && (
-                      <div className="flex items-center gap-3 px-4 py-3 bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] rounded-lg shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
+                      <div className="flex items-center gap-3 px-4 py-3 bg-white border border-[rgba(46,122,217,0.25)] rounded-lg shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
                         <Bath className="w-5 h-5 text-[#1A1A2E] flex-shrink-0" />
                         <div>
                           <p className="text-lg font-bold text-[#1A1A2E]">{listing.bathrooms}</p>
@@ -2530,7 +2530,7 @@ function VendorListingCard({ listing, isProductListing, isRentalProperty, isRide
                     )}
                     
                     {listing.maxGuests !== undefined && (
-                      <div className="flex items-center gap-3 px-4 py-3 bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] rounded-lg shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
+                      <div className="flex items-center gap-3 px-4 py-3 bg-white border border-[rgba(46,122,217,0.25)] rounded-lg shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
                         <Users className="w-5 h-5 text-[#1A1A2E] flex-shrink-0" />
                         <div>
                           <p className="text-lg font-bold text-[#1A1A2E]">{listing.maxGuests}</p>
@@ -2540,7 +2540,7 @@ function VendorListingCard({ listing, isProductListing, isRentalProperty, isRide
                     )}
                     
                     {listing.totalArea !== undefined && (
-                      <div className="flex items-center gap-3 px-4 py-3 bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] rounded-lg shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
+                      <div className="flex items-center gap-3 px-4 py-3 bg-white border border-[rgba(46,122,217,0.25)] rounded-lg shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
                         <Maximize2 className="w-5 h-5 text-[#1A1A2E] flex-shrink-0" />
                         <div>
                           <p className="text-lg font-bold text-[#1A1A2E]">{listing.totalArea} {listing.areaUnit || 'ft²'}</p>
@@ -2560,7 +2560,7 @@ function VendorListingCard({ listing, isProductListing, isRentalProperty, isRide
                     {listing.amenities.map((amenity, index) => (
                       <div
                         key={index}
-                        className="flex items-center gap-3 px-4 py-3 bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] rounded-lg shadow-[0_4px_16px_rgba(46,122,217,0.18)]"
+                        className="flex items-center gap-3 px-4 py-3 bg-white border border-[rgba(46,122,217,0.25)] rounded-lg shadow-[0_4px_16px_rgba(46,122,217,0.18)]"
                       >
                         {getAmenityIcon(amenity)}
                         <span className="text-sm text-[#1A1A2E]">{amenity}</span>
@@ -2582,7 +2582,7 @@ function VendorListingCard({ listing, isProductListing, isRentalProperty, isRide
                       {listing.vehicleTypes.map((vehicleType, index) => (
                         <div
                           key={index}
-                          className="flex items-center gap-3 px-4 py-3 bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] rounded-lg shadow-[0_4px_16px_rgba(46,122,217,0.18)]"
+                          className="flex items-center gap-3 px-4 py-3 bg-white border border-[rgba(46,122,217,0.25)] rounded-lg shadow-[0_4px_16px_rgba(46,122,217,0.18)]"
                         >
                           <Car className="w-5 h-5 text-[#1A1A2E] flex-shrink-0" />
                           <span className="text-[15px] text-[#1A1A2E]">{vehicleType}</span>
@@ -2614,7 +2614,7 @@ function VendorListingCard({ listing, isProductListing, isRentalProperty, isRide
                     {listing.whatsIncluded.map((item, index) => (
                       <div
                         key={index}
-                        className="flex items-center gap-2 px-4 py-3 bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] rounded-lg shadow-[0_4px_16px_rgba(46,122,217,0.18)]"
+                        className="flex items-center gap-2 px-4 py-3 bg-white border border-[rgba(46,122,217,0.25)] rounded-lg shadow-[0_4px_16px_rgba(46,122,217,0.18)]"
                       >
                         <CheckCircle2 className="w-4 h-4 text-[#10B981] flex-shrink-0" />
                         <span className="text-sm text-[#1A1A2E]">{item}</span>
@@ -2631,7 +2631,7 @@ function VendorListingCard({ listing, isProductListing, isRentalProperty, isRide
                   {listing.regions.map((region, index) => (
                     <div
                       key={index}
-                      className="inline-flex items-center gap-2 px-4 py-2 bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] rounded-lg shadow-[0_4px_16px_rgba(46,122,217,0.18)]"
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-[rgba(46,122,217,0.25)] rounded-lg shadow-[0_4px_16px_rgba(46,122,217,0.18)]"
                     >
                       <MapPin className="w-4 h-4 text-[#6B7280]" />
                       <span className="text-sm text-[#1A1A2E]">{region}</span>
@@ -2879,7 +2879,7 @@ export function VendorDetail() {
                     className="w-20 h-20 lg:w-[100px] lg:h-[100px] rounded-xl object-cover"
                   />
                 ) : (
-                  <div className="w-20 h-20 lg:w-[100px] lg:h-[100px] rounded-xl bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] flex items-center justify-center shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
+                  <div className="w-20 h-20 lg:w-[100px] lg:h-[100px] rounded-xl bg-white border border-[rgba(46,122,217,0.25)] flex items-center justify-center shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
                     <Building2 className="w-10 h-10 lg:w-12 lg:h-12 text-[#9CA3AF]" />
                   </div>
                 )}
@@ -2951,7 +2951,7 @@ export function VendorDetail() {
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             {/* Desktop Tabs */}
             <div className="hidden lg:block">
-              <TabsList className="w-full justify-start bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] rounded-t-xl h-[52px] p-0">
+              <TabsList className="w-full justify-start bg-white border border-[rgba(46,122,217,0.25)] rounded-t-xl h-[52px] p-0">
                 <TabsTrigger value="overview" className="h-full px-6 data-[state=active]:border-b-2 data-[state=active]:border-[#2E7AD9] data-[state=active]:text-[#2E7AD9]">
                   Overview
                 </TabsTrigger>
@@ -2983,7 +2983,7 @@ export function VendorDetail() {
             </div>
 
             {/* Tab Content Container */}
-            <div className="bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] border-t-0 rounded-b-xl lg:rounded-t-none p-5 sm:p-6 lg:p-8">
+            <div className="bg-white border border-[rgba(46,122,217,0.25)] border-t-0 rounded-b-xl lg:rounded-t-none p-5 sm:p-6 lg:p-8">
               {/* Overview Tab */}
               <TabsContent value="overview" className="mt-0 space-y-8">
                 {/* Quick Stats */}
@@ -2992,7 +2992,7 @@ export function VendorDetail() {
                     Quick Stats
                   </h3>
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
-                    <div className="bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] rounded-lg p-4 sm:p-5 shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
+                    <div className="bg-white border border-[rgba(46,122,217,0.25)] rounded-lg p-4 sm:p-5 shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
                       <p className="text-xs uppercase text-[#6B7280] mb-2">Total Revenue</p>
                       <p className="text-2xl sm:text-[28px] font-bold text-[#1A1A2E] mb-1">
                         ${vendor.stats.totalRevenue.toLocaleString()}
@@ -3003,7 +3003,7 @@ export function VendorDetail() {
                       </div>
                     </div>
 
-                    <div className="bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] rounded-lg p-4 sm:p-5 shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
+                    <div className="bg-white border border-[rgba(46,122,217,0.25)] rounded-lg p-4 sm:p-5 shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
                       <p className="text-xs uppercase text-[#6B7280] mb-2">Total Bookings</p>
                       <p className="text-2xl sm:text-[28px] font-bold text-[#1A1A2E] mb-1">
                         {vendor.stats.totalBookings}
@@ -3014,7 +3014,7 @@ export function VendorDetail() {
                       </div>
                     </div>
 
-                    <div className="bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] rounded-lg p-4 sm:p-5 shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
+                    <div className="bg-white border border-[rgba(46,122,217,0.25)] rounded-lg p-4 sm:p-5 shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
                       <p className="text-xs uppercase text-[#6B7280] mb-2">Average Rating</p>
                       <p className="text-2xl sm:text-[28px] font-bold text-[#1A1A2E] mb-1">
                         {vendor.stats.avgRating} ⭐
@@ -3024,7 +3024,7 @@ export function VendorDetail() {
                       </p>
                     </div>
 
-                    <div className="bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] rounded-lg p-4 sm:p-5 shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
+                    <div className="bg-white border border-[rgba(46,122,217,0.25)] rounded-lg p-4 sm:p-5 shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
                       <p className="text-xs uppercase text-[#6B7280] mb-2">Subscription</p>
                       <p className="text-2xl sm:text-[28px] font-bold text-[#1A1A2E] mb-1">
                         {vendor.subscription.status}
@@ -3122,7 +3122,7 @@ export function VendorDetail() {
                     {vendor.regions.map((region, index) => (
                       <div
                         key={index}
-                        className="flex items-center gap-2 px-4 py-2.5 bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] rounded-lg shadow-[0_4px_16px_rgba(46,122,217,0.18)]"
+                        className="flex items-center gap-2 px-4 py-2.5 bg-white border border-[rgba(46,122,217,0.25)] rounded-lg shadow-[0_4px_16px_rgba(46,122,217,0.18)]"
                       >
                         <MapPin className="w-4 h-4 text-[#6B7280]" />
                         <span className="text-sm text-[#1A1A2E]">{region.name}</span>

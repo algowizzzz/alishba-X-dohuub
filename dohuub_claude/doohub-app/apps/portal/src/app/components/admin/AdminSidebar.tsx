@@ -51,7 +51,7 @@ export function AdminSidebar({ activeMenu }: AdminSidebarProps) {
 
   return (
     <>
-      <div className="fixed left-0 top-[72px] w-[280px] h-[calc(100vh-72px)] bg-[#F8FAFF] border-r border-[rgba(46,122,217,0.25)] p-4 flex flex-col">
+      <div className="fixed left-0 top-[72px] w-[280px] h-[calc(100vh-72px)] bg-white border-r border-[rgba(46,122,217,0.25)] p-4 flex flex-col">
         <div className="space-y-1 flex-1">
           {menuItems.map((item) => {
             const Icon = item.icon;

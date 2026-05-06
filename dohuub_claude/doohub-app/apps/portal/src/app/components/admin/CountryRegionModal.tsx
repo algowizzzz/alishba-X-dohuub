@@ -238,7 +238,7 @@ export function CountryRegionModal({ open, onClose, onAddRegions }: CountryRegio
                     <button
                       key={country.code}
                       onClick={() => handleCountrySelect(country)}
-                      className="w-full h-14 flex items-center justify-between px-4 border border-[rgba(46,122,217,0.25)] rounded-lg hover:border-[#2E7AD9] hover:bg-[#F8FAFF] transition-colors shadow-[0_4px_16px_rgba(46,122,217,0.18)]"
+                      className="w-full h-14 flex items-center justify-between px-4 border border-[rgba(46,122,217,0.25)] rounded-lg hover:border-[#2E7AD9] hover:bg-white transition-colors shadow-[0_4px_16px_rgba(46,122,217,0.18)]"
                     >
                       <div className="flex items-center gap-3">
                         <span className="text-[32px]">{country.flag}</span>
@@ -261,7 +261,7 @@ export function CountryRegionModal({ open, onClose, onAddRegions }: CountryRegio
                     <button
                       key={country.code}
                       onClick={() => handleCountrySelect(country)}
-                      className="w-full h-14 flex items-center justify-between px-4 border border-[rgba(46,122,217,0.25)] rounded-lg hover:border-[#2E7AD9] hover:bg-[#F8FAFF] transition-colors shadow-[0_4px_16px_rgba(46,122,217,0.18)]"
+                      className="w-full h-14 flex items-center justify-between px-4 border border-[rgba(46,122,217,0.25)] rounded-lg hover:border-[#2E7AD9] hover:bg-white transition-colors shadow-[0_4px_16px_rgba(46,122,217,0.18)]"
                     >
                       <div className="flex items-center gap-3">
                         <span className="text-[32px]">{country.flag}</span>
@@ -347,7 +347,7 @@ export function CountryRegionModal({ open, onClose, onAddRegions }: CountryRegio
                         className={`w-full h-14 flex items-center gap-3 px-4 border rounded-lg transition-all cursor-pointer ${
                           isSelected
                             ? 'border-[#10B981] bg-[#D1FAE5]'
-                            : 'border-[rgba(46,122,217,0.25)] hover:border-[#2E7AD9] hover:bg-[#F8FAFF]'
+                            : 'border-[rgba(46,122,217,0.25)] hover:border-[#2E7AD9] hover:bg-white'
                         }`}
                       >
                         <Checkbox
@@ -399,7 +399,7 @@ export function CountryRegionModal({ open, onClose, onAddRegions }: CountryRegio
                         className={`w-full h-14 flex items-center gap-3 px-4 border rounded-lg transition-all cursor-pointer ${
                           isSelected
                             ? 'border-[#10B981] bg-[#D1FAE5]'
-                            : 'border-[rgba(46,122,217,0.25)] hover:border-[#2E7AD9] hover:bg-[#F8FAFF]'
+                            : 'border-[rgba(46,122,217,0.25)] hover:border-[#2E7AD9] hover:bg-white'
                         }`}
                       >
                         <Checkbox

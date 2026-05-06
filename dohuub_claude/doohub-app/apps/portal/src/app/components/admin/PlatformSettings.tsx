@@ -328,7 +328,7 @@ export function PlatformSettings() {
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             {/* Desktop Tabs */}
             <div className="hidden lg:block">
-              <TabsList className="w-full justify-start bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] rounded-t-xl h-[52px] p-0 mb-0">
+              <TabsList className="w-full justify-start bg-white border border-[rgba(46,122,217,0.25)] rounded-t-xl h-[52px] p-0 mb-0">
                 <TabsTrigger
                   value="help"
                   className="h-full px-6 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-[#2E7AD9] data-[state=active]:text-[#2E7AD9] data-[state=active]:bg-white"
@@ -379,7 +379,7 @@ export function PlatformSettings() {
             </div>
 
             {/* Tab Content Container */}
-            <div className="bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] border-t-0 rounded-b-xl lg:rounded-t-none p-6 lg:p-8">
+            <div className="bg-white border border-[rgba(46,122,217,0.25)] border-t-0 rounded-b-xl lg:rounded-t-none p-6 lg:p-8">
               {/* Help & Support Tab */}
               <TabsContent value="help" className="mt-0 space-y-8">
                 <div>
@@ -749,7 +749,7 @@ export function PlatformSettings() {
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-[#F8FAFF] flex items-center justify-center flex-shrink-0">
+                        <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center flex-shrink-0">
                           <Instagram className="w-5 h-5 text-[#E4405F]" />
                         </div>
                         <div className="flex-1">
@@ -767,7 +767,7 @@ export function PlatformSettings() {
                       </div>
 
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-[#F8FAFF] flex items-center justify-center flex-shrink-0">
+                        <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center flex-shrink-0">
                           <Facebook className="w-5 h-5 text-[#1877F2]" />
                         </div>
                         <div className="flex-1">
@@ -785,7 +785,7 @@ export function PlatformSettings() {
                       </div>
 
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-[#F8FAFF] flex items-center justify-center flex-shrink-0">
+                        <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center flex-shrink-0">
                           <Twitter className="w-5 h-5 text-[#1DA1F2]" />
                         </div>
                         <div className="flex-1">
@@ -803,7 +803,7 @@ export function PlatformSettings() {
                       </div>
 
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-[#F8FAFF] flex items-center justify-center flex-shrink-0">
+                        <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center flex-shrink-0">
                           <Linkedin className="w-5 h-5 text-[#0A66C2]" />
                         </div>
                         <div className="flex-1">

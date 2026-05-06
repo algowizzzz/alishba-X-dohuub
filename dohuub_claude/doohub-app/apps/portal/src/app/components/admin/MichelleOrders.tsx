@@ -476,7 +476,7 @@ export function MichelleOrders() {
                   {Object.entries(groupedOrders).map(([storeId, { storeName, orders: storeOrders }]) => (
                     <div key={storeId} className="bg-white border border-[rgba(46,122,217,0.25)] rounded-xl overflow-hidden shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
                       {/* Store Header */}
-                      <div className="bg-[#F8FAFF] border-b border-[rgba(46,122,217,0.25)] px-6 py-4">
+                      <div className="bg-white border-b border-[rgba(46,122,217,0.25)] px-6 py-4">
                         <div className="flex items-center justify-between">
                           <h3 className="text-base font-semibold text-[#1A1A2E]">
                             {storeName}
@@ -492,7 +492,7 @@ export function MichelleOrders() {
                         {storeOrders.map((order) => (
                           <div
                             key={order.id}
-                            className="p-6 hover:bg-[#F8FAFF] transition-colors cursor-pointer"
+                            className="p-6 hover:bg-white transition-colors cursor-pointer"
                             onClick={() => openOrderDetails(order)}
                           >
                             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -635,7 +635,7 @@ export function MichelleOrders() {
                 <h3 className="text-sm font-semibold text-[#1A1A2E] mb-3">
                   Customer Information
                 </h3>
-                <div className="bg-[#F8FAFF] rounded-lg p-4 space-y-2">
+                <div className="bg-white rounded-lg p-4 space-y-2">
                   <div className="flex items-start gap-2">
                     <User className="w-4 h-4 text-[#6B7280] mt-0.5" />
                     <div>
@@ -655,7 +655,7 @@ export function MichelleOrders() {
                   <h3 className="text-sm font-semibold text-[#1A1A2E] mb-3">
                     Service Details
                   </h3>
-                  <div className="bg-[#F8FAFF] rounded-lg p-4 space-y-3">
+                  <div className="bg-white rounded-lg p-4 space-y-3">
                     <div>
                       <p className="text-xs text-[#6B7280] mb-1">Service</p>
                       <p className="text-sm font-medium text-[#1A1A2E]">
@@ -716,7 +716,7 @@ export function MichelleOrders() {
                   <h3 className="text-sm font-semibold text-[#1A1A2E] mb-3">
                     Order Details
                   </h3>
-                  <div className="bg-[#F8FAFF] rounded-lg p-4 space-y-3">
+                  <div className="bg-white rounded-lg p-4 space-y-3">
                     <div>
                       <p className="text-xs text-[#6B7280] mb-2">Items ({(selectedOrder as GroceryOrder).itemCount})</p>
                       <div className="space-y-2">
@@ -765,7 +765,7 @@ export function MichelleOrders() {
                   <h3 className="text-sm font-semibold text-[#1A1A2E] mb-3">
                     Rental Details
                   </h3>
-                  <div className="bg-[#F8FAFF] rounded-lg p-4 space-y-3">
+                  <div className="bg-white rounded-lg p-4 space-y-3">
                     <div>
                       <p className="text-xs text-[#6B7280] mb-1">Property</p>
                       <p className="text-sm font-medium text-[#1A1A2E]">
@@ -827,7 +827,7 @@ export function MichelleOrders() {
                   <h3 className="text-sm font-semibold text-[#1A1A2E] mb-3">
                     Product Details
                   </h3>
-                  <div className="bg-[#F8FAFF] rounded-lg p-4 space-y-3">
+                  <div className="bg-white rounded-lg p-4 space-y-3">
                     <div>
                       <p className="text-xs text-[#6B7280] mb-1">Product</p>
                       <p className="text-sm font-medium text-[#1A1A2E]">
@@ -864,7 +864,7 @@ export function MichelleOrders() {
                 <h3 className="text-sm font-semibold text-[#1A1A2E] mb-3">
                   Order Summary
                 </h3>
-                <div className="bg-[#F8FAFF] rounded-lg p-4">
+                <div className="bg-white rounded-lg p-4">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-semibold text-[#1A1A2E]">Total</span>
                     <span className="text-lg font-bold text-[#1A1A2E]">

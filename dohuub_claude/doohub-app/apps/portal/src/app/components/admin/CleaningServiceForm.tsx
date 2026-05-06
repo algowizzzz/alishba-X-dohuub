@@ -193,7 +193,7 @@ export function CleaningServiceForm() {
                 className={`
                   border-2 border-dashed rounded-xl p-8 text-center cursor-pointer
                   transition-all
-                  ${isDragOver ? "border-[#2E7AD9] bg-[#F8FAFF]" : "border-[rgba(46,122,217,0.25)] hover:border-[#9CA3AF]"}
+                  ${isDragOver ? "border-[#2E7AD9] bg-white" : "border-[rgba(46,122,217,0.25)] hover:border-[#9CA3AF]"}
                 `}
                 onDragOver={(e) => {
                   e.preventDefault();
@@ -319,7 +319,7 @@ export function CleaningServiceForm() {
                   <div
                     className={`
                       aspect-square border-2 border-dashed rounded-lg flex flex-col items-center justify-center cursor-pointer transition-all
-                      ${galleryDragOver ? "border-[#2E7AD9] bg-[#F8FAFF]" : "border-[rgba(46,122,217,0.25)] hover:border-[#9CA3AF]"}
+                      ${galleryDragOver ? "border-[#2E7AD9] bg-white" : "border-[rgba(46,122,217,0.25)] hover:border-[#9CA3AF]"}
                     `}
                     onDragOver={(e) => {
                       e.preventDefault();

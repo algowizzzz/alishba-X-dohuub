@@ -211,7 +211,7 @@ export function PlatformReports() {
                   <h3 className="text-lg font-semibold text-[#1A1A2E] mb-4">
                     Revenue Trend
                   </h3>
-                  <div className="h-[250px] flex items-center justify-center bg-[#F8FAFF] rounded-lg border border-[rgba(46,122,217,0.25)] shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
+                  <div className="h-[250px] flex items-center justify-center bg-white rounded-lg border border-[rgba(46,122,217,0.25)] shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
                     <p className="text-[#6B7280]">Line chart: Revenue over time</p>
                   </div>
                 </div>
@@ -221,7 +221,7 @@ export function PlatformReports() {
                   <h3 className="text-lg font-semibold text-[#1A1A2E] mb-4">
                     Booking Volume by Category
                   </h3>
-                  <div className="h-[250px] flex items-center justify-center bg-[#F8FAFF] rounded-lg border border-[rgba(46,122,217,0.25)] shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
+                  <div className="h-[250px] flex items-center justify-center bg-white rounded-lg border border-[rgba(46,122,217,0.25)] shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
                     <p className="text-[#6B7280]">Bar chart: Bookings by category</p>
                   </div>
                 </div>
@@ -310,7 +310,7 @@ export function PlatformReports() {
                 <h3 className="text-lg font-semibold text-[#1A1A2E] mb-4">
                   Revenue by Category
                 </h3>
-                <div className="h-[300px] flex items-center justify-center bg-[#F8FAFF] rounded-lg border border-[rgba(46,122,217,0.25)] shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
+                <div className="h-[300px] flex items-center justify-center bg-white rounded-lg border border-[rgba(46,122,217,0.25)] shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
                   <p className="text-[#6B7280]">Pie chart: Revenue breakdown by category</p>
                 </div>
               </div>
@@ -337,7 +337,7 @@ export function PlatformReports() {
                 <h3 className="text-lg font-semibold text-[#1A1A2E] mb-4">
                   User Acquisition Trend
                 </h3>
-                <div className="h-[300px] flex items-center justify-center bg-[#F8FAFF] rounded-lg border border-[rgba(46,122,217,0.25)] shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
+                <div className="h-[300px] flex items-center justify-center bg-white rounded-lg border border-[rgba(46,122,217,0.25)] shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
                   <p className="text-[#6B7280]">Line chart: New users over time</p>
                 </div>
               </div>
@@ -364,7 +364,7 @@ export function PlatformReports() {
                 <h3 className="text-lg font-semibold text-[#1A1A2E] mb-4">
                   Vendor Performance Distribution
                 </h3>
-                <div className="h-[300px] flex items-center justify-center bg-[#F8FAFF] rounded-lg border border-[rgba(46,122,217,0.25)] shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
+                <div className="h-[300px] flex items-center justify-center bg-white rounded-lg border border-[rgba(46,122,217,0.25)] shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
                   <p className="text-[#6B7280]">Bar chart: Vendors by performance tier</p>
                 </div>
               </div>
@@ -391,7 +391,7 @@ export function PlatformReports() {
                 <h3 className="text-lg font-semibold text-[#1A1A2E] mb-4">
                   Booking Trends
                 </h3>
-                <div className="h-[300px] flex items-center justify-center bg-[#F8FAFF] rounded-lg border border-[rgba(46,122,217,0.25)] shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
+                <div className="h-[300px] flex items-center justify-center bg-white rounded-lg border border-[rgba(46,122,217,0.25)] shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
                   <p className="text-[#6B7280]">Line chart: Bookings over time</p>
                 </div>
               </div>

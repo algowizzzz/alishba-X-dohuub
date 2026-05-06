@@ -1087,7 +1087,7 @@ function ServiceListingCard({ listing }: { listing: ServiceListing }) {
               className="w-full sm:w-[200px] h-[200px] rounded-lg object-cover"
             />
           ) : (
-            <div className="w-full sm:w-[200px] h-[200px] rounded-lg bg-[#F8FAFF] flex items-center justify-center">
+            <div className="w-full sm:w-[200px] h-[200px] rounded-lg bg-white flex items-center justify-center">
               <Building2 className="w-12 h-12 text-[#9CA3AF]" />
             </div>
           )}
@@ -1148,7 +1148,7 @@ function ServiceListingCard({ listing }: { listing: ServiceListing }) {
                 {listing.whatsIncluded.slice(0, 4).map((item, index) => (
                   <span
                     key={index}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#F8FAFF] text-[#1A1A2E] text-xs rounded-lg"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white text-[#1A1A2E] text-xs rounded-lg"
                   >
                     <CheckCircle2 className="w-3.5 h-3.5 text-[#10B981]" />
                     {item}
@@ -1221,7 +1221,7 @@ function EmptyState() {
 
   return (
     <div className="flex flex-col items-center justify-center py-20">
-      <div className="w-[120px] h-[120px] rounded-full bg-[#F8FAFF] flex items-center justify-center mb-6">
+      <div className="w-[120px] h-[120px] rounded-full bg-white flex items-center justify-center mb-6">
         <Building2 className="w-16 h-16 text-[rgba(46, 122, 217, 0.18)]" />
       </div>
       <h3 className="text-2xl font-bold text-[#1A1A2E] mb-2">
@@ -1430,7 +1430,7 @@ export function ServiceListings() {
           </h1>
 
           {/* Profile Context */}
-          <div className="bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] rounded-lg px-4 sm:px-5 py-4 mb-6 sm:mb-8 shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
+          <div className="bg-white border border-[rgba(46,122,217,0.25)] rounded-lg px-4 sm:px-5 py-4 mb-6 sm:mb-8 shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div>
                 <p className="text-sm sm:text-base font-semibold text-[#1A1A2E] mb-1">

@@ -229,7 +229,7 @@ export function CreateEditServiceListing() {
             </h1>
 
             {/* Profile Context */}
-            <div className="bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] rounded-lg px-5 py-4 mb-8 flex items-center gap-6 shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
+            <div className="bg-white border border-[rgba(46,122,217,0.25)] rounded-lg px-5 py-4 mb-8 flex items-center gap-6 shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
               <div>
                 <span className="text-sm text-[#6B7280]">Profile: </span>
                 <span className="text-sm font-bold text-[#1A1A2E]">{profileName}</span>
@@ -331,7 +331,7 @@ export function CreateEditServiceListing() {
                     ))}
 
                     {images.length < 5 && (
-                      <label className="w-[160px] h-[120px] border-2 border-dashed border-[rgba(46,122,217,0.25)] rounded-[10px] bg-[#F8FAFF] flex flex-col items-center justify-center cursor-pointer hover:border-[#2E7AD9] transition-colors flex-shrink-0">
+                      <label className="w-[160px] h-[120px] border-2 border-dashed border-[rgba(46,122,217,0.25)] rounded-[10px] bg-white flex flex-col items-center justify-center cursor-pointer hover:border-[#2E7AD9] transition-colors flex-shrink-0">
                         <Upload className="w-8 h-8 text-[#9CA3AF] mb-1" />
                         <span className="text-sm text-[#6B7280]">
                           {images.length === 0 ? "Upload" : "+ Add Image"}
@@ -404,7 +404,7 @@ export function CreateEditServiceListing() {
                   </Label>
                   <RadioGroup value={priceType} onValueChange={setPriceType}>
                     <div className="grid grid-cols-3 gap-4">
-                      <div className={`flex items-start gap-3 p-4 border rounded-lg cursor-pointer transition-colors ${priceType === 'fixed' ? 'border-[#2E7AD9] bg-[#F8FAFF]' : 'border-[rgba(46,122,217,0.25)] hover:border-[#2E7AD9]'}`}>
+                      <div className={`flex items-start gap-3 p-4 border rounded-lg cursor-pointer transition-colors ${priceType === 'fixed' ? 'border-[#2E7AD9] bg-white' : 'border-[rgba(46,122,217,0.25)] hover:border-[#2E7AD9]'}`}>
                         <RadioGroupItem value="fixed" id="fixed" className="mt-1" />
                         <div className="flex-1">
                           <Label htmlFor="fixed" className="text-base font-bold text-[#1A1A2E] cursor-pointer block mb-1">
@@ -414,7 +414,7 @@ export function CreateEditServiceListing() {
                         </div>
                       </div>
 
-                      <div className={`flex items-start gap-3 p-4 border rounded-lg cursor-pointer transition-colors ${priceType === 'hourly' ? 'border-[#2E7AD9] bg-[#F8FAFF]' : 'border-[rgba(46,122,217,0.25)] hover:border-[#2E7AD9]'}`}>
+                      <div className={`flex items-start gap-3 p-4 border rounded-lg cursor-pointer transition-colors ${priceType === 'hourly' ? 'border-[#2E7AD9] bg-white' : 'border-[rgba(46,122,217,0.25)] hover:border-[#2E7AD9]'}`}>
                         <RadioGroupItem value="hourly" id="hourly" className="mt-1" />
                         <div className="flex-1">
                           <Label htmlFor="hourly" className="text-base font-bold text-[#1A1A2E] cursor-pointer block mb-1">
@@ -424,7 +424,7 @@ export function CreateEditServiceListing() {
                         </div>
                       </div>
 
-                      <div className={`flex items-start gap-3 p-4 border rounded-lg cursor-pointer transition-colors ${priceType === 'custom' ? 'border-[#2E7AD9] bg-[#F8FAFF]' : 'border-[rgba(46,122,217,0.25)] hover:border-[#2E7AD9]'}`}>
+                      <div className={`flex items-start gap-3 p-4 border rounded-lg cursor-pointer transition-colors ${priceType === 'custom' ? 'border-[#2E7AD9] bg-white' : 'border-[rgba(46,122,217,0.25)] hover:border-[#2E7AD9]'}`}>
                         <RadioGroupItem value="custom" id="custom" className="mt-1" />
                         <div className="flex-1">
                           <Label htmlFor="custom" className="text-base font-bold text-[#1A1A2E] cursor-pointer block mb-1">

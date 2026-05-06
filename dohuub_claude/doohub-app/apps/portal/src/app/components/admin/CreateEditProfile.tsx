@@ -415,7 +415,7 @@ export function CreateEditProfile() {
                           <img src={logoPreview} alt="Logo preview" className="w-full h-full object-cover" />
                         </div>
                       ) : (
-                        <label className="w-full sm:w-[200px] h-[200px] border-2 border-dashed border-[rgba(46,122,217,0.25)] rounded-xl bg-[#F8FAFF] flex flex-col items-center justify-center cursor-pointer hover:border-[#2E7AD9] transition-colors">
+                        <label className="w-full sm:w-[200px] h-[200px] border-2 border-dashed border-[rgba(46,122,217,0.25)] rounded-xl bg-white flex flex-col items-center justify-center cursor-pointer hover:border-[#2E7AD9] transition-colors">
                           <Upload className="w-12 h-12 text-[#9CA3AF] mb-2" />
                           <span className="text-sm text-[#6B7280]">Drag & Drop</span>
                           <span className="text-xs text-[#9CA3AF] mt-1">or click to browse</span>
@@ -499,7 +499,7 @@ export function CreateEditProfile() {
 
                   <Button
                     variant="outline"
-                    className="w-full h-[52px] border-2 border-dashed border-[rgba(46,122,217,0.25)] text-[#6B7280] hover:border-[#2E7AD9] hover:bg-[#F8FAFF] mb-4"
+                    className="w-full h-[52px] border-2 border-dashed border-[rgba(46,122,217,0.25)] text-[#6B7280] hover:border-[#2E7AD9] hover:bg-white mb-4"
                     onClick={() => setShowRegionModal(true)}
                   >
                     <Plus className="w-5 h-5 mr-2" />
@@ -613,7 +613,7 @@ export function CreateEditProfile() {
                     <Switch checked={showBadge} onCheckedChange={setShowBadge} />
                   </div>
 
-                  <div className="bg-[#F8FAFF] p-4 rounded-lg">
+                  <div className="bg-white p-4 rounded-lg">
                     <p className="text-sm text-[#6B7280] mb-3">Badge Preview:</p>
                     <div className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full ${showBadge ? 'bg-gradient-to-r from-[#F59E0B] to-[#F97316]' : 'bg-[rgba(46, 122, 217, 0.18)]'}`}>
                       <Star className={`w-3.5 h-3.5 ${showBadge ? 'fill-white text-white' : 'fill-[#6B7280] text-[#6B7280]'}`} />
@@ -638,7 +638,7 @@ export function CreateEditProfile() {
                 <div>
                   <h3 className="text-lg font-bold text-[#1A1A2E] mb-4">Profile Preview</h3>
 
-                  <div className="bg-[#F8FAFF] border-2 border-[rgba(46,122,217,0.25)] rounded-xl p-8 mb-6">
+                  <div className="bg-white border-2 border-[rgba(46,122,217,0.25)] rounded-xl p-8 mb-6">
                     <div className="flex gap-6 mb-6">
                       {logoPreview && (
                         <img
