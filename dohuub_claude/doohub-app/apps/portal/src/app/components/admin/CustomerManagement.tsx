@@ -676,11 +676,11 @@ export function CustomerManagement() {
 
           {/* Summary Stats */}
           <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-6">
-            <div className="bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] rounded-lg p-4 text-center shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
+            <div className="bg-white border border-[rgba(46,122,217,0.30)] rounded-lg p-4 text-center shadow-[0_4px_16px_rgba(46,122,217,0.10)]">
               <p className="text-sm text-[#6B7280] mb-1">Total</p>
               <p className="text-2xl font-bold text-[#1A1A2E]">{totalCustomers.toLocaleString()}</p>
             </div>
-            <div className="bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] rounded-lg p-4 text-center shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
+            <div className="bg-white border border-[rgba(46,122,217,0.30)] rounded-lg p-4 text-center shadow-[0_4px_16px_rgba(46,122,217,0.10)]">
               <p className="text-sm text-[#6B7280] mb-1">New (30d)</p>
               <p className="text-2xl font-bold text-[#2E7AD9]">{newCustomers}</p>
             </div>
