@@ -108,7 +108,7 @@ export function VendorOrderDetailModal({
             <h4 className="text-sm font-semibold text-[#1A1A2E] mb-3">
               Customer Information
             </h4>
-            <div className="bg-[#F8FAFF] rounded-xl p-4 space-y-2">
+            <div className="bg-white rounded-xl p-4 space-y-2">
               <div className="flex items-start gap-3">
                 <User className="w-4 h-4 text-[#6B7280] mt-0.5 shrink-0" />
                 <div>

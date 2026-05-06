@@ -173,7 +173,7 @@ export function VendorProfile() {
                     type="email"
                     value={formData.email}
                     disabled
-                    className="pl-10 bg-[#F8FAFF] cursor-not-allowed"
+                    className="pl-10 bg-white cursor-not-allowed"
                   />
                 </div>
                 <p className="text-xs text-[#6B7280] mt-1.5">

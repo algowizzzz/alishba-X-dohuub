@@ -146,7 +146,7 @@ export function VendorSidebar({
         {!isMobile && (
           <button
             onClick={onClose}
-            className="absolute -right-3 top-6 w-6 h-6 bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] rounded-full flex items-center justify-center hover:bg-[#F0F7FF] transition-colors"
+            className="absolute -right-3 top-6 w-6 h-6 bg-white border border-[rgba(46,122,217,0.25)] rounded-full flex items-center justify-center hover:bg-[#F0F7FF] transition-colors"
           >
             {isCollapsed ? (
               <ChevronRight className="w-3 h-3 text-[#6B7280]" />

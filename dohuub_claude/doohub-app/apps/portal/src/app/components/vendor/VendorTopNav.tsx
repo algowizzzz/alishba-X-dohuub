@@ -75,7 +75,7 @@ export function VendorTopNav({ onMenuClick }: VendorTopNavProps) {
         <div className="relative">
           <button
             onClick={() => setShowDropdown(!showDropdown)}
-            className="flex items-center gap-3 hover:bg-[#F8FAFF] rounded-lg p-2 transition-colors"
+            className="flex items-center gap-3 hover:bg-white rounded-lg p-2 transition-colors"
           >
             <div className="hidden sm:block text-right">
               <p className="text-sm font-semibold text-[#1A1A2E]">{displayName}</p>
@@ -104,7 +104,7 @@ export function VendorTopNav({ onMenuClick }: VendorTopNavProps) {
                       toggleSuspension();
                       setShowDropdown(false);
                     }}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-[#F8FAFF] transition-colors text-left"
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white transition-colors text-left"
                   >
                     <AlertTriangle className={`w-4 h-4 ${isSuspended ? 'text-[#10B981]' : 'text-[#DC2626]'}`} />
                     <div className="flex-1">
@@ -119,7 +119,7 @@ export function VendorTopNav({ onMenuClick }: VendorTopNavProps) {
                 </div>
 
                 <div className="border-t border-[rgba(46,122,217,0.25)] p-2">
-                  <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-[#F8FAFF] transition-colors text-left">
+                  <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white transition-colors text-left">
                     <Settings className="w-4 h-4 text-[#6B7280]" />
                     <span className="text-sm text-[#1A1A2E]">Settings</span>
                   </button>

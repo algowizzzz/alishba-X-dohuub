@@ -172,7 +172,7 @@ export function VendorFoodForm({
           {/* Restaurant/Kitchen Name - Read Only */}
           <div>
             <Label className="mb-1.5">Restaurant/Kitchen Name</Label>
-            <div className="px-4 py-3 bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] rounded-lg shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
+            <div className="px-4 py-3 bg-white border border-[rgba(46,122,217,0.25)] rounded-lg shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
               <span className="text-sm text-[#6B7280]">{formData.restaurantName}</span>
             </div>
           </div>

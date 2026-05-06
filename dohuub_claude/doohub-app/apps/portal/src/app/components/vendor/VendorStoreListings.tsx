@@ -816,7 +816,7 @@ function ListingCard({ listing, category, onEdit, onDeactivate }: ListingCardPro
       <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
         {/* Icon */}
         <div className="flex-shrink-0">
-          <div className="w-full sm:w-[100px] h-[100px] rounded-xl bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] flex items-center justify-center shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
+          <div className="w-full sm:w-[100px] h-[100px] rounded-xl bg-white border border-[rgba(46,122,217,0.25)] flex items-center justify-center shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
             <FileText className="w-10 h-10 text-[#9CA3AF]" />
           </div>
         </div>
@@ -881,7 +881,7 @@ function ListingCard({ listing, category, onEdit, onDeactivate }: ListingCardPro
                 {listing.whatsIncluded.map((item, index) => (
                   <div
                     key={index}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] rounded-lg text-xs text-[#6B7280] shadow-[0_4px_16px_rgba(46,122,217,0.18)]"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-[rgba(46,122,217,0.25)] rounded-lg text-xs text-[#6B7280] shadow-[0_4px_16px_rgba(46,122,217,0.18)]"
                   >
                     <Check className="w-3.5 h-3.5 text-[#10B981]" />
                     {item}

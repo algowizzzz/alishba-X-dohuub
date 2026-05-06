@@ -412,7 +412,7 @@ export function VendorHandymanServiceForm({
           {formData.customIncludedItems.map((item, index) => (
             <div
               key={index}
-              className="flex items-center gap-3 p-3 bg-[#F8FAFF] rounded-lg"
+              className="flex items-center gap-3 p-3 bg-white rounded-lg"
             >
               <span className="flex-1 text-sm text-[#1A1A2E]">{item}</span>
               <Button

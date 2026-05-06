@@ -348,7 +348,7 @@ export function VendorCleaningServiceForm({
           {/* Pricing Type - Read Only */}
           <div>
             <Label className="mb-1.5">Pricing Type</Label>
-            <div className="flex items-center gap-2 px-4 py-3 bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] rounded-lg shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
+            <div className="flex items-center gap-2 px-4 py-3 bg-white border border-[rgba(46,122,217,0.25)] rounded-lg shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
               <span className="text-sm font-medium text-[#1A1A2E]">
                 Fixed Pricing
               </span>
@@ -412,7 +412,7 @@ export function VendorCleaningServiceForm({
           {formData.customIncludedItems.map((item, index) => (
             <div
               key={index}
-              className="flex items-center gap-3 p-3 bg-[#F8FAFF] rounded-lg"
+              className="flex items-center gap-3 p-3 bg-white rounded-lg"
             >
               <span className="flex-1 text-sm text-[#1A1A2E]">{item}</span>
               <Button

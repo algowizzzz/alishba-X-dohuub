@@ -211,7 +211,7 @@ export function VendorSubscriptionManagement() {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
               {/* Plan Details */}
-              <div className="bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] rounded-xl p-6 shadow-[0_2px_8px_rgba(46,122,217,0.10)]">
+              <div className="bg-white border border-[rgba(46,122,217,0.25)] rounded-xl p-6 shadow-[0_2px_8px_rgba(46,122,217,0.10)]">
                 <p className="text-xs font-semibold text-[#6B7280] uppercase tracking-wide mb-2">
                   Plan Type
                 </p>
@@ -224,7 +224,7 @@ export function VendorSubscriptionManagement() {
               </div>
 
               {/* Next Billing */}
-              <div className="bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] rounded-xl p-6 shadow-[0_2px_8px_rgba(46,122,217,0.10)]">
+              <div className="bg-white border border-[rgba(46,122,217,0.25)] rounded-xl p-6 shadow-[0_2px_8px_rgba(46,122,217,0.10)]">
                 <p className="text-xs font-semibold text-[#6B7280] uppercase tracking-wide mb-2">
                   Next Billing Date
                 </p>
@@ -240,7 +240,7 @@ export function VendorSubscriptionManagement() {
               </div>
 
               {/* Payment Method */}
-              <div className="bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] rounded-xl p-6 shadow-[0_2px_8px_rgba(46,122,217,0.10)]">
+              <div className="bg-white border border-[rgba(46,122,217,0.25)] rounded-xl p-6 shadow-[0_2px_8px_rgba(46,122,217,0.10)]">
                 <p className="text-xs font-semibold text-[#6B7280] uppercase tracking-wide mb-2">
                   Payment Method
                 </p>

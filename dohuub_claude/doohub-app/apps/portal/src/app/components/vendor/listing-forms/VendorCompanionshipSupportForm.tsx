@@ -404,7 +404,7 @@ export function VendorCompanionshipSupportForm({
               {formData.languages.map((language) => (
                 <div
                   key={language}
-                  className="flex items-center gap-3 p-3 bg-[#F8FAFF] rounded-lg"
+                  className="flex items-center gap-3 p-3 bg-white rounded-lg"
                 >
                   <span className="flex-1 text-sm text-[#1A1A2E]">{language}</span>
                   <Button

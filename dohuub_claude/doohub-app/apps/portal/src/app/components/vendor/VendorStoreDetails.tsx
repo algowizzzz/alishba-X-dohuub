@@ -136,7 +136,7 @@ export function VendorStoreDetails() {
             <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
               {/* Icon */}
               <div className="flex-shrink-0">
-                <div className="w-full sm:w-[100px] h-[100px] rounded-xl bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] flex items-center justify-center shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
+                <div className="w-full sm:w-[100px] h-[100px] rounded-xl bg-white border border-[rgba(46,122,217,0.25)] flex items-center justify-center shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
                   <Building2 className="w-10 h-10 text-[#9CA3AF]" />
                 </div>
               </div>
@@ -346,7 +346,7 @@ export function VendorStoreDetails() {
               {storeDetails.regions.map((region, index) => (
                 <div
                   key={index}
-                  className="flex items-center gap-2 px-4 py-2 bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] rounded-lg shadow-[0_4px_16px_rgba(46,122,217,0.18)]"
+                  className="flex items-center gap-2 px-4 py-2 bg-white border border-[rgba(46,122,217,0.25)] rounded-lg shadow-[0_4px_16px_rgba(46,122,217,0.18)]"
                 >
                   <span className="text-sm font-medium text-[#1A1A2E]">
                     📍 {region.name}

@@ -103,7 +103,7 @@ export function VendorSubscription() {
                   onClick={() => setSelectedPlan("monthly")}
                   className={`relative border-2 rounded-xl p-6 text-left transition-all ${
                     selectedPlan === "monthly"
-                      ? "border-[#2E7AD9] bg-[#F8FAFF]"
+                      ? "border-[#2E7AD9] bg-white"
                       : "border-[rgba(46,122,217,0.25)] hover:border-[rgba(46,122,217,0.25)]"
                   }`}
                 >
@@ -136,7 +136,7 @@ export function VendorSubscription() {
                   onClick={() => setSelectedPlan("yearly")}
                   className={`relative border-2 rounded-xl p-6 text-left transition-all ${
                     selectedPlan === "yearly"
-                      ? "border-[#2E7AD9] bg-[#F8FAFF]"
+                      ? "border-[#2E7AD9] bg-white"
                       : "border-[rgba(46,122,217,0.25)] hover:border-[rgba(46,122,217,0.25)]"
                   }`}
                 >

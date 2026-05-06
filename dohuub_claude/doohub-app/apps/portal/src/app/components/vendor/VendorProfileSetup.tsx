@@ -111,7 +111,7 @@ export function VendorProfileSetup() {
                 type="email"
                 value={formData.email}
                 disabled
-                className="bg-[#F8FAFF]"
+                className="bg-white"
               />
             </div>
 

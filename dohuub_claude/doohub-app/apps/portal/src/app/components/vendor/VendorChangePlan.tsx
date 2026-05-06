@@ -136,7 +136,7 @@ export function VendorChangePlan() {
                   relative border-2 rounded-2xl p-6 text-left transition-all
                   ${
                     selectedPlan === "monthly"
-                      ? "border-[#2E7AD9] bg-[#F8FAFF]"
+                      ? "border-[#2E7AD9] bg-white"
                       : "border-[rgba(46,122,217,0.25)] hover:border-[rgba(46,122,217,0.25)]"
                   }
                 `}
@@ -170,7 +170,7 @@ export function VendorChangePlan() {
                   relative border-2 rounded-2xl p-6 text-left transition-all
                   ${
                     selectedPlan === "yearly"
-                      ? "border-[#2E7AD9] bg-[#F8FAFF]"
+                      ? "border-[#2E7AD9] bg-white"
                       : "border-[rgba(46,122,217,0.25)] hover:border-[rgba(46,122,217,0.25)]"
                   }
                 `}
@@ -205,7 +205,7 @@ export function VendorChangePlan() {
             </div>
 
             {/* Plan Comparison */}
-            <div className="bg-[#F8FAFF] border border-[rgba(46,122,217,0.25)] rounded-xl p-6 shadow-[0_2px_8px_rgba(46,122,217,0.10)]">
+            <div className="bg-white border border-[rgba(46,122,217,0.25)] rounded-xl p-6 shadow-[0_2px_8px_rgba(46,122,217,0.10)]">
               <h3 className="text-base font-semibold text-[#1A1A2E] mb-4">
                 All Plans Include
               </h3>
@@ -275,7 +275,7 @@ export function VendorChangePlan() {
                 : " You'll be charged $49 immediately."}
             </p>
 
-            <div className="bg-[#F8FAFF] rounded-xl p-4 mb-6">
+            <div className="bg-white rounded-xl p-4 mb-6">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm text-[#6B7280]">Current Plan:</span>
                 <span className="text-sm font-semibold text-[#1A1A2E]">

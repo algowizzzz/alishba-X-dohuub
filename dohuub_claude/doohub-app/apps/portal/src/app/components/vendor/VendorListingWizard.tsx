@@ -381,7 +381,7 @@ export function VendorListingWizard() {
               {includedItems.map((item) => (
                 <div
                   key={item.id}
-                  className="flex items-center justify-between p-3 bg-[#F8FAFF] rounded-xl"
+                  className="flex items-center justify-between p-3 bg-white rounded-xl"
                 >
                   <span className="text-sm text-[#1A1A2E]">{item.text}</span>
                   <Button

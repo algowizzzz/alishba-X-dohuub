@@ -383,7 +383,7 @@ export function VendorGeographicRegions() {
             </div>
 
             {/* Active Toggle */}
-            <div className="flex items-center justify-between p-4 bg-[#F8FAFF] rounded-xl">
+            <div className="flex items-center justify-between p-4 bg-white rounded-xl">
               <div>
                 <p className="text-sm font-semibold text-[#1A1A2E] mb-1">
                   Active Status
