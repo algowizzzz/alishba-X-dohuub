@@ -151,8 +151,10 @@ export function VendorStoreForm() {
         logo: logoPreview || null,
         phone,
         email,
-        regionIds: regions.filter((r) => r.isActive).map((r) => r.id),
-        status: activateNow === "active" ? "ACTIVE" : "INACTIVE",
+        // Region IDs from CountryRegionModal are hardcoded sample strings
+        // ("us-1", "us-2", ...) and don't FK to the Region table; manage
+        // regions from the dedicated /vendor/services/:storeId/regions page.
+        status: activateNow === "active" ? "ACTIVE" : "DRAFT",
       });
       navigate("/vendor/services");
     } catch (err: any) {
