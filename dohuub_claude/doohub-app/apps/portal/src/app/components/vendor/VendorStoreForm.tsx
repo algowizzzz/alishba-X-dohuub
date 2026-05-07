@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
+import axios from "axios";
+import { toast } from "sonner";
 import api from "../../../services/api";
+import { supabase } from "../../../lib/supabase";
 import {
   ArrowLeft,
   Upload,
@@ -63,6 +66,8 @@ export function VendorStoreForm() {
   const [category, setCategory] = useState("");
   const [description, setDescription] = useState("");
   const [logoPreview, setLogoPreview] = useState("");
+  const [logoUrl, setLogoUrl] = useState("");
+  const [isUploading, setIsUploading] = useState(false);
   const [regions, setRegions] = useState<RegionWithCountry[]>([
     { id: "1", name: "New York, NY", countryCode: "US", countryName: "United States", countryFlag: "🇺🇸", isActive: true },
     { id: "2", name: "Los Angeles, CA", countryCode: "US", countryName: "United States", countryFlag: "🇺🇸", isActive: true },
@@ -77,14 +82,41 @@ export function VendorStoreForm() {
 
   const progress = (currentStep / 4) * 100;
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setLogoPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+    // Show local preview immediately.
+    const reader = new FileReader();
+    reader.onloadend = () => setLogoPreview(reader.result as string);
+    reader.readAsDataURL(file);
+    // Upload to backend storage so we save a URL, not a multi-MB data URL.
+    setIsUploading(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      const API_BASE =
+        (import.meta as any).env?.VITE_API_URL ||
+        (typeof window !== "undefined" && window.location.hostname !== "localhost"
+          ? "https://alishba-x-dohuub-production.up.railway.app"
+          : "http://localhost:3001");
+      const form = new FormData();
+      form.append("image", file);
+      const resp = await axios.post(
+        `${API_BASE}/api/v1/upload/image?type=store-logo`,
+        form,
+        { headers: token ? { Authorization: `Bearer ${token}` } : {} }
+      );
+      const url = resp?.data?.data?.url;
+      if (url) {
+        setLogoUrl(url);
+        toast.success("Logo uploaded");
+      } else {
+        toast.error("Upload completed but no URL returned");
+      }
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || err?.message || "Failed to upload image");
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -148,7 +180,7 @@ export function VendorStoreForm() {
         name: businessName,
         category: categoryEnum,
         description,
-        logo: logoPreview || null,
+        logo: logoUrl || null,
         phone,
         email,
         // Region IDs from CountryRegionModal are hardcoded sample strings
