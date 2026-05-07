@@ -13,6 +13,8 @@ import {
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { useNavigate } from "react-router-dom";
+import api from "../../../services/api";
+import { toast } from "sonner";
 
 interface Invoice {
   id: string;
@@ -123,12 +125,19 @@ export function VendorSubscriptionManagement() {
     setCvv("");
   };
 
-  const handleConfirmCancel = () => {
-    // Process subscription cancellation
-    console.log("Subscription cancelled. Reason:", cancelReason);
-    setShowCancelModal(false);
-    setCancelReason("");
-    // Could navigate to a confirmation page or show success message
+  const [isCancelling, setIsCancelling] = useState(false);
+  const handleConfirmCancel = async () => {
+    setIsCancelling(true);
+    try {
+      await api.post("/api/v1/subscriptions/cancel", { reason: cancelReason || undefined });
+      toast.success("Subscription cancelled");
+      setShowCancelModal(false);
+      setCancelReason("");
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error || e?.message || "Failed to cancel subscription");
+    } finally {
+      setIsCancelling(false);
+    }
   };
 
   const formatCardNumber = (value: string) => {
@@ -487,9 +496,10 @@ export function VendorSubscriptionManagement() {
               <Button
                 onClick={handleConfirmCancel}
                 variant="outline"
+                disabled={isCancelling}
                 className="text-[#DC2626] hover:text-[#DC2626] hover:bg-[#FEF2F2] border-[#FEE2E2]"
               >
-                Cancel Subscription
+                {isCancelling ? "Cancelling..." : "Cancel Subscription"}
               </Button>
             </div>
           </div>

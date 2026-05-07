@@ -6,6 +6,8 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
+import api from "../../../services/api";
+import { toast } from "sonner";
 
 export function VendorUpdatePayment() {
   const navigate = useNavigate();
@@ -145,19 +147,25 @@ export function VendorUpdatePayment() {
     }
 
     setIsLoading(true);
-
-    // Simulate API call
-    setTimeout(() => {
-      console.log("Payment method updated:", {
-        cardNumber,
-        cardName,
-        expiryDate,
-        cvv,
+    try {
+      const last4 = cardNumber.replace(/\s+/g, "").slice(-4);
+      const [expMonth, expYearShort] = expiryDate.split("/").map((s) => s.trim());
+      // Demo: we don't tokenize through Stripe. Send a synthesized id and
+      // the card meta the backend persists.
+      await api.put("/api/v1/subscriptions/payment-method", {
+        paymentMethodId: `demo_pm_${Date.now()}`,
+        cardLast4: last4,
+        cardBrand: "visa",
+        cardExpMonth: Number(expMonth),
+        cardExpYear: 2000 + Number(expYearShort),
       });
-      setIsLoading(false);
-      // Navigate back to subscription management
+      toast.success("Payment method updated");
       navigate("/vendor/subscription-management");
-    }, 1500);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || err?.message || "Failed to update payment method");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

@@ -4,6 +4,8 @@ import { VendorTopNav } from "./VendorTopNav";
 import { Check, ArrowRight, AlertCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../ui/button";
+import api from "../../../services/api";
+import { toast } from "sonner";
 
 type PlanType = "monthly" | "yearly";
 
@@ -63,12 +65,21 @@ export function VendorChangePlan() {
     setShowConfirmModal(true);
   };
 
-  const handleConfirmChange = () => {
-    // Process plan change
-    console.log("Plan changed to:", selectedPlan);
-    setShowConfirmModal(false);
-    // Navigate back to subscription management
-    navigate("/vendor/subscription-management");
+  const [isChanging, setIsChanging] = useState(false);
+  const handleConfirmChange = async () => {
+    // Map UI billing-frequency to a real backend plan id
+    const planId = selectedPlan === "monthly" ? "basic" : "professional";
+    setIsChanging(true);
+    try {
+      await api.put("/api/v1/subscriptions/change-plan", { planId });
+      toast.success("Plan updated successfully");
+      setShowConfirmModal(false);
+      navigate("/vendor/subscription-management");
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error || e?.message || "Failed to change plan");
+    } finally {
+      setIsChanging(false);
+    }
   };
 
   return (
@@ -310,9 +321,10 @@ export function VendorChangePlan() {
               <Button
                 onClick={handleConfirmChange}
                 variant="default"
+                disabled={isChanging}
                 className="flex-1"
               >
-                Confirm Change
+                {isChanging ? "Updating..." : "Confirm Change"}
               </Button>
             </div>
           </div>
