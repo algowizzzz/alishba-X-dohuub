@@ -207,8 +207,17 @@ router.put('/change-plan', authenticate, async (req: AuthRequest, res) => {
       return res.status(403).json({ error: 'Vendor profile not found' });
     }
 
+    // Lazily create the subscription record if the vendor doesn't have one
+    // yet (demo accounts often don't go through full signup).
     if (!vendor.subscription) {
-      return res.status(400).json({ error: 'No subscription found. Create one first.' });
+      vendor.subscription = await prisma.vendorSubscription.create({
+        data: {
+          vendorId: vendor.id,
+          status: 'TRIAL',
+          stripeSubscriptionId: null,
+          planId: null,
+        },
+      });
     }
 
     const currentPlan = getPlanFromSubscription(vendor.subscription.stripeSubscriptionId);
@@ -219,6 +228,8 @@ router.put('/change-plan', authenticate, async (req: AuthRequest, res) => {
       where: { id: vendor.subscription.id },
       data: {
         stripeSubscriptionId: planId,
+        planId,
+        status: 'ACTIVE',
       },
     });
 
@@ -259,7 +270,9 @@ router.put('/payment-method', authenticate, async (req: AuthRequest, res) => {
     }
 
     if (!vendor.subscription) {
-      return res.status(400).json({ error: 'No subscription found' });
+      vendor.subscription = await prisma.vendorSubscription.create({
+        data: { vendorId: vendor.id, status: 'TRIAL' },
+      });
     }
 
     // In production, update payment method in Stripe
@@ -299,11 +312,24 @@ router.post('/cancel', authenticate, async (req: AuthRequest, res) => {
     }
 
     if (!vendor.subscription) {
-      return res.status(400).json({ error: 'No subscription found' });
+      // Vendor never had an active subscription — record a cancelled stub
+      // so the UI sees a consistent state.
+      vendor.subscription = await prisma.vendorSubscription.create({
+        data: {
+          vendorId: vendor.id,
+          status: 'CANCELLED',
+          cancelledAt: new Date(),
+          cancellationReason: reason || null,
+        },
+      });
     }
 
     if (vendor.subscription.status === 'CANCELLED') {
-      return res.status(400).json({ error: 'Subscription already cancelled' });
+      return res.json({
+        success: true,
+        data: vendor.subscription,
+        message: 'Subscription already cancelled',
+      });
     }
 
     // Update subscription status
@@ -312,6 +338,7 @@ router.post('/cancel', authenticate, async (req: AuthRequest, res) => {
       data: {
         status: 'CANCELLED',
         cancelledAt: new Date(),
+        cancellationReason: reason || null,
       },
     });
 
