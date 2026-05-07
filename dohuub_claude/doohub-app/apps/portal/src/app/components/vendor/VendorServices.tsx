@@ -413,29 +413,41 @@ export function VendorServices() {
   const [stores, setStores] = useState<VendorStore[]>([]);
 
   useEffect(() => {
-    api.get<{ success: boolean; data: any[] }>("/api/v1/vendors/listings")
+    const ENUM_TO_LABEL: Record<string, string> = {
+      CLEANING: "Cleaning Services",
+      HANDYMAN: "Handyman Services",
+      GROCERIES: "Grocery",
+      BEAUTY: "Beauty Services",
+      BEAUTY_PRODUCTS: "Beauty Products",
+      FOOD: "Food",
+      RENTALS: "Rental Properties",
+      RIDE_ASSISTANCE: "Ride Assistance",
+      COMPANIONSHIP: "Companionship Support",
+    };
+    api.get<{ success: boolean; data: any[] }>("/api/v1/stores?limit=200")
       .then((r) => {
-        // Group listings into one synthetic "store" per category for now.
-        const byCat = new Map<string, any[]>();
-        ((r as any)?.data || []).forEach((l: any) => {
-          const cat = l.category || l.__type || "other";
-          if (!byCat.has(cat)) byCat.set(cat, []);
-          byCat.get(cat)!.push(l);
+        const arr = (r as any)?.data || [];
+        const mapped: VendorStore[] = arr.map((s: any) => {
+          const counts = s._count || {};
+          const listingsTotal = Object.values(counts).reduce(
+            (acc: number, n) => acc + (typeof n === "number" ? n : 0),
+            0
+          ) as number;
+          return {
+            id: s.id,
+            businessName: s.name || "Untitled Store",
+            category: ENUM_TO_LABEL[s.category] || s.category || "Other",
+            status: (s.status === "ACTIVE" ? "active" : "inactive") as "active" | "inactive",
+            regions: Array.isArray(s.regions) ? s.regions.length : 0,
+            bookings: listingsTotal,
+            bookingTrend: 0,
+            rating: 0,
+            reviews: 0,
+            revenue: 0,
+            revenueTrend: 0,
+          };
         });
-        const synthStores: VendorStore[] = Array.from(byCat.entries()).map(([cat, items], idx) => ({
-          id: String(idx + 1),
-          businessName: `${cat.charAt(0).toUpperCase() + cat.slice(1).toLowerCase()} Listings`,
-          category: cat,
-          status: "active",
-          regions: [],
-          bookings: 0,
-          bookingTrend: 0,
-          rating: items[0]?.vendor?.rating ?? 0,
-          reviews: items[0]?.vendor?.reviewCount ?? 0,
-          revenue: 0,
-          revenueTrend: 0,
-        } as any));
-        setStores(synthStores);
+        setStores(mapped);
       })
       .catch(() => setStores([]));
   }, []);
