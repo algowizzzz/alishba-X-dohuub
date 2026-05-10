@@ -1,5 +1,7 @@
 import { useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
+import { toast } from "sonner";
+import api from "../../../services/api";
 import { VendorSidebar } from "./VendorSidebar";
 import { VendorTopNav } from "./VendorTopNav";
 import { VendorCleaningServiceForm } from "./listing-forms/VendorCleaningServiceForm";
@@ -25,8 +27,22 @@ const storeDataMap: Record<string, { category: string; name: string }> = {
   "9": { category: "Companionship Support", name: "Caring Companions" },
 };
 
+// Map UI category label → backend enum
+const CATEGORY_TO_ENUM: Record<string, string> = {
+  "Cleaning Services": "CLEANING",
+  "Handyman Services": "HANDYMAN",
+  "Beauty Services": "BEAUTY",
+  "Beauty Products": "BEAUTY_PRODUCTS",
+  "Groceries": "GROCERIES",
+  "Food": "FOOD",
+  "Rental Properties": "RENTALS",
+  "Ride Assistance": "RIDE_ASSISTANCE",
+  "Companionship Support": "COMPANIONSHIP",
+};
+
 export function VendorListingFormRouter() {
   const { storeId, listingId } = useParams();
+  const navigate = useNavigate();
   const isEditing = !!listingId;
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -63,25 +79,67 @@ export function VendorListingFormRouter() {
       }
     : undefined;
 
-  const handleSave = (data: any, isDraft: boolean) => {
-    // Save to localStorage for now (will be passed to parent in real implementation)
-    const existingListings = JSON.parse(
-      localStorage.getItem(`store-${storeId}-listings`) || "[]"
-    );
-
-    if (isEditing) {
-      const updatedListings = existingListings.map((listing: any) =>
-        listing.id === listingId ? data : listing
-      );
-      localStorage.setItem(
-        `store-${storeId}-listings`,
-        JSON.stringify(updatedListings)
-      );
-    } else {
-      localStorage.setItem(
-        `store-${storeId}-listings`,
-        JSON.stringify([...existingListings, data])
-      );
+  const handleSave = async (data: any, isDraft: boolean) => {
+    const categoryEnum = CATEGORY_TO_ENUM[category] || "CLEANING";
+    try {
+      // The child forms pass a flat object with field names like
+      // { title, description, fullDescription, price, whatsIncluded, ... }
+      // POST to the backend, which switches on `category`.
+      await api.post("/api/v1/vendors/listings", {
+        category: categoryEnum,
+        title: data.title || data.name || "",
+        description: data.description || data.shortDescription || "",
+        fullDescription: data.fullDescription || data.longDescription || undefined,
+        price: data.price ?? data.basePrice ?? data.hourlyRate ?? 0,
+        images: data.images || data.imageGallery || data.portfolio || [],
+        whatsIncluded: data.whatsIncluded || [],
+        status: isDraft ? "DRAFT" : "ACTIVE",
+        storeId,
+        // pass-through optional fields the API accepts when present
+        cleaningType: data.cleaningType,
+        handymanType: data.handymanType,
+        beautyType: data.beautyType,
+        duration: data.duration,
+        services: data.services,
+        portfolio: data.portfolio,
+        cuisines: data.cuisines,
+        portionSize: data.portionSize,
+        productCategory: data.productCategory || data.subCategory,
+        brand: data.brand,
+        quantityAmount: data.quantityAmount,
+        quantityUnit: data.quantityUnit || data.unit,
+        propertyType: data.propertyType,
+        address: data.address,
+        city: data.city,
+        state: data.state,
+        zipCode: data.zipCode,
+        bedrooms: data.bedrooms,
+        bathrooms: data.bathrooms,
+        maxGuests: data.maxGuests,
+        amenities: data.amenities,
+        pricePerNight: data.pricePerNight,
+        pricePerWeek: data.pricePerWeek,
+        pricePerMonth: data.pricePerMonth,
+        cleaningFee: data.cleaningFee,
+        rules: data.rules,
+        minStay: data.minStay,
+        maxStay: data.maxStay,
+        hourlyRate: data.hourlyRate,
+        vehicleTypes: data.vehicleTypes,
+        specialFeatures: data.specialFeatures,
+        coverageArea: data.coverageArea,
+        totalSeats: data.totalSeats,
+        yearsOfExperience: data.yearsOfExperience,
+        credentialImages: data.credentialImages,
+        certifications: data.certifications,
+        specialties: data.specialties,
+        supportTypes: data.supportTypes,
+        languages: data.languages,
+      });
+      toast.success(isDraft ? "Saved as draft" : "Listing published");
+      navigate(`/vendor/services/${storeId}/listings`);
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error || e?.message || "Failed to save listing");
     }
   };
 

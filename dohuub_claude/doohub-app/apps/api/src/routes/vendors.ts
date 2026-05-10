@@ -480,6 +480,253 @@ router.get('/listings', authenticate, async (req: AuthRequest, res) => {
   }
 });
 
+// Create a listing for the current vendor (any of 9 categories)
+router.post('/listings', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const vendor = await prisma.vendor.findFirst({ where: { userId: req.user!.id } });
+    if (!vendor) return res.status(403).json({ error: 'Vendor profile not found' });
+
+    const {
+      category,
+      title,
+      description,
+      fullDescription,
+      price,
+      images,
+      whatsIncluded,
+      status,
+      storeId,
+      // category-specific (any forms that already collect these can pass them)
+      cleaningType,
+      handymanType,
+      beautyType,
+      duration,
+      portfolio,
+      services,
+      cuisines,
+      portionSize,
+      productCategory,
+      brand,
+      quantityAmount,
+      quantityUnit,
+      propertyType,
+      address,
+      city,
+      state,
+      zipCode,
+      bedrooms,
+      bathrooms,
+      maxGuests,
+      amenities,
+      pricePerNight,
+      pricePerWeek,
+      pricePerMonth,
+      cleaningFee,
+      rules,
+      minStay,
+      maxStay,
+      hourlyRate,
+      vehicleTypes,
+      specialFeatures,
+      coverageArea,
+      totalSeats,
+      yearsOfExperience,
+      credentialImages,
+      certifications,
+      specialties,
+      supportTypes,
+      languages,
+    } = req.body;
+
+    if (!category || !title) {
+      return res.status(400).json({ error: 'category and title are required' });
+    }
+
+    const apiStatus = status === 'inactive' || status === 'DRAFT' ? 'DRAFT' : 'ACTIVE';
+    const desc = description || fullDescription || '';
+    const numPrice = Number(price) || 0;
+    const imgs = Array.isArray(images) ? images : [];
+    const included = Array.isArray(whatsIncluded) ? whatsIncluded : [];
+    const baseStore = storeId || undefined;
+
+    let listing: any;
+    let type: string;
+
+    switch (String(category).toUpperCase()) {
+      case 'CLEANING':
+        listing = await prisma.cleaningListing.create({
+          data: {
+            vendorId: vendor.id, storeId: baseStore,
+            title, description: desc,
+            cleaningType: cleaningType || 'DEEP_CLEANING',
+            basePrice: numPrice,
+            images: imgs, whatsIncluded: included,
+            duration: duration ? Number(duration) : null,
+            status: apiStatus as any,
+          },
+        });
+        type = 'CLEANING';
+        break;
+
+      case 'HANDYMAN':
+        listing = await prisma.handymanListing.create({
+          data: {
+            vendorId: vendor.id, storeId: baseStore,
+            title, description: desc,
+            handymanType: handymanType || 'PLUMBING',
+            basePrice: numPrice, hourlyRate: hourlyRate || null,
+            services: Array.isArray(services) ? services : [],
+            images: imgs, whatsIncluded: included,
+            status: apiStatus as any,
+          },
+        });
+        type = 'HANDYMAN';
+        break;
+
+      case 'BEAUTY':
+        listing = await prisma.beautyListing.create({
+          data: {
+            vendorId: vendor.id, storeId: baseStore,
+            title, description: desc,
+            beautyType: beautyType || 'HAIR_STYLING',
+            basePrice: numPrice,
+            duration: duration ? Number(duration) : 60,
+            services: Array.isArray(services) ? services : [],
+            images: imgs,
+            portfolio: Array.isArray(portfolio) ? portfolio : [],
+            status: apiStatus as any,
+          },
+        });
+        type = 'BEAUTY';
+        break;
+
+      case 'BEAUTY_PRODUCTS':
+        listing = await prisma.beautyProductListing.create({
+          data: {
+            vendorId: vendor.id, storeId: baseStore,
+            name: title, description: desc,
+            category: productCategory || 'Skincare',
+            brand: brand || null,
+            price: numPrice,
+            quantityAmount: quantityAmount ? Number(quantityAmount) : null,
+            quantityUnit: quantityUnit || null,
+            image: imgs[0] || null,
+            status: apiStatus as any,
+          },
+        });
+        type = 'BEAUTY_PRODUCTS';
+        break;
+
+      case 'GROCERIES':
+        listing = await prisma.groceryListing.create({
+          data: {
+            vendorId: vendor.id, storeId: baseStore,
+            name: title, description: desc,
+            category: productCategory || 'Produce',
+            price: numPrice,
+            unit: quantityUnit || 'each',
+            image: imgs[0] || null,
+            status: apiStatus as any,
+          },
+        });
+        type = 'GROCERIES';
+        break;
+
+      case 'FOOD':
+        listing = await prisma.foodListing.create({
+          data: {
+            vendorId: vendor.id, storeId: baseStore,
+            name: title, description: desc,
+            category: productCategory || 'Main Courses',
+            cuisines: Array.isArray(cuisines) ? cuisines : [],
+            portionSize: portionSize || null,
+            quantityAmount: quantityAmount ? Number(quantityAmount) : null,
+            quantityUnit: quantityUnit || null,
+            price: numPrice,
+            image: imgs[0] || null,
+            status: apiStatus as any,
+          },
+        });
+        type = 'FOOD';
+        break;
+
+      case 'RENTALS':
+        listing = await prisma.rentalListing.create({
+          data: {
+            vendorId: vendor.id, storeId: baseStore,
+            title, description: desc,
+            propertyType: propertyType || 'Apartment',
+            address: address || '',
+            city: city || '',
+            state: state || '',
+            zipCode: zipCode || '',
+            bedrooms: bedrooms ? Number(bedrooms) : 1,
+            bathrooms: bathrooms ? Number(bathrooms) : 1,
+            maxGuests: maxGuests ? Number(maxGuests) : null,
+            amenities: Array.isArray(amenities) ? amenities : [],
+            images: imgs,
+            pricePerNight: pricePerNight ? Number(pricePerNight) : numPrice,
+            pricePerWeek: pricePerWeek ? Number(pricePerWeek) : null,
+            pricePerMonth: pricePerMonth ? Number(pricePerMonth) : null,
+            cleaningFee: cleaningFee ? Number(cleaningFee) : null,
+            rules: Array.isArray(rules) ? rules : [],
+            minStay: minStay ? Number(minStay) : 1,
+            maxStay: maxStay ? Number(maxStay) : null,
+            status: apiStatus as any,
+          },
+        });
+        type = 'RENTALS';
+        break;
+
+      case 'RIDE_ASSISTANCE':
+        listing = await prisma.rideAssistanceListing.create({
+          data: {
+            vendorId: vendor.id, storeId: baseStore,
+            title, description: desc,
+            longDescription: fullDescription || null,
+            hourlyRate: hourlyRate ? Number(hourlyRate) : numPrice,
+            image: imgs[0] || null,
+            images: imgs,
+            vehicleTypes: Array.isArray(vehicleTypes) ? vehicleTypes : [],
+            specialFeatures: specialFeatures || null,
+            coverageArea: coverageArea || null,
+            totalSeats: totalSeats ? Number(totalSeats) : null,
+            status: apiStatus as any,
+          },
+        });
+        type = 'RIDE_ASSISTANCE';
+        break;
+
+      case 'COMPANIONSHIP':
+        listing = await prisma.companionshipListing.create({
+          data: {
+            vendorId: vendor.id, storeId: baseStore,
+            title, description: desc,
+            hourlyRate: hourlyRate ? Number(hourlyRate) : numPrice,
+            yearsOfExperience: yearsOfExperience ? Number(yearsOfExperience) : null,
+            image: imgs[0] || null,
+            credentialImages: Array.isArray(credentialImages) ? credentialImages : [],
+            certifications: Array.isArray(certifications) ? certifications : [],
+            specialties: Array.isArray(specialties) ? specialties : [],
+            supportTypes: Array.isArray(supportTypes) ? supportTypes : [],
+            languages: Array.isArray(languages) ? languages : [],
+            status: apiStatus as any,
+          },
+        });
+        type = 'COMPANIONSHIP';
+        break;
+
+      default:
+        return res.status(400).json({ error: `Unknown category: ${category}` });
+    }
+
+    res.status(201).json({ success: true, data: { ...listing, category: type } });
+  } catch (error: any) {
+    console.error('Create vendor listing error:', error);
+    res.status(500).json({ error: error?.message || 'Failed to create listing' });
+  }
+});
+
 // Get all listings across all vendors (admin only)
 router.get('/all-listings', authenticate, requireRole('ADMIN'), async (req: AuthRequest, res) => {
   try {
