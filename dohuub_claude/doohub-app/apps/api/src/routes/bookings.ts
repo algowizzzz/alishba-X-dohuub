@@ -210,8 +210,34 @@ router.post('/', authenticate, async (req: AuthRequest, res) => {
         subtotal = listing?.basePrice || 0;
         if (isRoundTrip) subtotal *= 2;
         break;
+      case 'FOOD':
+        listing = await prisma.foodListing.findUnique({ where: { id: listingId } });
+        listingField = 'foodListingId' as any;
+        subtotal = listing?.basePrice || 0;
+        break;
+      case 'GROCERIES':
+        listing = await prisma.groceryListing.findUnique({ where: { id: listingId } });
+        listingField = 'groceryListingId' as any;
+        subtotal = listing?.basePrice || 0;
+        break;
+      case 'BEAUTY_PRODUCTS':
+        listing = await prisma.beautyProductListing.findUnique({ where: { id: listingId } });
+        listingField = 'beautyProductListingId' as any;
+        subtotal = listing?.basePrice || 0;
+        break;
+      case 'RIDE_ASSISTANCE':
+        listing = await prisma.rideAssistanceListing.findUnique({ where: { id: listingId } });
+        listingField = 'rideAssistanceListingId' as any;
+        subtotal = (listing?.basePrice || 0) * (duration ? duration / 60 : 1);
+        if (isRoundTrip) subtotal *= 2;
+        break;
+      case 'COMPANIONSHIP':
+        listing = await prisma.companionshipListing.findUnique({ where: { id: listingId } });
+        listingField = 'companionshipListingId' as any;
+        subtotal = (listing?.basePrice || 0) * (duration ? duration / 60 : 1);
+        break;
       default:
-        return res.status(400).json({ error: 'Invalid category' });
+        return res.status(400).json({ error: `Invalid category: ${category}` });
     }
 
     if (!listing) {

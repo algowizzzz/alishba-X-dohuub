@@ -48,9 +48,6 @@ export default function PaymentScreen() {
 
   const handlePayNow = async () => {
     setIsProcessing(true);
-
-    // Try to create real booking, fall back to dummy ID if it fails
-    let bookingId = `dummy-${Date.now()}`;
     try {
       const booking = await createBooking({
         vendorId: vendorId || '',
@@ -64,22 +61,24 @@ export default function PaymentScreen() {
         serviceFee,
         total: totalAmount,
       });
-      bookingId = booking.id;
-    } catch {
-      // proceed with dummy booking ID
+      setIsProcessing(false);
+      router.replace({
+        pathname: '/checkout/processing',
+        params: {
+          serviceName,
+          amount: totalAmount.toString(),
+          date,
+          time,
+          bookingId: booking.id,
+        },
+      });
+    } catch (err: any) {
+      setIsProcessing(false);
+      Alert.alert(
+        'Booking failed',
+        err?.response?.data?.error || err?.message || 'Could not create the booking. Please try again.'
+      );
     }
-
-    setIsProcessing(false);
-    router.replace({
-      pathname: '/checkout/processing',
-      params: {
-        serviceName,
-        amount: totalAmount.toString(),
-        date,
-        time,
-        bookingId,
-      },
-    });
   };
 
   return (
