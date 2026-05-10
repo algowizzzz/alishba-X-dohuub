@@ -2,8 +2,40 @@ import { Router } from 'express';
 import { prisma, BookingStatus } from '@doohub/database';
 import { authenticate, AuthRequest } from '../middleware/auth';
 import { supabase } from '../utils/supabase';
+import { sendPushToUsers, PushPayload } from '../utils/push';
 
 const router = Router();
+
+// Map a booking status to a customer push payload.
+function bookingStatusPush(status: string, booking: any): PushPayload | null {
+  const vendorName = booking?.vendor?.businessName || 'your vendor';
+  const dateStr = booking?.scheduledDate
+    ? new Date(booking.scheduledDate).toLocaleDateString()
+    : 'your scheduled date';
+  const data = { type: 'booking_update', bookingId: booking?.id, status };
+
+  switch (status) {
+    case 'ACCEPTED':
+      return {
+        title: 'Booking confirmed',
+        body: `Your booking at ${vendorName} on ${dateStr} is confirmed.`,
+        data,
+      };
+    case 'IN_PROGRESS':
+      return { title: 'Vendor on the way', body: 'Your vendor is on the way.', data };
+    case 'COMPLETED':
+      return {
+        title: 'Booking completed',
+        body: 'Your booking is complete — leave a review!',
+        data,
+      };
+    case 'CANCELLED':
+    case 'DECLINED':
+      return { title: 'Booking cancelled', body: 'Your booking was cancelled.', data };
+    default:
+      return null;
+  }
+}
 
 const SERVICE_FEE_PERCENTAGE = 0.08; // 8% service fee
 
@@ -316,7 +348,17 @@ router.post('/:id/cancel', authenticate, async (req: AuthRequest, res) => {
           create: { status: 'CANCELLED', note: reason },
         },
       },
+      include: { vendor: { select: { id: true, businessName: true } } },
     });
+
+    try {
+      const payload = bookingStatusPush('CANCELLED', updated);
+      if (payload && updated.userId) {
+        await sendPushToUsers([updated.userId], payload);
+      }
+    } catch (e) {
+      console.error('[bookings/:id/cancel] push error:', e);
+    }
 
     res.json({ success: true, data: updated });
   } catch (error) {
@@ -412,6 +454,15 @@ router.post('/:id/complete', authenticate, async (req: AuthRequest, res) => {
       });
     }
 
+    try {
+      const payload = bookingStatusPush('COMPLETED', updated);
+      if (payload && updated.userId) {
+        await sendPushToUsers([updated.userId], payload);
+      }
+    } catch (e) {
+      console.error('[bookings/:id/complete] push error:', e);
+    }
+
     res.json({ success: true, data: { ...updated, pointsEarned: points } });
   } catch (error) {
     console.error('Complete booking error:', error);
@@ -484,9 +535,21 @@ router.put('/:id/status', authenticate, async (req: AuthRequest, res) => {
             profile: true,
           },
         },
+        vendor: { select: { id: true, businessName: true } },
         address: true,
       },
     });
+
+    // Notify the customer about the status change. Wrap so push delivery
+    // failures can never break the status update itself.
+    try {
+      const payload = bookingStatusPush(status, updated);
+      if (payload && updated.userId) {
+        await sendPushToUsers([updated.userId], payload);
+      }
+    } catch (e) {
+      console.error('[bookings/:id/status] push error:', e);
+    }
 
     res.json({ success: true, data: updated });
   } catch (error) {

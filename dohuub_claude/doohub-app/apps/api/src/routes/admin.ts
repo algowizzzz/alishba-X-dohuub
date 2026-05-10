@@ -1,8 +1,62 @@
 import { Router } from 'express';
 import { prisma } from '@doohub/database';
 import { authenticate, requireAdmin, AuthRequest } from '../middleware/auth';
+import { sendPushToUsers, PushPayload } from '../utils/push';
 
 const router = Router();
+
+// Map a booking-status transition to a customer-facing push payload.
+function bookingStatusPushPayload(status: string, booking: any): PushPayload | null {
+  const vendorName = booking?.vendor?.businessName || 'your vendor';
+  const dateStr = booking?.scheduledDate
+    ? new Date(booking.scheduledDate).toLocaleDateString()
+    : 'your scheduled date';
+  const data = { type: 'booking_update', bookingId: booking?.id, status };
+
+  switch (status) {
+    case 'ACCEPTED':
+      return {
+        title: 'Booking confirmed',
+        body: `Your booking at ${vendorName} on ${dateStr} is confirmed.`,
+        data,
+      };
+    case 'IN_PROGRESS':
+      return { title: 'Vendor on the way', body: 'Your vendor is on the way.', data };
+    case 'COMPLETED':
+      return {
+        title: 'Booking completed',
+        body: 'Your booking is complete — leave a review!',
+        data,
+      };
+    case 'CANCELLED':
+      return { title: 'Booking cancelled', body: 'Your booking was cancelled.', data };
+    default:
+      return null;
+  }
+}
+
+// Map an order-status transition to a customer-facing push payload.
+function orderStatusPushPayload(status: string, order: any): PushPayload | null {
+  const vendorName = order?.vendor?.businessName || 'your vendor';
+  const data = { type: 'order_update', orderId: order?.id, status };
+
+  switch (status) {
+    case 'ACCEPTED':
+      return { title: 'Order confirmed', body: `${vendorName} accepted your order.`, data };
+    case 'PREPARING':
+      return { title: 'Order in progress', body: `${vendorName} is preparing your order.`, data };
+    case 'READY':
+      return { title: 'Order ready', body: 'Your order is ready.', data };
+    case 'OUT_FOR_DELIVERY':
+      return { title: 'Out for delivery', body: 'Your order is on its way.', data };
+    case 'COMPLETED':
+      return { title: 'Order delivered', body: 'Your order has been delivered.', data };
+    case 'CANCELLED':
+      return { title: 'Order cancelled', body: 'Your order was cancelled.', data };
+    default:
+      return null;
+  }
+}
 
 // ========================================
 // MICHELLE PROFILES MANAGEMENT
@@ -1133,32 +1187,58 @@ router.post('/push-notifications', authenticate, requireAdmin, async (req: AuthR
       return res.status(400).json({ error: 'title and body are required' });
     }
 
-    // In production, integrate with Firebase Cloud Messaging, OneSignal, etc.
-    // For now, we'll store the notification and return success
+    // Resolve target user IDs based on targetType.
+    let resolvedUserIds: string[] = [];
+    if (targetType === 'SPECIFIC' && Array.isArray(targetIds) && targetIds.length > 0) {
+      resolvedUserIds = targetIds;
+    } else if (targetType === 'CUSTOMERS') {
+      const users = await prisma.user.findMany({
+        where: { role: 'CUSTOMER' },
+        select: { id: true },
+      });
+      resolvedUserIds = users.map((u) => u.id);
+    } else if (targetType === 'VENDORS') {
+      const users = await prisma.user.findMany({
+        where: { role: 'VENDOR' },
+        select: { id: true },
+      });
+      resolvedUserIds = users.map((u) => u.id);
+    } else {
+      // ALL or unspecified — fan out to every user
+      const users = await prisma.user.findMany({ select: { id: true } });
+      resolvedUserIds = users.map((u) => u.id);
+    }
 
+    // Record an audit row (broadcast notification, no userId).
     const notification = await prisma.notification.create({
       data: {
         type: 'PUSH',
         title,
         body,
         data: data || {},
-        // In production, store targeting info
+        targetType: targetType || 'ALL',
+        targetIds: targetType === 'SPECIFIC' ? resolvedUserIds : [],
       },
     });
 
-    // Log notification for audit
-    console.log('Push notification sent:', {
+    // Fire-and-forget the actual push delivery so a slow Expo round-trip
+    // doesn't make the admin UI hang.
+    sendPushToUsers(resolvedUserIds, { title, body, data }).catch((e) => {
+      console.error('[admin/push-notifications] sendPushToUsers failed:', e);
+    });
+
+    console.log('Push notification dispatched:', {
       id: notification.id,
       title,
-      targetType,
-      targetCount: targetIds?.length || 'all',
+      targetType: targetType || 'ALL',
+      targetCount: resolvedUserIds.length,
       sentBy: req.user!.id,
     });
 
     res.json({
       success: true,
       data: notification,
-      message: `Notification sent to ${targetIds?.length || 'all'} recipients`,
+      message: `Notification sent to ${resolvedUserIds.length} recipient(s)`,
     });
   } catch (error) {
     console.error('Send push notification error:', error);
@@ -1498,6 +1578,16 @@ router.patch('/orders/:id/status', authenticate, requireAdmin, async (req: AuthR
       },
     });
 
+    // Push customer about order status change.
+    try {
+      const payload = orderStatusPushPayload(status, order);
+      if (payload && order.userId) {
+        await sendPushToUsers([order.userId], payload);
+      }
+    } catch (e) {
+      console.error('[admin/orders/status] push error:', e);
+    }
+
     res.json({ success: true, data: order });
   } catch (error) {
     console.error('Update order status error:', error);
@@ -1630,6 +1720,17 @@ router.patch('/bookings/:id/status', authenticate, requireAdmin, async (req: Aut
         vendor: { select: { id: true, businessName: true } },
       },
     });
+
+    // Notify the customer about the status change. Wrap so push errors
+    // can never 500 the status update itself.
+    try {
+      const payload = bookingStatusPushPayload(status, booking);
+      if (payload && booking.userId) {
+        await sendPushToUsers([booking.userId], payload);
+      }
+    } catch (e) {
+      console.error('[admin/bookings/status] push error:', e);
+    }
 
     res.json({ success: true, data: booking });
   } catch (error) {
