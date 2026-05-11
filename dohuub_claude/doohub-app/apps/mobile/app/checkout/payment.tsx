@@ -37,9 +37,9 @@ export default function PaymentScreen() {
 
   const createBooking = useBookingStore((s) => s.createBooking);
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'apple'>('card');
-  const [cardNumber, setCardNumber] = useState('213789217398');
-  const [expiry, setExpiry] = useState('11/33');
-  const [cvc, setCvc] = useState('••');
+  const [cardNumber, setCardNumber] = useState('');
+  const [expiry, setExpiry] = useState('');
+  const [cvc, setCvc] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
 
   const subtotal = parseInt(amount || '0');
@@ -207,11 +207,11 @@ export default function PaymentScreen() {
           </View>
         )}
 
-        {/* Secure Payment Notice */}
-        <View style={styles.secureNotice}>
-          <Ionicons name="lock-closed" size={16} color={colors.text.secondary} />
-          <Text style={styles.secureText}>
-            Your payment is secured by Stripe. We never store your card details.
+        {/* Demo Mode Notice — replace with real Stripe Payment Sheet before launch */}
+        <View style={styles.demoNotice}>
+          <Ionicons name="information-circle" size={18} color="#1E5DB0" />
+          <Text style={styles.demoText}>
+            Demo mode — no real charge will be made. Booking is created on the server, but Stripe payment processing isn't wired yet.
           </Text>
         </View>
       </ScrollView>
@@ -328,19 +328,22 @@ const styles = StyleSheet.create({
   halfInput: {
     flex: 1,
   },
-  secureNotice: {
+  demoNotice: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: spacing.sm,
     padding: spacing.md,
-    backgroundColor: 'rgba(46, 122, 217, 0.03)',
+    backgroundColor: 'rgba(46, 122, 217, 0.08)',
     borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: 'rgba(46, 122, 217, 0.25)',
   },
-  secureText: {
+  demoText: {
     flex: 1,
     fontSize: fontSize.sm,
-    color: colors.text.secondary,
+    color: '#1E5DB0',
     lineHeight: 18,
+    fontWeight: '500',
   },
   ctaContainer: {
     padding: spacing.lg,

@@ -5,10 +5,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, fontSize } from '../../src/constants/theme';
 
 /**
- * Payment Processing Screen matching wireframe:
- * - Processing state with spinner (~2 seconds)
- * - Success state with checkmark (~1 second)
- * - Auto-navigates to confirmation
+ * Booking confirmation transition screen.
+ * The booking was already created on the previous screen — this is just a
+ * brief visual handoff before the confirmation page renders.
+ * (Demo mode — no payment was actually charged.)
  */
 export default function PaymentProcessingScreen() {
   const { serviceName, amount, date, time, bookingId } = useLocalSearchParams<{
@@ -22,25 +22,20 @@ export default function PaymentProcessingScreen() {
   const [isSuccess, setIsSuccess] = useState(false);
 
   useEffect(() => {
-    // Show processing for 2 seconds
-    const processingTimer = setTimeout(() => {
-      setIsSuccess(true);
-    }, 2000);
-
-    return () => clearTimeout(processingTimer);
+    // Short visual handoff — booking is already persisted by now.
+    const t = setTimeout(() => setIsSuccess(true), 600);
+    return () => clearTimeout(t);
   }, []);
 
   useEffect(() => {
     if (isSuccess) {
-      // Show success for 1 second then navigate
-      const successTimer = setTimeout(() => {
+      const t = setTimeout(() => {
         router.replace({
           pathname: '/checkout/confirmation',
           params: { serviceName, amount, date, time, bookingId },
         });
-      }, 1000);
-
-      return () => clearTimeout(successTimer);
+      }, 500);
+      return () => clearTimeout(t);
     }
   }, [isSuccess]);
 
@@ -52,9 +47,9 @@ export default function PaymentProcessingScreen() {
             <View style={styles.iconCircle}>
               <ActivityIndicator size="large" color={colors.text.inverse} />
             </View>
-            <Text style={styles.heading}>Processing Payment</Text>
+            <Text style={styles.heading}>Confirming booking</Text>
             <Text style={styles.subtext}>
-              Please wait while we process your payment...
+              Almost done — saving your booking with the vendor.
             </Text>
           </>
         ) : (
@@ -62,9 +57,9 @@ export default function PaymentProcessingScreen() {
             <View style={styles.successCircle}>
               <Ionicons name="checkmark" size={56} color={colors.text.inverse} />
             </View>
-            <Text style={styles.heading}>Payment Successful!</Text>
+            <Text style={styles.heading}>Booking confirmed!</Text>
             <Text style={styles.subtext}>
-              Your booking has been confirmed
+              The vendor has been notified. (Demo mode — no payment was charged.)
             </Text>
           </>
         )}
