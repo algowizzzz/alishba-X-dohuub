@@ -10,20 +10,37 @@ import {
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import * as WebBrowser from 'expo-web-browser';
 import { colors, spacing, fontSize, borderRadius, borderWidth } from '../../src/constants/theme';
 import { ScreenHeader } from '../../src/components/composite';
-import { Button, Input } from '../../src/components/ui';
+import { Button } from '../../src/components/ui';
 import { useBookingStore } from '../../src/store/bookingStore';
+import api from '../../src/services/api';
 
 /**
- * Payment screen matching wireframe:
- * - Order summary
- * - Payment method selection
- * - Card input fields (Stripe integration placeholder)
- * - Pay Now button
+ * Payment screen — real Stripe Checkout flow.
+ *
+ * 1. Create the booking on our API.
+ * 2. Ask our API for a Stripe Checkout Session URL.
+ * 3. Open the hosted Checkout page in a system browser session.
+ * 4. When Stripe redirects back to dohuub://checkout/return (or the user
+ *    closes the browser), navigate to the processing screen which polls for
+ *    payment status.
+ *
+ * No card form on this screen — Stripe owns the card UI for PCI compliance.
  */
 export default function PaymentScreen() {
-  const { serviceName, amount, date, time, notes, vendorId, category, listingId, serviceFee: serviceFeeParam } = useLocalSearchParams<{
+  const {
+    serviceName,
+    amount,
+    date,
+    time,
+    notes,
+    vendorId,
+    category,
+    listingId,
+    serviceFee: serviceFeeParam,
+  } = useLocalSearchParams<{
     serviceName: string;
     amount: string;
     date: string;
@@ -36,10 +53,6 @@ export default function PaymentScreen() {
   }>();
 
   const createBooking = useBookingStore((s) => s.createBooking);
-  const [paymentMethod, setPaymentMethod] = useState<'card' | 'apple'>('card');
-  const [cardNumber, setCardNumber] = useState('');
-  const [expiry, setExpiry] = useState('');
-  const [cvc, setCvc] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
 
   const subtotal = parseInt(amount || '0');
@@ -49,6 +62,7 @@ export default function PaymentScreen() {
   const handlePayNow = async () => {
     setIsProcessing(true);
     try {
+      // 1. Create the booking (server is the source of truth for fees/totals).
       const booking = await createBooking({
         vendorId: vendorId || '',
         category: category || 'CLEANING',
@@ -61,22 +75,57 @@ export default function PaymentScreen() {
         serviceFee,
         total: totalAmount,
       });
+
+      // 2. Ask the API for a Stripe Checkout Session URL.
+      const sessionRes = await api.post<{
+        success: boolean;
+        data?: { url: string; sessionId: string };
+        error?: string;
+      }>('/api/v1/payments/checkout-session', { bookingId: booking.id });
+
+      if (!sessionRes.success || !sessionRes.data?.url) {
+        throw new Error(
+          sessionRes.error ||
+            'Could not start the payment session. Your booking is saved as pending — you can pay later from Bookings.'
+        );
+      }
+
+      const { url, sessionId } = sessionRes.data;
+
+      // 3. Open Stripe Checkout. openAuthSessionAsync intercepts our deep
+      // link return scheme on iOS/Android. In Expo Go, the scheme isn't
+      // registered, so the user just closes the in-app browser when done —
+      // we still navigate to /checkout/processing after the browser closes.
+      const result = await WebBrowser.openAuthSessionAsync(
+        url,
+        'dohuub://checkout/return'
+      );
+
+      // Regardless of how the browser closes (success/cancel/dismiss),
+      // hand off to the processing screen which polls the session status.
+      // The webhook is the source of truth, but the poll gives the user
+      // immediate feedback.
       setIsProcessing(false);
       router.replace({
         pathname: '/checkout/processing',
         params: {
-          serviceName,
+          serviceName: serviceName || '',
           amount: totalAmount.toString(),
-          date,
-          time,
+          date: date || '',
+          time: time || '',
           bookingId: booking.id,
+          sessionId,
+          // result.type can be 'success' (deep link hit), 'cancel' (user back),
+          // or 'dismiss' (closed sheet). We pass it through so processing can
+          // show a sensible message.
+          browserResult: result.type,
         },
       });
     } catch (err: any) {
       setIsProcessing(false);
       Alert.alert(
-        'Booking failed',
-        err?.response?.data?.error || err?.message || 'Could not create the booking. Please try again.'
+        'Payment could not be started',
+        err?.response?.data?.error || err?.message || 'Please try again.'
       );
     }
   };
@@ -117,101 +166,27 @@ export default function PaymentScreen() {
           </View>
         </View>
 
-        {/* Payment Method */}
+        {/* Hosted-checkout notice */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Payment Method</Text>
 
-          <TouchableOpacity
-            style={[
-              styles.paymentOption,
-              paymentMethod === 'card' && styles.paymentOptionActive,
-            ]}
-            onPress={() => setPaymentMethod('card')}
-          >
-            <Ionicons
-              name="card"
-              size={24}
-              color={paymentMethod === 'card' ? colors.text.primary : colors.text.secondary}
-            />
-            <Text
-              style={[
-                styles.paymentOptionText,
-                paymentMethod === 'card' && styles.paymentOptionTextActive,
-              ]}
-            >
-              Credit / Debit Card
-            </Text>
-            <View style={styles.radioOuter}>
-              {paymentMethod === 'card' && <View style={styles.radioInner} />}
+          <View style={styles.paymentOption}>
+            <Ionicons name="card" size={24} color={colors.text.primary} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.paymentOptionText}>Credit / Debit Card</Text>
+              <Text style={styles.paymentOptionSubtext}>
+                Securely handled by Stripe
+              </Text>
             </View>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[
-              styles.paymentOption,
-              paymentMethod === 'apple' && styles.paymentOptionActive,
-            ]}
-            onPress={() => setPaymentMethod('apple')}
-          >
-            <Ionicons
-              name="logo-apple"
-              size={24}
-              color={paymentMethod === 'apple' ? colors.text.primary : colors.text.secondary}
-            />
-            <Text
-              style={[
-                styles.paymentOptionText,
-                paymentMethod === 'apple' && styles.paymentOptionTextActive,
-              ]}
-            >
-              Apple Pay
-            </Text>
-            <View style={styles.radioOuter}>
-              {paymentMethod === 'apple' && <View style={styles.radioInner} />}
-            </View>
-          </TouchableOpacity>
+            <Ionicons name="lock-closed" size={18} color={colors.text.muted} />
+          </View>
         </View>
 
-        {/* Card Details */}
-        {paymentMethod === 'card' && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Card Details</Text>
-            <Input
-              placeholder="Card Number"
-              value={cardNumber}
-              onChangeText={setCardNumber}
-              keyboardType="number-pad"
-              maxLength={19}
-            />
-            <View style={styles.cardRow}>
-              <View style={styles.halfInput}>
-                <Input
-                  placeholder="MM/YY"
-                  value={expiry}
-                  onChangeText={setExpiry}
-                  keyboardType="number-pad"
-                  maxLength={5}
-                />
-              </View>
-              <View style={styles.halfInput}>
-                <Input
-                  placeholder="CVC"
-                  value={cvc}
-                  onChangeText={setCvc}
-                  keyboardType="number-pad"
-                  maxLength={4}
-                  secureTextEntry
-                />
-              </View>
-            </View>
-          </View>
-        )}
-
-        {/* Demo Mode Notice — replace with real Stripe Payment Sheet before launch */}
-        <View style={styles.demoNotice}>
+        <View style={styles.infoNotice}>
           <Ionicons name="information-circle" size={18} color="#1E5DB0" />
-          <Text style={styles.demoText}>
-            Demo mode — no real charge will be made. Booking is created on the server, but Stripe payment processing isn't wired yet.
+          <Text style={styles.infoText}>
+            You'll be redirected to Stripe to complete payment. After you finish,
+            you'll come right back to the app.
           </Text>
         </View>
       </ScrollView>
@@ -219,7 +194,7 @@ export default function PaymentScreen() {
       {/* CTA */}
       <View style={styles.ctaContainer}>
         <Button
-          title={`Pay $${totalAmount}`}
+          title={`Pay $${totalAmount} with Card`}
           onPress={handlePayNow}
           loading={isProcessing}
           fullWidth
@@ -289,46 +264,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: spacing.md,
     borderWidth: borderWidth.default,
-    borderColor: colors.border.default,
+    borderColor: colors.primary,
     borderRadius: borderRadius.lg,
-    marginBottom: spacing.sm,
     gap: spacing.md,
   },
-  paymentOptionActive: {
-    borderColor: colors.primary,
-  },
   paymentOptionText: {
-    flex: 1,
     fontSize: fontSize.md,
-    color: colors.text.secondary,
-  },
-  paymentOptionTextActive: {
     color: colors.text.primary,
     fontWeight: '500',
   },
-  radioOuter: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: colors.text.muted,
-    justifyContent: 'center',
-    alignItems: 'center',
+  paymentOptionSubtext: {
+    fontSize: fontSize.xs,
+    color: colors.text.secondary,
+    marginTop: 2,
   },
-  radioInner: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: colors.primary,
-  },
-  cardRow: {
-    flexDirection: 'row',
-    gap: spacing.md,
-  },
-  halfInput: {
-    flex: 1,
-  },
-  demoNotice: {
+  infoNotice: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: spacing.sm,
@@ -338,7 +288,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(46, 122, 217, 0.25)',
   },
-  demoText: {
+  infoText: {
     flex: 1,
     fontSize: fontSize.sm,
     color: '#1E5DB0',
@@ -352,4 +302,3 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
 });
-

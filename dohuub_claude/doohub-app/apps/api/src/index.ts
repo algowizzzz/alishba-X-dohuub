@@ -35,6 +35,7 @@ import orderRoutes from './routes/orders';
 import cartRoutes from './routes/cart';
 import reviewRoutes from './routes/reviews';
 import paymentRoutes from './routes/payments';
+import stripeWebhookRoutes from './routes/payments-webhook';
 import chatRoutes from './routes/chat';
 import notificationRoutes from './routes/notifications';
 import reportRoutes from './routes/reports';
@@ -72,6 +73,14 @@ if (process.env.NODE_ENV === 'production') {
   });
   app.use('/api/', limiter);
 }
+
+// Stripe webhook MUST be mounted BEFORE express.json() so we can verify the
+// raw body signature. See apps/api/src/routes/payments-webhook.ts.
+app.use(
+  '/api/v1/payments/webhook',
+  express.raw({ type: 'application/json' }),
+  stripeWebhookRoutes
+);
 
 // Body parsing
 app.use(express.json({ limit: '10mb' }));
