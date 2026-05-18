@@ -1,4 +1,4 @@
-import axios, { AxiosInstance, AxiosError } from 'axios';
+import axios, { AxiosInstance, AxiosError, AxiosRequestConfig } from 'axios';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 import { API_BASE } from '../constants/api';
@@ -95,8 +95,8 @@ class ApiService {
   }
 
   // POST request
-  async post<T>(url: string, data?: object): Promise<T> {
-    const response = await this.client.post<T>(url, data);
+  async post<T>(url: string, data?: object, config?: AxiosRequestConfig): Promise<T> {
+    const response = await this.client.post<T>(url, data, config);
     return response.data;
   }
 

@@ -14,6 +14,7 @@ import {
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Rect, Circle, Path, Line } from 'react-native-svg';
+import api from '../../src/services/api';
 // Boss wireframe colors - hardcoded
 const colors = {
   background: '#F0F7FF',
@@ -201,6 +202,7 @@ export default function ChatScreen() {
   ]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const flatListRef = useRef<FlatList>(null);
 
   const sendMessage = async (text: string) => {
@@ -216,11 +218,40 @@ export default function ChatScreen() {
     setInput('');
     setIsTyping(true);
 
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    try {
+      const resp = await api.post<{
+        success: boolean;
+        data: {
+          conversationId: string;
+          message: {
+            id: string;
+            role: 'assistant';
+            content: string;
+            metadata?: Message['metadata'];
+            createdAt: string;
+          };
+        };
+      }>('/chat/send', { message: text, conversationId }, { timeout: 120_000 });
 
-    const aiMessage = processMessage(text);
-    setMessages((prev) => [...prev, aiMessage]);
-    setIsTyping(false);
+      if (resp?.data?.conversationId) setConversationId(resp.data.conversationId);
+
+      const m = resp?.data?.message;
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: m?.id ?? Date.now().toString(),
+          role: 'assistant',
+          content: m?.content ?? "I'm having trouble responding right now. Please try again.",
+          metadata: (m?.metadata as Message['metadata']) ?? { type: 'text' },
+        },
+      ]);
+    } catch (err) {
+      // Fall back to local keyword routing if the API is unreachable (offline dev / agent down)
+      console.warn('[chat] API failed, falling back to local:', err);
+      setMessages((prev) => [...prev, processMessage(text)]);
+    } finally {
+      setIsTyping(false);
+    }
   };
 
   const handleNewChat = () => {
