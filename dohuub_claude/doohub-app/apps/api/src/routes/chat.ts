@@ -63,9 +63,53 @@ router.post('/send', authenticate, async (req: AuthRequest, res) => {
       data: { conversationId: conversation.id, role: 'user', content: message },
     });
 
+    // Build a compact user-context block so the agent can personalize.
+    // Failures here are non-fatal — we still send the raw message.
+    let personalizedMessage = message;
+    try {
+      const userId = req.user!.id;
+      const [user, defaultAddr, recentBookings] = await Promise.all([
+        prisma.user.findUnique({
+          where: { id: userId },
+          include: { profile: { select: { firstName: true, lastName: true } } },
+        }),
+        prisma.address.findFirst({
+          where: { userId, isDefault: true },
+          select: { city: true, state: true, country: true },
+        }),
+        prisma.booking.findMany({
+          where: { userId },
+          orderBy: { createdAt: 'desc' },
+          take: 5,
+          select: { category: true, vendorId: true, vendor: { select: { businessName: true } } },
+        }),
+      ]);
+
+      const ctxLines: string[] = [];
+      const first = user?.profile?.firstName;
+      if (first) ctxLines.push(`name=${first}`);
+      ctxLines.push(`user_id=${userId}`);
+      if (defaultAddr?.city) {
+        ctxLines.push(`city=${defaultAddr.city}${defaultAddr.state ? ', ' + defaultAddr.state : ''}`);
+      }
+      if (recentBookings.length) {
+        const cats = Array.from(new Set(recentBookings.map(b => b.category)));
+        ctxLines.push(`recent_categories=${cats.join(',')}`);
+        const lastVendor = recentBookings[0]?.vendor?.businessName;
+        if (lastVendor) ctxLines.push(`last_vendor="${lastVendor}"`);
+      }
+
+      if (ctxLines.length > 1) {
+        personalizedMessage =
+          `[User context — use this to personalize and filter results when relevant; do NOT echo it back:\n  ${ctxLines.join('\n  ')}\n]\n\nUser message: ${message}`;
+      }
+    } catch (e) {
+      console.warn('[chat] personalization context build failed (non-fatal):', e);
+    }
+
     const agentThreadId =
       ((conversation as unknown) as { agentThreadId?: string | null }).agentThreadId || undefined;
-    const reply = await askDohuubAgent(message, agentThreadId);
+    const reply = await askDohuubAgent(personalizedMessage, agentThreadId);
 
     const aiMessage = await prisma.chatMessage.create({
       data: {
