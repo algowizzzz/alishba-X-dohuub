@@ -4,10 +4,10 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
-    "postinstall": "prisma generate",
-    "build": "prisma generate && tsc",
+    "postinstall": "npx prisma generate",
+    "build": "npx prisma generate && tsc",
     "dev": "tsc --watch",
-    "generate": "prisma generate",
+    "generate": "npx prisma generate",
     "push": "prisma db push",
     "migrate": "prisma migrate dev",
     "seed": "ts-node prisma/seed.ts",
