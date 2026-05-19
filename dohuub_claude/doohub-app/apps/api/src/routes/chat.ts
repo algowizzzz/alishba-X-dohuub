@@ -116,7 +116,7 @@ router.post('/send', authenticate, async (req: AuthRequest, res) => {
         conversationId: conversation.id,
         role: 'assistant',
         content: reply.content,
-        metadata: reply.metadata as Record<string, unknown>,
+        metadata: reply.metadata as any,
       },
     });
 
