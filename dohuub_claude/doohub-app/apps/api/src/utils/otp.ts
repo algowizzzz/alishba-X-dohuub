@@ -58,11 +58,63 @@ export async function verifyOtp(email: string, otp: string): Promise<boolean> {
   return true;
 }
 
+function otpHtml(otp: string): string {
+  return `
+    <div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;padding:24px;">
+      <h2 style="color:#2E7AD9;margin:0 0 16px;">DoHuub</h2>
+      <p>Your verification code is:</p>
+      <p style="font-size:32px;font-weight:700;letter-spacing:6px;margin:16px 0;">${otp}</p>
+      <p style="color:#666;font-size:13px;">This code expires in 10 minutes. If you didn't request this, ignore this email.</p>
+    </div>
+  `;
+}
+
+// Resend HTTP API path. Railway (and most PaaS) block outbound SMTP on
+// 25/465/587, so HTTPS to api.resend.com is the only reliable path.
+async function sendViaResendHttp(to: string, otp: string): Promise<boolean> {
+  const apiKey = process.env.RESEND_API_KEY;
+  if (!apiKey) return false;
+
+  const from = process.env.SMTP_FROM || 'DoHuub <onboarding@resend.dev>';
+  try {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        from,
+        to: [to],
+        subject: 'Your DoHuub verification code',
+        text: `Your DoHuub verification code is ${otp}. It expires in 10 minutes.`,
+        html: otpHtml(otp),
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      logger.error({ status: res.status, body }, 'Resend HTTP send failed');
+      return false;
+    }
+    return true;
+  } catch (err) {
+    logger.error({ err }, 'Resend HTTP request error');
+    return false;
+  }
+}
+
 export async function sendOtpEmail(email: string, otp: string): Promise<void> {
+  // 1. Prefer Resend HTTP API when RESEND_API_KEY is set (Railway-friendly).
+  if (process.env.RESEND_API_KEY) {
+    const ok = await sendViaResendHttp(email, otp);
+    if (ok) return;
+    logger.warn('Resend HTTP failed — falling through to SMTP');
+  }
+
+  // 2. Generic SMTP fallback (works locally / on hosts that allow outbound SMTP).
   const tx = getTransporter();
   if (!tx) {
-    // Dev fallback — log to console so you can read it from the terminal.
-    if (!isProd) logger.info({ email, otp }, '[dev] OTP (SMTP not configured)');
+    if (!isProd) logger.info({ email, otp }, '[dev] OTP (no email transport configured)');
     return;
   }
 
@@ -72,13 +124,6 @@ export async function sendOtpEmail(email: string, otp: string): Promise<void> {
     to: email,
     subject: 'Your DoHuub verification code',
     text: `Your DoHuub verification code is ${otp}. It expires in 10 minutes.`,
-    html: `
-      <div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;padding:24px;">
-        <h2 style="color:#2E7AD9;margin:0 0 16px;">DoHuub</h2>
-        <p>Your verification code is:</p>
-        <p style="font-size:32px;font-weight:700;letter-spacing:6px;margin:16px 0;">${otp}</p>
-        <p style="color:#666;font-size:13px;">This code expires in 10 minutes. If you didn't request this, ignore this email.</p>
-      </div>
-    `,
+    html: otpHtml(otp),
   });
 }

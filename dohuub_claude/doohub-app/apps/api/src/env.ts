@@ -20,15 +20,28 @@ const baseSchema = z.object({
 // Stricter in production — these MUST be set for a real launch.
 // Stripe is intentionally optional: payments routes return 503 cleanly when
 // STRIPE_SECRET_KEY is absent, so the rest of the API can still serve.
+// Email: either RESEND_API_KEY (HTTPS, Railway-friendly) OR SMTP_* must be set.
 const prodOnlySchema = z.object({
   ALLOWED_ORIGINS: z.string().min(1, 'Set ALLOWED_ORIGINS (comma-separated) in production'),
-  SMTP_HOST: z.string().min(1),
-  SMTP_USER: z.string().min(1),
-  SMTP_PASS: z.string().min(1),
-  SMTP_FROM: z.string().min(1),
+  RESEND_API_KEY: z.string().optional(),
+  SMTP_HOST: z.string().optional(),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  SMTP_FROM: z.string().optional(),
 });
 
-const parsed = (isProd ? baseSchema.merge(prodOnlySchema) : baseSchema).safeParse(process.env);
+const schema = isProd
+  ? baseSchema.merge(prodOnlySchema).refine(
+      (v) => Boolean(v.RESEND_API_KEY) || Boolean(v.SMTP_HOST && v.SMTP_USER && v.SMTP_PASS),
+      {
+        message:
+          'Configure email: set RESEND_API_KEY (preferred on Railway) or SMTP_HOST + SMTP_USER + SMTP_PASS',
+        path: ['RESEND_API_KEY'],
+      }
+    )
+  : baseSchema;
+
+const parsed = schema.safeParse(process.env);
 
 if (!parsed.success) {
   const issues = parsed.error.issues
