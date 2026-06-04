@@ -6,8 +6,19 @@ import { authenticate, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
-// Register with email - creates user and returns token directly (OTP disabled)
-router.post('/register', async (req, res) => {
+// Block dev-only / legacy email-only endpoints in production.
+// Mobile + portal both authenticate via Supabase directly; these routes only
+// exist for local dev tooling and seed scripts.
+const devOnly = (req: any, res: any, next: any) => {
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(404).json({ error: 'Not found' });
+  }
+  next();
+};
+
+// Register with email - creates user and returns token directly (OTP disabled).
+// DEV-ONLY: no password challenge. Real signup goes through Supabase Auth from the client.
+router.post('/register', devOnly, async (req, res) => {
   try {
     const { email, profile } = req.body;
 
@@ -71,8 +82,11 @@ router.post('/register', async (req, res) => {
   }
 });
 
-// Login with email - returns token directly (OTP disabled)
-router.post('/login', async (req, res) => {
+// Login with email - returns token directly (OTP disabled).
+// DEV-ONLY: this issues a JWT off email alone, which is unsafe for production.
+// Real login goes through Supabase Auth from the client and is verified by
+// middleware/auth.ts via supabase.auth.getUser().
+router.post('/login', devOnly, async (req, res) => {
   try {
     const { email } = req.body;
 
@@ -218,8 +232,10 @@ router.post('/resend-otp', async (req, res) => {
   }
 });
 
-// Google Sign-In (simplified - would need Firebase Admin SDK in production)
-router.post('/google-signin', async (req, res) => {
+// Google Sign-In (simplified - would need Firebase Admin SDK in production).
+// DEV-ONLY: does NOT verify the Google id_token. Real Google sign-in must go
+// through Supabase Auth (signInWithOAuth) which verifies the id_token server-side.
+router.post('/google-signin', devOnly, async (req, res) => {
   try {
     const { email, displayName, photoURL, googleId } = req.body;
 
@@ -293,14 +309,9 @@ router.post('/logout', authenticate, async (req: AuthRequest, res) => {
   });
 });
 
-// DEV ONLY: Direct login without OTP (for testing)
-// TODO: Re-enable production check before real launch
-router.post('/dev-login', async (req, res) => {
-  // Temporarily disabled for testing
-  // if (process.env.NODE_ENV === 'production') {
-  //   return res.status(403).json({ error: 'Not available in production' });
-  // }
-
+// DEV ONLY: Direct login without OTP (for testing).
+// Hard-blocked in production by devOnly middleware.
+router.post('/dev-login', devOnly, async (req, res) => {
   try {
     const { email } = req.body;
 

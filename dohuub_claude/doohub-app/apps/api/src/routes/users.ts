@@ -134,15 +134,51 @@ router.put('/me', authenticate, async (req: AuthRequest, res) => {
   }
 });
 
-// Delete user account
+// Delete user account.
+//
+// We anonymize PII immediately (Apple App Store + GDPR) and mark the account
+// inactive. Bookings, orders, and reviews keep their userId so financial /
+// review history stays intact, but the identifying data is gone. Cascades on
+// the schema clean up profile/addresses/etc. The caller must confirm by
+// sending { confirm: "DELETE" } in the body so accidental DELETEs from a
+// stolen-session attacker have at least one extra hop.
 router.delete('/me', authenticate, async (req: AuthRequest, res) => {
   try {
-    await prisma.user.update({
-      where: { id: req.user!.id },
-      data: { isActive: false },
-    });
+    const { confirm } = req.body as { confirm?: string };
+    if (confirm !== 'DELETE') {
+      return res.status(400).json({ error: 'Confirmation required: send { "confirm": "DELETE" }' });
+    }
 
-    res.json({ success: true, message: 'Account deleted successfully' });
+    const userId = req.user!.id;
+    const anonEmail = `deleted-${userId}@deleted.local`;
+
+    await prisma.$transaction([
+      // Drop everything that is pure PII or session/device data.
+      prisma.address.deleteMany({ where: { userId } }),
+      prisma.paymentMethod.deleteMany({ where: { userId } }),
+      prisma.pushToken.deleteMany({ where: { userId } }),
+      prisma.notification.deleteMany({ where: { userId } }),
+      // Clear profile name + avatar but keep the row so FK references survive.
+      prisma.userProfile.updateMany({
+        where: { userId },
+        data: { firstName: 'Deleted', lastName: 'User', avatar: null, dateOfBirth: null },
+      }),
+      // Anonymize the user row itself and mark inactive.
+      prisma.user.update({
+        where: { id: userId },
+        data: {
+          email: anonEmail,
+          phone: null,
+          firebaseUid: null,
+          passwordHash: null,
+          stripeCustomerId: null,
+          isActive: false,
+          status: 'SUSPENDED',
+        },
+      }),
+    ]);
+
+    res.json({ success: true, message: 'Account deleted' });
   } catch (error) {
     console.error('Delete user error:', error);
     res.status(500).json({ error: 'Failed to delete account' });

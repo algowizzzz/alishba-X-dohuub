@@ -1,11 +1,15 @@
-import './env'; // must be first - loads .env before any module reads process.env
+import './env'; // must be first - loads + validates .env before any module reads process.env
 
 import express from 'express';
 import path from 'path';
 import cors from 'cors';
 import helmet from 'helmet';
-import morgan from 'morgan';
-import rateLimit from 'express-rate-limit';
+import pinoHttp from 'pino-http';
+import { logger } from './lib/logger';
+import { initSentry, Sentry } from './lib/sentry';
+import { globalLimiter, authLimiter, paymentLimiter } from './middleware/rateLimit';
+
+initSentry();
 
 // Import routes
 import authRoutes from './routes/auth';
@@ -44,35 +48,46 @@ const app = express();
 // Railway uses PORT, locally we use API_PORT
 const PORT = process.env.PORT || process.env.API_PORT || 3001;
 
+// Sentry request handler must come BEFORE other middleware to capture context.
+if (process.env.SENTRY_DSN) {
+  app.use(Sentry.Handlers.requestHandler());
+}
+
 // Security middleware
 app.use(helmet());
-app.use(cors({
-  origin: (origin, callback) => {
-    // Allow no-origin requests (e.g. mobile apps, Postman) and any localhost.
-    if (!origin) return callback(null, true);
-    if (/^https?:\/\/localhost:\d+$/.test(origin)) return callback(null, true);
-    if (/^exp:\/\/localhost:\d+$/.test(origin)) return callback(null, true);
-    // Allow any Vercel preview/production URL ending in vercel.app
-    if (/^https:\/\/[a-z0-9-]+\.vercel\.app$/i.test(origin)) return callback(null, true);
-    // Allow Railway production URLs
-    if (/^https:\/\/[a-z0-9-]+\.up\.railway\.app$/i.test(origin)) return callback(null, true);
-    // Allow explicit FRONTEND_URL
-    if (process.env.FRONTEND_URL && origin === process.env.FRONTEND_URL) return callback(null, true);
-    return callback(new Error(`CORS: origin ${origin} not allowed`));
-  },
-  credentials: true,
-}));
 
-// Rate limiting
-// Only enable in production to avoid accidental lock-outs during local development / e2e testing.
-if (process.env.NODE_ENV === 'production') {
-  const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100,
-    message: { error: 'Too many requests, please try again later.' },
-  });
-  app.use('/api/', limiter);
-}
+// CORS — strict allowlist driven by ALLOWED_ORIGINS env var (comma-separated).
+// In non-production we also allow localhost + Expo origins for DX.
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow same-origin / native mobile apps / curl (no Origin header).
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+
+      if (process.env.NODE_ENV !== 'production') {
+        if (/^https?:\/\/localhost:\d+$/.test(origin)) return callback(null, true);
+        if (/^exp:\/\/.+/.test(origin)) return callback(null, true);
+      }
+
+      logger.warn({ origin }, 'CORS: rejected origin');
+      return callback(new Error(`CORS: origin ${origin} not allowed`));
+    },
+    credentials: true,
+  })
+);
+
+// Global rate limit (production only — see middleware/rateLimit.ts).
+app.use('/api/', globalLimiter);
+// Tight limits on credential and money-touching endpoints.
+app.use('/api/v1/auth/', authLimiter);
+app.use('/api/v1/payments/', paymentLimiter);
 
 // Stripe webhook MUST be mounted BEFORE express.json() so we can verify the
 // raw body signature. See apps/api/src/routes/payments-webhook.ts.
@@ -86,8 +101,17 @@ app.use(
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Logging
-app.use(morgan('dev'));
+// Structured request logging.
+app.use(
+  pinoHttp({
+    logger,
+    customLogLevel: (_req, res, err) => {
+      if (err || res.statusCode >= 500) return 'error';
+      if (res.statusCode >= 400) return 'warn';
+      return 'info';
+    },
+  })
+);
 
 // Static file serving for uploads
 const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, '../uploads');
@@ -166,34 +190,43 @@ app.use((req, res) => {
   res.status(404).json({ error: 'Not found' });
 });
 
-// Error handler
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error('Error:', err);
-  res.status(err.status || 500).json({
-    error: err.message || 'Internal server error',
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
+// Sentry error handler must come BEFORE our own error handler.
+if (process.env.SENTRY_DSN) {
+  app.use(Sentry.Handlers.errorHandler());
+}
+
+// Error handler — never leak stack traces in production.
+app.use((err: any, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  logger.error({ err, path: req.path }, 'request failed');
+  const status = err.status || 500;
+  res.status(status).json({
+    error: status >= 500 ? 'Internal server error' : err.message || 'Request failed',
+    ...(process.env.NODE_ENV !== 'production' && { stack: err.stack }),
   });
 });
 
-// Handle uncaught errors
 process.on('uncaughtException', (error) => {
-  console.error('Uncaught Exception:', error);
+  logger.fatal({ err: error }, 'Uncaught Exception');
 });
 
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+process.on('unhandledRejection', (reason) => {
+  logger.error({ reason }, 'Unhandled Rejection');
 });
 
-// Start server
 const server = app.listen(PORT, () => {
-  console.log(`🚀 DoHuub API running on port ${PORT}`);
-  console.log(`📚 Health check: /health`);
-  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🔗 Database URL configured: ${process.env.DATABASE_URL ? 'Yes' : 'No'}`);
+  logger.info(
+    {
+      port: PORT,
+      env: process.env.NODE_ENV || 'development',
+      dbConfigured: Boolean(process.env.DATABASE_URL),
+      sentry: Boolean(process.env.SENTRY_DSN),
+    },
+    'DoHuub API started'
+  );
 });
 
 server.on('error', (error) => {
-  console.error('Server error:', error);
+  logger.error({ err: error }, 'Server error');
 });
 
 export default app;
