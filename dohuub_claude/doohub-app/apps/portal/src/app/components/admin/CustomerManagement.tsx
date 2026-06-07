@@ -159,7 +159,9 @@ function CustomerCard({ customer, onStatusChange }: { customer: Customer; onStat
           <div className="flex items-center gap-2 mb-1">
             <h3 className="text-lg font-bold text-[#1A1A2E]">{customer.name}</h3>
             {customer.verified && (
-              <CheckCircle className="w-5 h-5 text-[#10B981] flex-shrink-0" title="Verified" />
+              <span title="Verified" className="inline-flex">
+                <CheckCircle className="w-5 h-5 text-[#10B981] flex-shrink-0" />
+              </span>
             )}
             {customer.status === "suspended" && (
               <span className="px-2 py-0.5 bg-[#FEE2E2] text-[#991B1B] text-xs font-semibold rounded-full">
@@ -393,7 +395,9 @@ export function CustomerManagement() {
                   <div className="flex items-center gap-2 mb-2">
                     <h2 className="text-2xl font-bold text-[#1A1A2E]">{customer.name}</h2>
                     {customer.verified && (
-                      <CheckCircle className="w-6 h-6 text-[#10B981]" title="Verified" />
+                      <span title="Verified" className="inline-flex">
+                        <CheckCircle className="w-6 h-6 text-[#10B981]" />
+                      </span>
                     )}
                   </div>
                   <div className="space-y-1 text-sm text-[#6B7280]">

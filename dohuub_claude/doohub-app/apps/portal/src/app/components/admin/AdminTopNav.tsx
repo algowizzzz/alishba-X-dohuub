@@ -2,10 +2,13 @@ import { Link } from "react-router-dom";
 import { Menu } from "lucide-react";
 
 interface AdminTopNavProps {
-  onMenuClick: () => void;
+  // Optional — some screens (form/detail views) don't have a collapsible
+  // sidebar to toggle. Default to a no-op so the hamburger is still
+  // clickable without throwing.
+  onMenuClick?: () => void;
 }
 
-export function AdminTopNav({ onMenuClick }: AdminTopNavProps) {
+export function AdminTopNav({ onMenuClick = () => {} }: AdminTopNavProps) {
   return (
     <div className="fixed top-0 left-0 right-0 h-[72px] bg-white border-b border-[rgba(46,122,217,0.25)] z-50 shadow-[0_4px_16px_rgba(46,122,217,0.20)]">
       <div className="h-full flex items-center justify-between px-4 lg:px-6">

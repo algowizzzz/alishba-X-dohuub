@@ -9,12 +9,14 @@ import {
   KeyboardAvoidingView,
   Platform,
   Image,
+  ActivityIndicator,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../src/store/authStore';
 import { colors, spacing, fontSize, borderRadius, borderWidth } from '../../src/constants/theme';
 import { Button, Input, Stepper, PhoneInput } from '../../src/components/ui';
+import { pickAndUploadAvatar } from '../../src/services/uploadImage';
 
 /**
  * Profile Setup screen (Step 1 of 2) matching wireframe:
@@ -28,6 +30,8 @@ export default function ProfileSetupScreen() {
   const [fullName, setFullName] = useState('');
   const [countryCode, setCountryCode] = useState('+1');
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
   const { updateProfile, isLoading } = useAuthStore();
 
   const handleContinue = async () => {
@@ -46,6 +50,7 @@ export default function ProfileSetupScreen() {
         firstName,
         lastName,
         phone: phoneNumber ? `${countryCode}${phoneNumber}` : undefined,
+        avatar: avatarUrl || undefined,
       });
 
       router.push('/(auth)/referral-code');
@@ -60,9 +65,15 @@ export default function ProfileSetupScreen() {
     }
   };
 
-  const handlePhotoPress = () => {
-    // TODO: Implement photo picker
-    Alert.alert('Coming Soon', 'Photo upload will be available soon!');
+  const handlePhotoPress = async () => {
+    if (uploading) return;
+    setUploading(true);
+    try {
+      const url = await pickAndUploadAvatar();
+      if (url) setAvatarUrl(url);
+    } finally {
+      setUploading(false);
+    }
   };
 
   return (
@@ -84,12 +95,22 @@ export default function ProfileSetupScreen() {
             <Text style={styles.subtitle}>Tell us a bit about yourself</Text>
 
             {/* Profile Photo */}
-            <TouchableOpacity style={styles.photoContainer} onPress={handlePhotoPress}>
+            <TouchableOpacity
+              style={styles.photoContainer}
+              onPress={handlePhotoPress}
+              disabled={uploading}
+            >
               <View style={styles.photoCircle}>
-                <Image
-                  source={{ uri: 'https://randomuser.me/api/portraits/men/32.jpg' }}
-                  style={styles.photoImage}
-                />
+                {avatarUrl ? (
+                  <Image source={{ uri: avatarUrl }} style={styles.photoImage} />
+                ) : (
+                  <Ionicons name="person" size={56} color={colors.text.secondary} />
+                )}
+                {uploading && (
+                  <View style={styles.photoOverlay}>
+                    <ActivityIndicator color={colors.text.inverse} />
+                  </View>
+                )}
               </View>
               <View style={styles.photoEditBadge}>
                 <Ionicons name="camera" size={16} color={colors.text.inverse} />
@@ -172,6 +193,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
+  },
+  photoOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   photoImage: {
     width: 96,

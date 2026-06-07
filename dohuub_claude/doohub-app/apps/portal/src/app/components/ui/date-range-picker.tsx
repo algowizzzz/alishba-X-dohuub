@@ -1,6 +1,10 @@
 import { useState } from "react";
 import { Calendar, X } from "lucide-react";
 import { DayPicker, DateRange } from "react-day-picker";
+
+// Re-export so callers can use a single import boundary instead of pulling
+// the type from react-day-picker directly.
+export type { DateRange };
 import { format, subDays, startOfMonth, endOfMonth } from "date-fns";
 import "react-day-picker/dist/style.css";
 import { Button } from "./button";

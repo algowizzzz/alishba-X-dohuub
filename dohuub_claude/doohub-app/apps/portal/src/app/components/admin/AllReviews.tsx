@@ -158,7 +158,9 @@ function ReviewCard({ review }: { review: Review }) {
               Customer: {review.customerName}
             </span>
             {review.verified && (
-              <CheckCircle className="w-4 h-4 text-[#10B981]" title="Verified Purchase" />
+              <span title="Verified Purchase" className="inline-flex">
+                <CheckCircle className="w-4 h-4 text-[#10B981]" />
+              </span>
             )}
           </div>
         </div>

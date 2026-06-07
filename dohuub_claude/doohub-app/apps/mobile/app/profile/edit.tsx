@@ -17,17 +17,27 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../src/store/authStore';
 import { LinearGradient } from 'expo-linear-gradient';
+import { pickAndUploadAvatar } from '../../src/services/uploadImage';
 
 export default function EditProfileScreen() {
   const { user, updateProfile, isLoading } = useAuthStore();
   const [fullName, setFullName] = useState(
     [user?.profile?.firstName, user?.profile?.lastName].filter(Boolean).join(' ') || ''
   );
-  const [phone, setPhone] = useState(user?.profile?.phone || '');
+  const [phone, setPhone] = useState(user?.phone || '');
   const [focusedField, setFocusedField] = useState<string | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(user?.profile?.avatar || null);
+  const [uploading, setUploading] = useState(false);
 
-  const handlePhotoPress = () => {
-    Alert.alert('Coming Soon', 'Photo upload will be available soon!');
+  const handlePhotoPress = async () => {
+    if (uploading) return;
+    setUploading(true);
+    try {
+      const url = await pickAndUploadAvatar();
+      if (url) setAvatarUrl(url);
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleSave = async () => {
@@ -41,7 +51,12 @@ export default function EditProfileScreen() {
     }
 
     try {
-      await updateProfile({ firstName, lastName, phone });
+      await updateProfile({
+        firstName,
+        lastName,
+        phone,
+        avatar: avatarUrl || undefined,
+      });
       Alert.alert('Success', 'Profile updated successfully');
       router.back();
     } catch (error) {
@@ -74,9 +89,22 @@ export default function EditProfileScreen() {
           <View style={styles.avatarSection}>
             <View style={styles.avatarWrapper}>
               <View style={styles.avatarCircle}>
-                <Ionicons name="person" size={56} color="#64748B" />
+                {avatarUrl ? (
+                  <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
+                ) : (
+                  <Ionicons name="person" size={56} color="#64748B" />
+                )}
+                {uploading && (
+                  <View style={styles.avatarOverlay}>
+                    <ActivityIndicator color="#FFFFFF" />
+                  </View>
+                )}
               </View>
-              <TouchableOpacity style={styles.cameraButton} onPress={handlePhotoPress}>
+              <TouchableOpacity
+                style={styles.cameraButton}
+                onPress={handlePhotoPress}
+                disabled={uploading}
+              >
                 <LinearGradient
                   colors={['#2E7AD9', '#1E6AC9']}
                   style={styles.cameraGradient}
@@ -225,6 +253,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderWidth: 3,
     borderColor: '#2E7AD9',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+  },
+  avatarOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   cameraButton: {
     position: 'absolute',

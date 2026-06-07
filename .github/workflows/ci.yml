@@ -33,13 +33,9 @@ jobs:
       - name: Typecheck
         run: npm run typecheck --workspace=@doohub/api
 
-  # Portal has pre-existing type errors that don't block its production build
-  # (vite uses esbuild/swc, no strict typecheck). Run for visibility but allow
-  # failure until those are cleaned up.
   typecheck-portal:
-    name: Typecheck @doohub/portal (non-blocking)
+    name: Typecheck @doohub/portal
     runs-on: ubuntu-latest
-    continue-on-error: true
     defaults:
       run:
         working-directory: dohuub_claude/doohub-app
