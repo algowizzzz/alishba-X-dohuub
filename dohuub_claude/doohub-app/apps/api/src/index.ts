@@ -1,7 +1,6 @@
 import './env'; // must be first - loads + validates .env before any module reads process.env
 
 import express from 'express';
-import path from 'path';
 import cors from 'cors';
 import helmet from 'helmet';
 import pinoHttp from 'pino-http';
@@ -113,9 +112,9 @@ app.use(
   })
 );
 
-// Static file serving for uploads
-const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, '../uploads');
-app.use('/uploads', express.static(UPLOAD_DIR));
+// Uploads go to Supabase Storage (see routes/upload.ts). The previous
+// local-disk static serve was removed because Railway's filesystem is
+// ephemeral — any file landed there would vanish on the next redeploy.
 
 // Health check
 app.get('/health', async (req, res) => {
