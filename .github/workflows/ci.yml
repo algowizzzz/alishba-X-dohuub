@@ -1,0 +1,57 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  typecheck-api:
+    name: Typecheck @doohub/api
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dohuub_claude/doohub-app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install workspace dependencies
+        run: npm install --include=optional --legacy-peer-deps
+
+      - name: Generate Prisma client
+        run: npm run db:generate
+
+      - name: Typecheck
+        run: npm run typecheck --workspace=@doohub/api
+
+  # Portal has pre-existing type errors that don't block its production build
+  # (vite uses esbuild/swc, no strict typecheck). Run for visibility but allow
+  # failure until those are cleaned up.
+  typecheck-portal:
+    name: Typecheck @doohub/portal (non-blocking)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    defaults:
+      run:
+        working-directory: dohuub_claude/doohub-app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install workspace dependencies
+        run: npm install --include=optional --legacy-peer-deps
+
+      - name: Typecheck
+        run: npm run typecheck --workspace=@doohub/portal
