@@ -27,8 +27,15 @@ jobs:
       - name: Install workspace dependencies
         run: npm install --include=optional --legacy-peer-deps
 
-      - name: Generate Prisma client
-        run: npm run db:generate
+      # The api imports from '@doohub/database' and '@doohub/shared' which
+      # both resolve to ./dist/*.js + *.d.ts via their package.json `main`/`types`.
+      # Those files don't exist until each workspace package is built. The
+      # database build also runs prisma generate to produce the client types.
+      - name: Build @doohub/database
+        run: npm run build --workspace=@doohub/database
+
+      - name: Build @doohub/shared
+        run: npm run build --workspace=@doohub/shared
 
       - name: Typecheck
         run: npm run typecheck --workspace=@doohub/api
