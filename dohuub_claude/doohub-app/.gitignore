@@ -3,6 +3,11 @@ node_modules/
 .pnp
 .pnp.js
 
+# Lockfile — regenerated per-platform. A Windows-generated lockfile breaks
+# Vercel's Linux builds because esbuild/rollup platform-binaries get pinned
+# to the wrong OS. Revisit when we have a Linux-only build flow.
+package-lock.json
+
 # Build outputs
 dist/
 build/
