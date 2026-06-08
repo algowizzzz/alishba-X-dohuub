@@ -27,19 +27,35 @@ const ADDRESS_TYPES: { type: AddressType; icon: keyof typeof Ionicons.glyphMap }
 ];
 
 export default function AddAddressScreen() {
-  const { type, edit } = useLocalSearchParams<{ type?: string; edit?: string }>();
-  const isEditing = edit === 'true';
+  // Prefill params come from manual.tsx after a Nominatim suggestion is
+  // picked or "Use current location" succeeds. Fall back to empty for the
+  // bare-form entry case.
+  const params = useLocalSearchParams<{
+    type?: string;
+    edit?: string;
+    street?: string;
+    city?: string;
+    state?: string;
+    zipCode?: string;
+    country?: string;
+    latitude?: string;
+    longitude?: string;
+  }>();
+  const isEditing = params.edit === 'true';
 
-  const [addressType, setAddressType] = useState<AddressType>((type as AddressType) || 'Home');
-  const [label, setLabel] = useState((type as AddressType) || 'Home');
-  const [country, setCountry] = useState('United States');
-  const [street, setStreet] = useState('');
-  const [city, setCity] = useState('');
-  const [state, setState] = useState('');
-  const [zipCode, setZipCode] = useState('');
+  const [addressType, setAddressType] = useState<AddressType>((params.type as AddressType) || 'Home');
+  const [label, setLabel] = useState<string>((params.type as string) || 'Home');
+  const [country, setCountry] = useState(params.country || 'United States');
+  const [street, setStreet] = useState(params.street || '');
+  const [city, setCity] = useState(params.city || '');
+  const [state, setState] = useState(params.state || '');
+  const [zipCode, setZipCode] = useState(params.zipCode || '');
   const [deliveryInstructions, setDeliveryInstructions] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
+
+  const prefilledLat = params.latitude ? parseFloat(params.latitude) : undefined;
+  const prefilledLon = params.longitude ? parseFloat(params.longitude) : undefined;
 
   const isFormValid = street.trim() && city.trim() && state.trim() && zipCode.trim() && country.trim();
 
@@ -64,6 +80,8 @@ export default function AddAddressScreen() {
           state,
           zipCode,
           country,
+          ...(prefilledLat !== undefined && Number.isFinite(prefilledLat) && { latitude: prefilledLat }),
+          ...(prefilledLon !== undefined && Number.isFinite(prefilledLon) && { longitude: prefilledLon }),
           isDefault: false,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),

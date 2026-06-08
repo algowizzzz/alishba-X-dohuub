@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   FlatList,
   SafeAreaView,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,13 +17,11 @@ import { ScreenHeader } from '../../src/components/composite';
 import { Button, EmptyState } from '../../src/components/ui';
 import { useAuthStore } from '../../src/store/authStore';
 import { getAddressesByUser } from '../../src/lib/queries';
-
-// Autocomplete suggestions (static fallback until geocoding API is wired)
-const STATIC_SUGGESTIONS = [
-  { id: '1', address: '123 Main Street, New York, NY 10001' },
-  { id: '2', address: '456 Broadway, New York, NY 10012' },
-  { id: '3', address: '789 Park Avenue, New York, NY 10021' },
-];
+import {
+  searchAddresses,
+  getCurrentLocationAddress,
+  ParsedAddress,
+} from '../../src/services/geocoding';
 
 /**
  * Manual Location Screen matching wireframe:
@@ -54,7 +53,11 @@ export default function ManualLocationScreen() {
   const [isLoadingAddresses, setIsLoadingAddresses] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [suggestions, setSuggestions] = useState(STATIC_SUGGESTIONS);
+  const [suggestions, setSuggestions] = useState<ParsedAddress[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastRequestRef = useRef(0);
 
   const fetchAddresses = useCallback(async () => {
     if (!user?.id) return;
@@ -88,18 +91,48 @@ export default function ManualLocationScreen() {
 
   const handleSearch = (query: string) => {
     setSearchQuery(query);
-    if (query.length > 2) {
-      setShowSuggestions(true);
-      // TODO: Call geocoding API for real suggestions
-    } else {
+    if (query.length < 3) {
       setShowSuggestions(false);
+      setSuggestions([]);
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      return;
     }
+    setShowSuggestions(true);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    // 400ms debounce — Nominatim rate-limits to ~1 req/sec.
+    debounceRef.current = setTimeout(async () => {
+      const requestId = ++lastRequestRef.current;
+      setIsSearching(true);
+      const results = await searchAddresses(query);
+      // Drop stale responses if a newer query has fired since.
+      if (requestId === lastRequestRef.current) {
+        setSuggestions(results);
+        setIsSearching(false);
+      }
+    }, 400);
   };
 
-  const handleSelectSuggestion = (suggestion: typeof STATIC_SUGGESTIONS[0]) => {
-    setSearchQuery(suggestion.address);
+  // Route to the add-address form with the chosen suggestion's fields prefilled.
+  // The user picks HOME/WORK/Other + reviews/adds apartment + saves there.
+  const routeWithPrefill = (addr: ParsedAddress) => {
+    router.push({
+      pathname: '/profile/add-address',
+      params: {
+        street: addr.street,
+        city: addr.city,
+        state: addr.state,
+        zipCode: addr.zipCode,
+        country: addr.country,
+        latitude: String(addr.latitude),
+        longitude: String(addr.longitude),
+      },
+    });
+  };
+
+  const handleSelectSuggestion = (suggestion: ParsedAddress) => {
+    setSearchQuery(suggestion.displayName);
     setShowSuggestions(false);
-    // TODO: Parse address and save
+    routeWithPrefill(suggestion);
   };
 
   const handleSelectRecentAddress = (addressId: string) => {
@@ -107,10 +140,31 @@ export default function ManualLocationScreen() {
     router.back();
   };
 
-  const handleUseCurrentLocation = () => {
-    // TODO: Get current location and reverse geocode
-    router.push('/location-permission');
+  const handleUseCurrentLocation = async () => {
+    if (isLocating) return;
+    setIsLocating(true);
+    try {
+      const addr = await getCurrentLocationAddress();
+      if (!addr) {
+        Alert.alert(
+          'Location unavailable',
+          'We could not get your location. Make sure location services are enabled and the app has permission.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Open permissions', onPress: () => router.push('/location-permission') },
+          ]
+        );
+        return;
+      }
+      routeWithPrefill(addr);
+    } finally {
+      setIsLocating(false);
+    }
   };
+
+  useEffect(() => () => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+  }, []);
 
   const handleAddNewAddress = () => {
     router.push('/profile/add-address');
@@ -138,13 +192,13 @@ export default function ManualLocationScreen() {
     </TouchableOpacity>
   );
 
-  const renderSuggestion = ({ item }: { item: typeof STATIC_SUGGESTIONS[0] }) => (
+  const renderSuggestion = ({ item }: { item: ParsedAddress }) => (
     <TouchableOpacity
       style={styles.suggestionItem}
       onPress={() => handleSelectSuggestion(item)}
     >
       <Ionicons name="location-outline" size={20} color={colors.text.secondary} />
-      <Text style={styles.suggestionText}>{item.address}</Text>
+      <Text style={styles.suggestionText} numberOfLines={2}>{item.displayName}</Text>
     </TouchableOpacity>
   );
 
@@ -174,21 +228,41 @@ export default function ManualLocationScreen() {
         {/* Autocomplete Suggestions */}
         {showSuggestions && (
           <View style={styles.suggestionsContainer}>
-            <FlatList
-              data={suggestions}
-              keyExtractor={(item) => item.id}
-              renderItem={renderSuggestion}
-              ItemSeparatorComponent={() => <View style={styles.separator} />}
-            />
+            {isSearching && suggestions.length === 0 ? (
+              <View style={styles.suggestionEmpty}>
+                <ActivityIndicator size="small" color={colors.primary} />
+              </View>
+            ) : suggestions.length === 0 ? (
+              <View style={styles.suggestionEmpty}>
+                <Text style={styles.suggestionEmptyText}>No matches found</Text>
+              </View>
+            ) : (
+              <FlatList
+                data={suggestions}
+                keyExtractor={(item, i) => `${item.latitude},${item.longitude},${i}`}
+                renderItem={renderSuggestion}
+                ItemSeparatorComponent={() => <View style={styles.separator} />}
+              />
+            )}
           </View>
         )}
 
         {/* Use Current Location */}
-        <TouchableOpacity style={styles.currentLocationButton} onPress={handleUseCurrentLocation}>
+        <TouchableOpacity
+          style={styles.currentLocationButton}
+          onPress={handleUseCurrentLocation}
+          disabled={isLocating}
+        >
           <View style={styles.currentLocationIcon}>
-            <Ionicons name="navigate" size={20} color={colors.primary} />
+            {isLocating ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <Ionicons name="navigate" size={20} color={colors.primary} />
+            )}
           </View>
-          <Text style={styles.currentLocationText}>Use current location</Text>
+          <Text style={styles.currentLocationText}>
+            {isLocating ? 'Finding your location...' : 'Use current location'}
+          </Text>
         </TouchableOpacity>
 
         {/* Recent/Saved Addresses */}
@@ -276,6 +350,14 @@ const styles = StyleSheet.create({
   separator: {
     height: borderWidth.thin,
     backgroundColor: 'rgba(46, 122, 217, 0.1)',
+  },
+  suggestionEmpty: {
+    padding: spacing.md,
+    alignItems: 'center',
+  },
+  suggestionEmptyText: {
+    fontSize: fontSize.sm,
+    color: colors.text.secondary,
   },
   currentLocationButton: {
     flexDirection: 'row',
