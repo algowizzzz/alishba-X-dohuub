@@ -8,10 +8,9 @@
   ],
   "scripts": {
     "dev": "turbo run dev",
-    "dev:api": "turbo run dev --filter=api",
-    "dev:mobile": "turbo run dev --filter=mobile",
-    "dev:business": "turbo run dev --filter=business-portal",
-    "dev:admin": "turbo run dev --filter=admin-panel",
+    "dev:api": "turbo run dev --filter=@doohub/api",
+    "dev:mobile": "turbo run dev --filter=@doohub/mobile",
+    "dev:portal": "turbo run dev --filter=@doohub/portal",
     "build": "turbo run build",
     "test": "turbo run test",
     "lint": "turbo run lint",
