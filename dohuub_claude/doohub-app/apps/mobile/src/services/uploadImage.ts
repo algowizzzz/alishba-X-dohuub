@@ -1,5 +1,5 @@
 import * as ImagePicker from 'expo-image-picker';
-import { Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
 import { api } from './api';
 
 type UploadResponse = {
@@ -38,13 +38,19 @@ export async function pickAndUploadAvatar(): Promise<string | null> {
   const mimeType = asset.mimeType || 'image/jpeg';
 
   const formData = new FormData();
-  // React Native FormData accepts this {uri, name, type} shape — TS doesn't
-  // know about it because it expects a Blob, so cast to any.
-  formData.append('image', {
-    uri: asset.uri,
-    name: filename,
-    type: mimeType,
-  } as any);
+  if (Platform.OS === 'web') {
+    // expo-image-picker on web returns a blob:/data: URI; native multipart
+    // needs a real Blob, not the RN {uri,name,type} shape.
+    const blob = await (await fetch(asset.uri)).blob();
+    formData.append('image', blob, filename);
+  } else {
+    // React Native: FormData accepts this shape; TS expects a Blob so cast.
+    formData.append('image', {
+      uri: asset.uri,
+      name: filename,
+      type: mimeType,
+    } as any);
+  }
 
   try {
     const response = await api.post<UploadResponse>(
