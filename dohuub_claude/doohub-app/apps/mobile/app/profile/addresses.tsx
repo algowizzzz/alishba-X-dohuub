@@ -36,6 +36,14 @@ export default function AddressesScreen() {
   };
 
   const handleDelete = (addressId: string) => {
+    // RN's Alert.alert with multi-button confirm doesn't fire callbacks on web
+    // (RNW stub), so the Delete tap was silently no-op'ing. Use window.confirm
+    // on web; Alert.alert still works as expected on iOS/Android.
+    if (Platform.OS === 'web') {
+      const ok = window.confirm('Are you sure you want to delete this address?');
+      if (ok) deleteAddress(addressId);
+      return;
+    }
     Alert.alert('Delete Address', 'Are you sure you want to delete this address?', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: () => deleteAddress(addressId) },
