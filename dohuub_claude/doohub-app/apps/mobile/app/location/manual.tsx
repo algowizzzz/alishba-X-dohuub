@@ -321,6 +321,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.lg,
     gap: spacing.sm,
     marginBottom: spacing.md,
+    backgroundColor: '#FFFFFF',
   },
   searchInput: {
     flex: 1,
@@ -332,7 +333,7 @@ const styles = StyleSheet.create({
     borderWidth: borderWidth.default,
     borderColor: 'rgba(46, 122, 217, 0.1)',
     borderRadius: borderRadius.lg,
-    backgroundColor: colors.background,
+    backgroundColor: '#FFFFFF',
     marginBottom: spacing.md,
     maxHeight: 200,
   },
@@ -368,6 +369,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.lg,
     marginBottom: spacing.xl,
     gap: spacing.md,
+    backgroundColor: '#FFFFFF',
   },
   currentLocationIcon: {
     width: 40,
@@ -405,6 +407,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.lg,
     marginBottom: spacing.sm,
     gap: spacing.md,
+    backgroundColor: '#FFFFFF',
   },
   addressIcon: {
     width: 40,
