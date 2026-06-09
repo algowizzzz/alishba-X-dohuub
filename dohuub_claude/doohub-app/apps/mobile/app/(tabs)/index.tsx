@@ -193,7 +193,7 @@ export default function HomeScreen() {
         addresses={modalAddresses}
         selectedAddressId={selectedAddressId || undefined}
         onSelectAddress={(addr) => setSelectedAddress(addr.id)}
-        onAddNew={() => router.push('/profile/add-address')}
+        onAddNew={() => router.push('/location/manual')}
       />
     </View>
   );
