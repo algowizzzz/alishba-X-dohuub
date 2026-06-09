@@ -39,7 +39,7 @@ export default function PaymentProcessingScreen() {
         const res = await api.get<{
           success: boolean;
           data?: { paymentStatus: string; status: string };
-        }>(`/api/v1/payments/session/${sessionId}`);
+        }>(`/payments/session/${sessionId}`);
 
         if (!res.success || !res.data) return null;
         const ps = res.data.paymentStatus;

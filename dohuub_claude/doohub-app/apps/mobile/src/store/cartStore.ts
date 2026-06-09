@@ -61,7 +61,7 @@ export const useCartStore = create<CartState>((set, get) => ({
   fetchCart: async () => {
     set({ isLoading: true, error: null });
     try {
-      const response = await api.get<CartResponse>('/api/v1/cart');
+      const response = await api.get<CartResponse>('/cart');
       if (!response.success) throw new Error(response.error || 'Fetch cart failed');
       applyCart(set, response.data);
     } catch (error: any) {
@@ -79,7 +79,7 @@ export const useCartStore = create<CartState>((set, get) => ({
   addItem: async (listingId: string, quantity = 1) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await api.post<CartResponse>('/api/v1/cart/items', { listingId, quantity });
+      const response = await api.post<CartResponse>('/cart/items', { listingId, quantity });
       if (!response.success) throw new Error(response.error || 'Add item failed');
       applyCart(set, response.data);
     } catch (error: any) {
@@ -96,7 +96,7 @@ export const useCartStore = create<CartState>((set, get) => ({
     }
     set({ isLoading: true, error: null });
     try {
-      await api.put<CartResponse>(`/api/v1/cart/items/${itemId}`, { quantity });
+      await api.put<CartResponse>(`/cart/items/${itemId}`, { quantity });
       await get().fetchCart();
     } catch (error: any) {
       const msg = extractMessage(error, 'Failed to update quantity');
@@ -108,7 +108,7 @@ export const useCartStore = create<CartState>((set, get) => ({
   removeItem: async (itemId: string) => {
     set({ isLoading: true, error: null });
     try {
-      await api.delete<CartResponse>(`/api/v1/cart/items/${itemId}`);
+      await api.delete<CartResponse>(`/cart/items/${itemId}`);
       await get().fetchCart();
     } catch (error: any) {
       const msg = extractMessage(error, 'Failed to remove item');
@@ -120,7 +120,7 @@ export const useCartStore = create<CartState>((set, get) => ({
   clearCart: async () => {
     set({ isLoading: true, error: null });
     try {
-      await api.delete<CartResponse>('/api/v1/cart');
+      await api.delete<CartResponse>('/cart');
     } catch {
       // still reset local state even if server call fails
     } finally {
@@ -131,7 +131,7 @@ export const useCartStore = create<CartState>((set, get) => ({
   checkout: async (addressId: string, specialNotes?: string) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await api.post<CartResponse>('/api/v1/orders', { addressId, specialNotes });
+      const response = await api.post<CartResponse>('/orders', { addressId, specialNotes });
       if (!response.success || !response.data) {
         throw new Error(response.error || 'Failed to place order');
       }

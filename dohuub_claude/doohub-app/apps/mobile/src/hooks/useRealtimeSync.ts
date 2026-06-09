@@ -24,7 +24,7 @@ async function resolveVendorId(userId: string, role?: string): Promise<string | 
   if (role !== 'VENDOR') return null;
   if (vendorIdCache.has(userId)) return vendorIdCache.get(userId)!;
   try {
-    const res: any = await api.get('/api/v1/vendors/me');
+    const res: any = await api.get('/vendors/me');
     const vendorId = res?.data?.id || res?.id || null;
     if (vendorId) vendorIdCache.set(userId, vendorId);
     return vendorId;

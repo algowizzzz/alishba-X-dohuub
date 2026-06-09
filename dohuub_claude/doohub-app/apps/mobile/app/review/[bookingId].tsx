@@ -34,7 +34,7 @@ export default function LeaveReviewScreen() {
     setIsSubmitting(true);
     try {
       const response = await api.post<{ success: boolean; data: any; error?: string }>(
-        '/api/v1/reviews',
+        '/reviews',
         { bookingId, rating, comment: reviewText }
       );
       if (!response.success) throw new Error(response.error || 'Submit failed');

@@ -69,7 +69,7 @@ export function usePushToken() {
         const token = tokenResult.data;
         if (!token || cancelled) return;
 
-        await api.post('/api/v1/notifications/register-token', {
+        await api.post('/notifications/register-token', {
           token,
           platform: Platform.OS,
         });

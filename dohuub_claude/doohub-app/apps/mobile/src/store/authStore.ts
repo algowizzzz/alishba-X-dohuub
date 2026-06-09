@@ -282,7 +282,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ isLoading: true });
     try {
       const response = await api.put<{ success: boolean; data: any; error?: string }>(
-        '/api/v1/users/me',
+        '/users/me',
         {
           firstName: data.firstName,
           lastName: data.lastName,
@@ -323,7 +323,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ isLoading: true });
     try {
       const response = await api.post<{ success: boolean; data: Address; error?: string }>(
-        '/api/v1/addresses',
+        '/addresses',
         address
       );
       if (!response.success || !response.data) throw new Error(response.error || 'Add address failed');
@@ -343,7 +343,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ isLoading: true });
     try {
       const response = await api.put<{ success: boolean; data: Address; error?: string }>(
-        `/api/v1/addresses/${id}`,
+        `/addresses/${id}`,
         address
       );
       if (!response.success || !response.data) throw new Error(response.error || 'Update address failed');
@@ -361,7 +361,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   deleteAddress: async (id: string) => {
     set({ isLoading: true });
     try {
-      await api.delete(`/api/v1/addresses/${id}`);
+      await api.delete(`/addresses/${id}`);
       set((state) => ({
         addresses: state.addresses.filter((a) => a.id !== id),
         selectedAddressId: state.selectedAddressId === id ? state.addresses[0]?.id || null : state.selectedAddressId,

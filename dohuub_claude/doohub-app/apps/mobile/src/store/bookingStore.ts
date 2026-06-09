@@ -114,7 +114,7 @@ export const useBookingStore = create<BookingState>((set) => ({
 
       // Server calculates fees + creates status history. We only send inputs.
       const response = await api.post<{ success: boolean; data: any; error?: string }>(
-        '/api/v1/bookings',
+        '/bookings',
         {
           vendorId: data.vendorId,
           addressId,
@@ -153,7 +153,7 @@ export const useBookingStore = create<BookingState>((set) => ({
     set({ isLoading: true, error: null });
     try {
       const response = await api.post<{ success: boolean; data: any; error?: string }>(
-        `/api/v1/bookings/${id}/cancel`,
+        `/bookings/${id}/cancel`,
         { reason }
       );
       if (!response.success) throw new Error(response.error || 'Cancel failed');
@@ -178,7 +178,7 @@ export const useBookingStore = create<BookingState>((set) => ({
     set({ isLoading: true, error: null });
     try {
       const response = await api.post<{ success: boolean; data: any; error?: string }>(
-        `/api/v1/bookings/${id}/complete`
+        `/bookings/${id}/complete`
       );
       if (!response.success || !response.data) {
         throw new Error(response.error || 'Complete failed');

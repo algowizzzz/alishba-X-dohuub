@@ -81,7 +81,7 @@ export default function PaymentScreen() {
         success: boolean;
         data?: { url: string; sessionId: string };
         error?: string;
-      }>('/api/v1/payments/checkout-session', { bookingId: booking.id });
+      }>('/payments/checkout-session', { bookingId: booking.id });
 
       if (!sessionRes.success || !sessionRes.data?.url) {
         throw new Error(

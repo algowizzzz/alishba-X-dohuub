@@ -48,7 +48,7 @@ export async function pickAndUploadAvatar(): Promise<string | null> {
 
   try {
     const response = await api.post<UploadResponse>(
-      '/api/v1/upload/image?type=avatar',
+      '/upload/image?type=avatar',
       formData,
       {
         // Let axios set multipart Content-Type WITH boundary by clearing the

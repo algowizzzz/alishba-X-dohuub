@@ -116,7 +116,7 @@ export default function NotificationsScreen() {
         n.id === notification.id ? { ...n, read: true } : n
       ));
       try {
-        await api.put(`/api/v1/notifications/${notification.id}/read`);
+        await api.put(`/notifications/${notification.id}/read`);
       } catch (error) {
         console.error('Failed to mark as read:', error);
       }
