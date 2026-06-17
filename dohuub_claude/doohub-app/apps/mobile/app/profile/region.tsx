@@ -11,10 +11,13 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { colors, spacing, fontSize, borderRadius, borderWidth } from '../../src/constants/theme';
 import { ScreenHeader } from '../../src/components/composite';
 import { Button } from '../../src/components/ui';
 import { getRegions } from '../../src/lib/queries';
+
+const REGION_STORAGE_KEY = 'doohub:selected-region';
 
 interface Region {
   id: string;
@@ -54,21 +57,23 @@ export default function RegionScreen() {
     setIsLoading(true);
     try {
       const data = await getRegions();
+      const stored = await AsyncStorage.getItem(REGION_STORAGE_KEY);
+      let availableList: Region[] = FALLBACK_REGIONS;
       if (data && data.length > 0) {
-        const mapped: Region[] = data.map((r: any) => ({
+        availableList = data.map((r: any) => ({
           id: r.id,
           name: r.name,
           code: r.code || '',
           flag: r.flag || '',
           available: r.isActive !== false,
         }));
-        setRegions(mapped);
-        // Select the first available region by default
-        const firstAvailable = mapped.find((r) => r.available);
-        if (firstAvailable) setSelectedRegion(firstAvailable.id);
+        setRegions(availableList);
       }
+      const restored = stored && availableList.some((r) => r.id === stored && r.available)
+        ? stored
+        : availableList.find((r) => r.available)?.id;
+      if (restored) setSelectedRegion(restored);
     } catch (error) {
-      // Fall back to hardcoded regions
       console.error('Failed to load regions:', error);
     } finally {
       setIsLoading(false);
@@ -86,10 +91,16 @@ export default function RegionScreen() {
     setSelectedRegion(region.id);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const region = regions.find((r) => r.id === selectedRegion);
-    Alert.alert('Region Updated', `Your region has been set to ${region?.name}.`);
-    router.back();
+    try {
+      await AsyncStorage.setItem(REGION_STORAGE_KEY, selectedRegion);
+    } catch (e) {
+      console.error('Failed to persist region:', e);
+    }
+    Alert.alert('Region Updated', `Your region has been set to ${region?.name}.`, [
+      { text: 'OK', onPress: () => router.back() },
+    ]);
   };
 
   return (

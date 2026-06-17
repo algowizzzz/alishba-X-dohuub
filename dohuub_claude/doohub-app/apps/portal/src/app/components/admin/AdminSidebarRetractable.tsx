@@ -11,6 +11,7 @@ import {
   LogOut,
   X,
   Gift,
+  Lock,
 } from "lucide-react";
 import { Button } from "../ui/button";
 
@@ -45,6 +46,7 @@ export function AdminSidebarRetractable({
     { icon: <Package className="w-5 h-5" />, label: "Orders", href: "/admin/orders", key: "orders" },
     { icon: <Bell className="w-5 h-5" />, label: "Push Notifications", href: "/admin/push-notifications", key: "notifications" },
     { icon: <Settings className="w-5 h-5" />, label: "Settings", href: "/admin/settings", key: "settings" },
+    { icon: <Lock className="w-5 h-5" />, label: "Change Password", href: "/admin/account/password", key: "account-password" },
   ];
 
   return (

@@ -80,11 +80,14 @@ router.post('/', authenticate, async (req: AuthRequest, res) => {
       return res.status(400).json({ error: 'Business name is required' });
     }
 
-    if (!categories || categories.length === 0) {
-      return res.status(400).json({ error: 'At least one category is required' });
-    }
+    // Categories are optional at initial signup — vendor selects them during
+    // onboarding/profile setup. Skip the nested create when none are provided.
+    const hasCategories = Array.isArray(categories) && categories.length > 0;
 
-    // Create vendor profile
+    // Create vendor profile.
+    // Auto-approve so customers see the new vendor on mobile immediately;
+    // admins can suspend later via the moderation UI. The mobile catalog
+    // queries filter on `status = APPROVED AND isActive = true`.
     const vendor = await prisma.vendor.create({
       data: {
         userId,
@@ -92,15 +95,17 @@ router.post('/', authenticate, async (req: AuthRequest, res) => {
         description: description || '',
         contactEmail: contactEmail || '',
         contactPhone: contactPhone || '',
+        status: 'APPROVED',
+        isActive: true,
         subscriptionStatus: 'TRIAL',
         trialStartedAt: new Date(),
         trialEndsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days trial
-        categories: {
+        categories: hasCategories ? {
           create: categories.map((cat: string) => ({
-            category: cat,
+            category: cat as any,
             isActive: true,
           })),
-        },
+        } : undefined,
         serviceAreas: serviceAreas && serviceAreas.length > 0 ? {
           create: serviceAreas.map((area: string) => ({
             name: area,
@@ -173,6 +178,156 @@ router.get('/me', authenticate, async (req: AuthRequest, res) => {
   } catch (error) {
     console.error('Get my vendor error:', error);
     res.status(500).json({ error: 'Failed to get vendor profile' });
+  }
+});
+
+/* ============================================================
+   SERVICE AREAS CRUD (vendor-scoped — operates on own vendor)
+   ============================================================ */
+
+async function getCurrentVendorId(userId: string) {
+  const v = await prisma.vendor.findFirst({ where: { userId }, select: { id: true } });
+  return v?.id || null;
+}
+
+router.get('/me/service-areas', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const vendorId = await getCurrentVendorId(req.user!.id);
+    if (!vendorId) return res.status(403).json({ error: 'Vendor profile not found' });
+    const areas = await prisma.vendorServiceArea.findMany({
+      where: { vendorId },
+      orderBy: { createdAt: 'desc' },
+    });
+    res.json({ success: true, data: areas });
+  } catch (e) {
+    console.error('List service areas error:', e);
+    res.status(500).json({ error: 'Failed to list service areas' });
+  }
+});
+
+router.post('/me/service-areas', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const vendorId = await getCurrentVendorId(req.user!.id);
+    if (!vendorId) return res.status(403).json({ error: 'Vendor profile not found' });
+    const { name, city, state, zipCodes, isActive } = req.body as {
+      name?: string; city?: string; state?: string; zipCodes?: string[]; isActive?: boolean;
+    };
+    if (!name || !city || !state) {
+      return res.status(400).json({ error: 'name, city and state are required' });
+    }
+    const area = await prisma.vendorServiceArea.create({
+      data: {
+        vendorId,
+        name,
+        city,
+        state,
+        zipCodes: Array.isArray(zipCodes) ? zipCodes : [],
+        isActive: isActive ?? true,
+      },
+    });
+    res.status(201).json({ success: true, data: area });
+  } catch (e) {
+    console.error('Create service area error:', e);
+    res.status(500).json({ error: 'Failed to create service area' });
+  }
+});
+
+router.put('/me/service-areas/:id', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const vendorId = await getCurrentVendorId(req.user!.id);
+    if (!vendorId) return res.status(403).json({ error: 'Vendor profile not found' });
+    const { id } = req.params;
+    const existing = await prisma.vendorServiceArea.findFirst({ where: { id, vendorId } });
+    if (!existing) return res.status(404).json({ error: 'Service area not found' });
+
+    const { name, city, state, zipCodes, isActive } = req.body as {
+      name?: string; city?: string; state?: string; zipCodes?: string[]; isActive?: boolean;
+    };
+    const updated = await prisma.vendorServiceArea.update({
+      where: { id },
+      data: {
+        ...(name !== undefined && { name }),
+        ...(city !== undefined && { city }),
+        ...(state !== undefined && { state }),
+        ...(Array.isArray(zipCodes) && { zipCodes }),
+        ...(isActive !== undefined && { isActive }),
+      },
+    });
+    res.json({ success: true, data: updated });
+  } catch (e) {
+    console.error('Update service area error:', e);
+    res.status(500).json({ error: 'Failed to update service area' });
+  }
+});
+
+router.delete('/me/service-areas/:id', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const vendorId = await getCurrentVendorId(req.user!.id);
+    if (!vendorId) return res.status(403).json({ error: 'Vendor profile not found' });
+    const { id } = req.params;
+    const existing = await prisma.vendorServiceArea.findFirst({ where: { id, vendorId } });
+    if (!existing) return res.status(404).json({ error: 'Service area not found' });
+    await prisma.vendorServiceArea.delete({ where: { id } });
+    res.json({ success: true });
+  } catch (e) {
+    console.error('Delete service area error:', e);
+    res.status(500).json({ error: 'Failed to delete service area' });
+  }
+});
+
+/* ============================================================
+   AVAILABILITY (working hours by day of week)
+   ============================================================ */
+
+router.get('/me/availability', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const vendorId = await getCurrentVendorId(req.user!.id);
+    if (!vendorId) return res.status(403).json({ error: 'Vendor profile not found' });
+    const slots = await prisma.vendorAvailability.findMany({
+      where: { vendorId },
+      orderBy: { dayOfWeek: 'asc' },
+    });
+    res.json({ success: true, data: slots });
+  } catch (e) {
+    console.error('List availability error:', e);
+    res.status(500).json({ error: 'Failed to list availability' });
+  }
+});
+
+// Bulk upsert — accepts an array of 7 day-of-week entries. The portal sends
+// the whole week at once when the vendor hits Save.
+router.put('/me/availability', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const vendorId = await getCurrentVendorId(req.user!.id);
+    if (!vendorId) return res.status(403).json({ error: 'Vendor profile not found' });
+    const { schedule } = req.body as {
+      schedule?: { dayOfWeek: number; startTime: string; endTime: string; isAvailable: boolean }[];
+    };
+    if (!Array.isArray(schedule)) {
+      return res.status(400).json({ error: 'schedule must be an array' });
+    }
+    const ops = schedule.map((s) =>
+      prisma.vendorAvailability.upsert({
+        where: { vendorId_dayOfWeek: { vendorId, dayOfWeek: s.dayOfWeek } },
+        update: {
+          startTime: s.startTime,
+          endTime: s.endTime,
+          isAvailable: s.isAvailable,
+        },
+        create: {
+          vendorId,
+          dayOfWeek: s.dayOfWeek,
+          startTime: s.startTime,
+          endTime: s.endTime,
+          isAvailable: s.isAvailable,
+        },
+      })
+    );
+    const results = await prisma.$transaction(ops);
+    res.json({ success: true, data: results });
+  } catch (e) {
+    console.error('Upsert availability error:', e);
+    res.status(500).json({ error: 'Failed to save availability' });
   }
 });
 

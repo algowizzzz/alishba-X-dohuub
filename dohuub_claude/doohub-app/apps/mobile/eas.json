@@ -16,6 +16,8 @@
         "EXPO_ROUTER_APP_ROOT": "app",
         "EXPO_ROUTER_IMPORT_MODE": "sync",
         "EXPO_NO_DOCTOR": "1",
+        "EXPO_PUBLIC_ENV": "preview",
+        "EXPO_PUBLIC_API_URL": "https://alishba-x-dohuub-production.up.railway.app",
         "EXPO_PUBLIC_SUPABASE_URL": "https://qiotpmjbhjpegylqgrwd.supabase.co",
         "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFpb3RwbWpiaGpwZWd5bHFncndkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0NDQ3MTAsImV4cCI6MjA4NDAyMDcxMH0.NnH4WAZOflA0twj9qoD0Nqa7LVvBqIi6PRvuS3zuZ9c"
       },
@@ -24,10 +26,28 @@
       }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": "versionCode",
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_ROUTER_APP_ROOT": "app",
+        "EXPO_ROUTER_IMPORT_MODE": "sync",
+        "EXPO_NO_DOCTOR": "1",
+        "EXPO_PUBLIC_ENV": "production",
+        "EXPO_PUBLIC_API_URL": "https://alishba-x-dohuub-production.up.railway.app",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://qiotpmjbhjpegylqgrwd.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFpb3RwbWpiaGpwZWd5bHFncndkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg0NDQ3MTAsImV4cCI6MjA4NDAyMDcxMH0.NnH4WAZOflA0twj9qoD0Nqa7LVvBqIi6PRvuS3zuZ9c"
+      }
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "android": {
+        "track": "internal",
+        "releaseStatus": "draft",
+        "changesNotSentForReview": false
+      }
+    }
   }
 }

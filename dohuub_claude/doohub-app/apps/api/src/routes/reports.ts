@@ -267,6 +267,37 @@ router.put('/:id', authenticate, requireRole('ADMIN'), async (req: AuthRequest, 
   }
 });
 
+// Auto-hide a listing by flipping its status to PAUSED. Best-effort across the
+// 9 listing tables — never blocks report creation if it fails.
+async function autoHideListing(listingTypeRaw: unknown, listingId: string) {
+  const t = normalizeListingType(listingTypeRaw);
+  try {
+    switch (t) {
+      case 'CLEANING':
+        await prisma.cleaningListing.update({ where: { id: listingId }, data: { status: 'PAUSED' as any } });
+        return;
+      case 'HANDYMAN':
+        await prisma.handymanListing.update({ where: { id: listingId }, data: { status: 'PAUSED' as any } });
+        return;
+      case 'BEAUTY':
+        await prisma.beautyListing.update({ where: { id: listingId }, data: { status: 'PAUSED' as any } });
+        return;
+      case 'GROCERIES':
+        await prisma.groceryListing.update({ where: { id: listingId }, data: { status: 'PAUSED' as any } });
+        return;
+      case 'RENTALS':
+        await prisma.rentalListing.update({ where: { id: listingId }, data: { status: 'PAUSED' as any } });
+        return;
+      case 'CAREGIVING':
+        await prisma.caregivingListing.update({ where: { id: listingId }, data: { status: 'PAUSED' as any } });
+        return;
+    }
+  } catch (e) {
+    // Vendor listing may not exist or already paused — don't block the report.
+    console.warn('[reports] auto-hide failed:', e);
+  }
+}
+
 // Create a report (any authenticated user)
 router.post('/', authenticate, async (req: AuthRequest, res) => {
   try {
@@ -286,6 +317,10 @@ router.post('/', authenticate, async (req: AuthRequest, res) => {
         status: 'PENDING',
       },
     });
+
+    // Hide the listing until an admin reviews. Admin can restore via the
+    // moderation UI by flipping the listing's status back to ACTIVE.
+    await autoHideListing(listingType, listingId);
 
     res.status(201).json({ success: true, data: report });
   } catch (error) {

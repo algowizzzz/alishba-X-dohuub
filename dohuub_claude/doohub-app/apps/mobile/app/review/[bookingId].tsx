@@ -8,12 +8,16 @@ import {
   TextInput,
   SafeAreaView,
   Alert,
+  Image,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, fontSize, borderRadius, borderWidth } from '../../src/constants/theme';
 import { ScreenHeader } from '../../src/components/composite';
 import api from '../../src/services/api';
+import { pickAndUploadImage } from '../../src/services/uploadImage';
+
+const MAX_REVIEW_PHOTOS = 5;
 
 export default function LeaveReviewScreen() {
   const { bookingId, serviceName, scheduledDate, scheduledTime } = useLocalSearchParams<{
@@ -25,9 +29,22 @@ export default function LeaveReviewScreen() {
 
   const [rating, setRating] = useState(0);
   const [reviewText, setReviewText] = useState('');
+  const [photos, setPhotos] = useState<string[]>([]);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const canSubmit = rating > 0 && reviewText.trim().length > 0;
+
+  const handlePickPhoto = async () => {
+    if (photos.length >= MAX_REVIEW_PHOTOS || uploadingPhoto) return;
+    setUploadingPhoto(true);
+    try {
+      const url = await pickAndUploadImage({ type: 'review' });
+      if (url) setPhotos((p) => [...p, url]);
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
 
   const handleSubmit = async () => {
     if (!canSubmit || !bookingId) return;
@@ -35,7 +52,7 @@ export default function LeaveReviewScreen() {
     try {
       const response = await api.post<{ success: boolean; data: any; error?: string }>(
         '/reviews',
-        { bookingId, rating, comment: reviewText }
+        { bookingId, rating, comment: reviewText, photos }
       );
       if (!response.success) throw new Error(response.error || 'Submit failed');
       router.back();
@@ -106,14 +123,36 @@ export default function LeaveReviewScreen() {
 
         {/* Add Photos */}
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Add Photos (Optional)</Text>
-          <TouchableOpacity
-            style={styles.addPhotoBtn}
-            onPress={() => Alert.alert('Coming Soon', 'Photo upload will be available soon')}
-          >
-            <Ionicons name="image-outline" size={28} color={colors.text.secondary} />
-            <Text style={styles.addPhotoText}>Add</Text>
-          </TouchableOpacity>
+          <Text style={styles.sectionLabel}>
+            Add Photos (Optional) {photos.length > 0 && `· ${photos.length}/${MAX_REVIEW_PHOTOS}`}
+          </Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }}>
+            {photos.map((url) => (
+              <View key={url} style={styles.photoTile}>
+                <Image source={{ uri: url }} style={styles.photoImg} resizeMode="cover" />
+                <TouchableOpacity
+                  onPress={() => setPhotos((p) => p.filter((u) => u !== url))}
+                  style={styles.photoRemove}
+                >
+                  <Ionicons name="close" size={14} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
+            ))}
+            {photos.length < MAX_REVIEW_PHOTOS && (
+              <TouchableOpacity
+                style={[styles.addPhotoBtn, uploadingPhoto && { opacity: 0.6 }]}
+                onPress={handlePickPhoto}
+                disabled={uploadingPhoto}
+              >
+                <Ionicons
+                  name={uploadingPhoto ? 'cloud-upload-outline' : 'image-outline'}
+                  size={28}
+                  color={colors.text.secondary}
+                />
+                <Text style={styles.addPhotoText}>{uploadingPhoto ? 'Uploading…' : 'Add'}</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       </ScrollView>
 
@@ -243,6 +282,28 @@ const styles = StyleSheet.create({
   addPhotoText: {
     fontSize: fontSize.xs,
     color: colors.text.secondary,
+  },
+  photoTile: {
+    width: 72,
+    height: 72,
+    borderRadius: borderRadius.md,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  photoImg: {
+    width: '100%',
+    height: '100%',
+  },
+  photoRemove: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   // CTA

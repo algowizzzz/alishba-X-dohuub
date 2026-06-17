@@ -1,24 +1,63 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, Image } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, Image, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, fontSize } from '../../../../src/constants/theme';
+import { getBeautyProducts } from '../../../../src/lib/queries';
 
-const BEAUTY_PRODUCT_VENDORS = [
-  { id: '1', name: 'Beauty on DE Run',  category: 'Full Beauty Store',     rating: 4.9, deliveryTime: '30-45 min', deliveryFee: 2.99, minOrder: 25, isPoweredByDoHuub: true,  image: 'https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=200&h=200&fit=crop' },
-  { id: '2', name: 'Glam Studio',       category: 'Makeup & Cosmetics',    rating: 4.8, deliveryTime: '25-40 min', deliveryFee: 1.99, minOrder: 20, isPoweredByDoHuub: false, image: 'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?w=200&h=200&fit=crop' },
-  { id: '3', name: 'Beauty Lounge',     category: 'Skincare & Beauty',     rating: 4.7, deliveryTime: '35-50 min', deliveryFee: 3.49, minOrder: 30, isPoweredByDoHuub: false, image: 'https://images.unsplash.com/photo-1571875257727-256c39da42af?w=200&h=200&fit=crop' },
-  { id: '4', name: 'Elite Salon & Spa', category: 'Hair & Body Care',      rating: 4.6, deliveryTime: '40-55 min', deliveryFee: 2.49, minOrder: 15, isPoweredByDoHuub: false, image: 'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=200&h=200&fit=crop' },
-  { id: '5', name: 'Radiance Beauty',   category: 'Skincare & Anti-Aging', rating: 4.5, deliveryTime: '45-60 min', deliveryFee: 0,    minOrder: 35, isPoweredByDoHuub: false, image: 'https://images.unsplash.com/photo-1556228578-0d85b1a4d571?w=200&h=200&fit=crop' },
-  { id: '6', name: 'Nail Art Studio',   category: 'Nail Products',         rating: 4.7, deliveryTime: '20-35 min', deliveryFee: 1.49, minOrder: 10, isPoweredByDoHuub: false, image: 'https://images.unsplash.com/photo-1604654894610-df63bc536371?w=200&h=200&fit=crop' },
-];
+interface BeautyProductVendor {
+  id: string;
+  name: string;
+  category: string;
+  rating: number;
+  deliveryTime: string;
+  deliveryFee: number;
+  minOrder: number;
+  isPoweredByDoHuub: boolean;
+  image?: string;
+}
 
 export default function BeautyProductsVendorsList() {
-  const navigateToCatalog = (item: typeof BEAUTY_PRODUCT_VENDORS[0]) => {
+  const [vendors, setVendors] = useState<BeautyProductVendor[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const rows = await getBeautyProducts();
+        const byVendor = new Map<string, BeautyProductVendor>();
+        for (const r of rows || []) {
+          const vendor = Array.isArray(r.Vendor) ? r.Vendor[0] : r.Vendor;
+          if (!vendor || byVendor.has(vendor.id)) continue;
+          byVendor.set(vendor.id, {
+            id: vendor.id,
+            name: vendor.businessName,
+            category: r.category || 'Beauty Products',
+            rating: Number(vendor.rating) || 0,
+            deliveryTime: '30-45 min',
+            deliveryFee: 0,
+            minOrder: 0,
+            isPoweredByDoHuub: Boolean(vendor.isMichelle),
+            image: r.image || vendor.coverImage || vendor.logo || undefined,
+          });
+        }
+        const list = Array.from(byVendor.values()).sort(
+          (a, b) => Number(b.isPoweredByDoHuub) - Number(a.isPoweredByDoHuub) || b.rating - a.rating
+        );
+        setVendors(list);
+      } catch (e) {
+        console.warn('Failed to load beauty products vendors:', e);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const navigateToCatalog = (item: BeautyProductVendor) => {
     router.push({ pathname: '/services/beauty/products/vendors/[id]', params: { id: item.id, name: item.name, isPoweredByDoHuub: String(item.isPoweredByDoHuub), rating: String(item.rating) } } as any);
   };
 
-  const navigateToProfile = (item: typeof BEAUTY_PRODUCT_VENDORS[0]) => {
+  const navigateToProfile = (item: BeautyProductVendor) => {
     router.push({ pathname: '/services/beauty/profile', params: { id: item.id, name: item.name, isPoweredByDoHuub: String(item.isPoweredByDoHuub), rating: String(item.rating) } } as any);
   };
 
@@ -37,15 +76,27 @@ export default function BeautyProductsVendorsList() {
         </TouchableOpacity>
       </View>
 
+      {loading ? (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      ) : (
       <FlatList
-        data={BEAUTY_PRODUCT_VENDORS}
+        data={vendors}
         keyExtractor={item => item.id}
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
+        ListEmptyComponent={<Text style={{ color: colors.text.secondary, textAlign: 'center', marginTop: 40 }}>No stores found.</Text>}
         renderItem={({ item }) => (
           <View style={styles.card}>
             <View style={styles.cardTop}>
-              <Image source={{ uri: item.image }} style={styles.vendorImg} resizeMode="cover" />
+              {item.image ? (
+                <Image source={{ uri: item.image }} style={styles.vendorImg} resizeMode="cover" />
+              ) : (
+                <View style={[styles.vendorImg, { backgroundColor: 'rgba(236,72,153,0.15)', alignItems: 'center', justifyContent: 'center' }]}>
+                  <Ionicons name="bag-handle" size={28} color="#EC4899" />
+                </View>
+              )}
               <View style={styles.vendorInfo}>
                 <View style={styles.nameRow}>
                   <Text style={styles.vendorName} numberOfLines={1}>{item.name}</Text>
@@ -80,6 +131,7 @@ export default function BeautyProductsVendorsList() {
           </View>
         )}
       />
+      )}
     </SafeAreaView>
   );
 }

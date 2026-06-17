@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   SafeAreaView,
   Alert,
+  Switch,
+  TextInput,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -42,18 +44,36 @@ export default function CheckoutScreen() {
   const [selectedPayment, setSelectedPayment] = useState('card');
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
 
+  // "Order for someone else" — delivers to a third party (e.g. family abroad).
+  // We don't have a recipient table, so we encode the details in specialNotes
+  // for the vendor's reference.
+  const [forSomeoneElse, setForSomeoneElse] = useState(false);
+  const [recipientName, setRecipientName] = useState('');
+  const [recipientPhone, setRecipientPhone] = useState('');
+  const [recipientAddress, setRecipientAddress] = useState('');
+
   const selectedAddress = addresses.find(a => a.id === selectedAddressId);
   const deliveryFee = 4.99;
   const serviceFee = 1.99;
   const total = subtotal + deliveryFee + serviceFee;
 
   const handlePlaceOrder = async () => {
+    if (forSomeoneElse) {
+      if (!recipientName.trim() || !recipientPhone.trim() || !recipientAddress.trim()) {
+        Alert.alert('Missing recipient details', 'Please fill in recipient name, phone and address.');
+        return;
+      }
+    }
+
     setIsPlacingOrder(true);
     try {
       const userId = useAuthStore.getState().user?.id;
       if (!userId) throw new Error('Not authenticated');
 
       const orderId = `order-${Date.now()}`;
+      const specialNotes = forSomeoneElse
+        ? `Order for someone else:\n  Name: ${recipientName.trim()}\n  Phone: ${recipientPhone.trim()}\n  Address: ${recipientAddress.trim()}`
+        : null;
 
       const { error: orderError } = await supabase.from('Order').insert({
         id: orderId,
@@ -66,6 +86,7 @@ export default function CheckoutScreen() {
         total,
         deliveryAddressId: selectedAddressId,
         paymentMethod: selectedPayment,
+        specialNotes,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
@@ -126,6 +147,55 @@ export default function CheckoutScreen() {
               <Text style={styles.changeText}>Change</Text>
             </TouchableOpacity>
           </View>
+        </View>
+
+        {/* Order for someone else */}
+        <View style={styles.section}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <View style={{ flex: 1, paddingRight: spacing.md }}>
+              <Text style={styles.sectionTitle}>Order for someone else?</Text>
+              <Text style={styles.recipientHint}>
+                Use this if you're sending groceries to a friend or family member in another region.
+              </Text>
+            </View>
+            <Switch
+              value={forSomeoneElse}
+              onValueChange={setForSomeoneElse}
+              trackColor={{ false: '#CBD5E1', true: colors.primary }}
+              thumbColor="#FFFFFF"
+            />
+          </View>
+
+          {forSomeoneElse && (
+            <View style={styles.recipientCard}>
+              <Text style={styles.recipientLabel}>Recipient name *</Text>
+              <TextInput
+                style={styles.recipientInput}
+                value={recipientName}
+                onChangeText={setRecipientName}
+                placeholder="Jane Doe"
+                placeholderTextColor={colors.text.muted}
+              />
+              <Text style={styles.recipientLabel}>Recipient phone *</Text>
+              <TextInput
+                style={styles.recipientInput}
+                value={recipientPhone}
+                onChangeText={setRecipientPhone}
+                placeholder="+1 555 0123"
+                placeholderTextColor={colors.text.muted}
+                keyboardType="phone-pad"
+              />
+              <Text style={styles.recipientLabel}>Delivery address *</Text>
+              <TextInput
+                style={[styles.recipientInput, { minHeight: 64, textAlignVertical: 'top' }]}
+                value={recipientAddress}
+                onChangeText={setRecipientAddress}
+                placeholder="Street, city, state, country"
+                placeholderTextColor={colors.text.muted}
+                multiline
+              />
+            </View>
+          )}
         </View>
 
         {/* Delivery Time */}
@@ -396,6 +466,33 @@ const styles = StyleSheet.create({
     borderTopWidth: borderWidth.thin,
     borderTopColor: 'rgba(46, 122, 217, 0.1)',
     backgroundColor: colors.background,
+  },
+  recipientHint: {
+    fontSize: fontSize.sm,
+    color: colors.text.secondary,
+    marginTop: 2,
+  },
+  recipientCard: {
+    marginTop: spacing.md,
+    padding: spacing.md,
+    backgroundColor: 'rgba(46, 122, 217, 0.04)',
+    borderRadius: borderRadius.lg,
+    gap: spacing.sm,
+  },
+  recipientLabel: {
+    fontSize: fontSize.sm,
+    fontWeight: '500',
+    color: colors.text.secondary,
+    marginTop: spacing.sm,
+  },
+  recipientInput: {
+    backgroundColor: colors.surface,
+    borderWidth: borderWidth.default,
+    borderColor: colors.border.default,
+    borderRadius: borderRadius.md,
+    padding: spacing.sm,
+    fontSize: fontSize.md,
+    color: colors.text.primary,
   },
 });
 

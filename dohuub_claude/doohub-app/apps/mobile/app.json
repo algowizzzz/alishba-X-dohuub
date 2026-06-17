@@ -20,7 +20,9 @@
       "bundleIdentifier": "com.doohub.app",
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "DoHuub needs your location to show nearby services.",
-        "NSCameraUsageDescription": "DoHuub needs camera access to upload photos for reviews and bookings."
+        "NSCameraUsageDescription": "DoHuub needs camera access to upload photos for reviews and bookings.",
+        "NSPhotoLibraryUsageDescription": "DoHuub needs access to your photos to upload an avatar and attach images to reviews and bookings.",
+        "NSPhotoLibraryAddUsageDescription": "DoHuub needs permission to save images you upload to your photo library."
       }
     },
     "android": {
@@ -29,11 +31,19 @@
         "backgroundColor": "#2E7AD9"
       },
       "package": "com.doohub.app",
+      "versionCode": 6,
       "permissions": [
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.INTERNET",
+        "android.permission.READ_MEDIA_IMAGES"
+      ],
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO",
         "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO"
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
       ]
     },
     "web": {

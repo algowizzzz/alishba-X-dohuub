@@ -1,11 +1,13 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowLeft, Plus, Edit, Trash2, MapPin, Check } from "lucide-react";
+import { toast } from "sonner";
 import { VendorSidebar } from "./VendorSidebar";
 import { VendorTopNav } from "./VendorTopNav";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { useNavigate, useParams } from "react-router-dom";
+import api from "../../../services/api";
 import {
   Dialog,
   DialogContent,
@@ -18,6 +20,8 @@ import {
 interface Region {
   id: string;
   name: string;
+  city: string;
+  state: string;
   zipCodes: string[];
   isActive: boolean;
 }
@@ -39,29 +43,35 @@ export function VendorGeographicRegions() {
     }
   };
 
-  // Mock store data
-  const storeName = "John's Cleaning Services";
+  const storeName = "Your service areas";
 
-  const [regions, setRegions] = useState<Region[]>([
-    {
-      id: "1",
-      name: "Downtown San Francisco",
-      zipCodes: ["94102", "94103", "94104"],
-      isActive: true,
-    },
-    {
-      id: "2",
-      name: "Mission District",
-      zipCodes: ["94110", "94114"],
-      isActive: true,
-    },
-    {
-      id: "3",
-      name: "Richmond District",
-      zipCodes: ["94118", "94121"],
-      isActive: false,
-    },
-  ]);
+  const [regions, setRegions] = useState<Region[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const loadRegions = async () => {
+    setLoading(true);
+    try {
+      const res = await api.get<{ success: boolean; data: any[] }>("/api/v1/vendors/me/service-areas");
+      const rows = (res?.data || []).map((r: any) => ({
+        id: r.id,
+        name: r.name,
+        city: r.city,
+        state: r.state,
+        zipCodes: Array.isArray(r.zipCodes) ? r.zipCodes : [],
+        isActive: r.isActive,
+      }));
+      setRegions(rows);
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error || "Failed to load service areas");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadRegions();
+  }, []);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -70,6 +80,8 @@ export function VendorGeographicRegions() {
 
   const [formData, setFormData] = useState({
     name: "",
+    city: "",
+    state: "",
     zipCodes: "",
     isActive: true,
   });
@@ -79,6 +91,8 @@ export function VendorGeographicRegions() {
       setEditingRegion(region);
       setFormData({
         name: region.name,
+        city: region.city,
+        state: region.state,
         zipCodes: region.zipCodes.join(", "),
         isActive: region.isActive,
       });
@@ -86,6 +100,8 @@ export function VendorGeographicRegions() {
       setEditingRegion(null);
       setFormData({
         name: "",
+        city: "",
+        state: "",
         zipCodes: "",
         isActive: true,
       });
@@ -93,58 +109,74 @@ export function VendorGeographicRegions() {
     setDialogOpen(true);
   };
 
-  const handleSaveRegion = () => {
+  const handleSaveRegion = async () => {
     const zipCodesArray = formData.zipCodes
       .split(",")
       .map((zip) => zip.trim())
       .filter((zip) => zip !== "");
 
-    if (editingRegion) {
-      // Edit existing region
-      setRegions(
-        regions.map((r) =>
-          r.id === editingRegion.id
-            ? {
-                ...r,
-                name: formData.name,
-                zipCodes: zipCodesArray,
-                isActive: formData.isActive,
-              }
-            : r
-        )
-      );
-    } else {
-      // Add new region
-      setRegions([
-        ...regions,
-        {
-          id: Date.now().toString(),
+    if (!formData.name || !formData.city || !formData.state) {
+      toast.error("Name, city and state are required");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      if (editingRegion) {
+        await api.put(`/api/v1/vendors/me/service-areas/${editingRegion.id}`, {
           name: formData.name,
+          city: formData.city,
+          state: formData.state,
           zipCodes: zipCodesArray,
           isActive: formData.isActive,
-        },
-      ]);
+        });
+        toast.success("Service area updated");
+      } else {
+        await api.post(`/api/v1/vendors/me/service-areas`, {
+          name: formData.name,
+          city: formData.city,
+          state: formData.state,
+          zipCodes: zipCodesArray,
+          isActive: formData.isActive,
+        });
+        toast.success("Service area added");
+      }
+      setDialogOpen(false);
+      setEditingRegion(null);
+      setFormData({ name: "", city: "", state: "", zipCodes: "", isActive: true });
+      await loadRegions();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error || "Failed to save service area");
+    } finally {
+      setSaving(false);
     }
-
-    setDialogOpen(false);
-    setEditingRegion(null);
-    setFormData({ name: "", zipCodes: "", isActive: true });
   };
 
-  const handleDeleteRegion = () => {
-    if (regionToDelete) {
-      setRegions(regions.filter((r) => r.id !== regionToDelete.id));
+  const handleDeleteRegion = async () => {
+    if (!regionToDelete) return;
+    setSaving(true);
+    try {
+      await api.delete(`/api/v1/vendors/me/service-areas/${regionToDelete.id}`);
+      toast.success("Service area removed");
       setDeleteDialogOpen(false);
       setRegionToDelete(null);
+      await loadRegions();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error || "Failed to delete service area");
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleToggleActive = (regionId: string) => {
-    setRegions(
-      regions.map((r) =>
-        r.id === regionId ? { ...r, isActive: !r.isActive } : r
-      )
-    );
+  const handleToggleActive = async (region: Region) => {
+    try {
+      await api.put(`/api/v1/vendors/me/service-areas/${region.id}`, {
+        isActive: !region.isActive,
+      });
+      setRegions((rs) => rs.map((r) => (r.id === region.id ? { ...r, isActive: !r.isActive } : r)));
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error || "Failed to toggle area");
+    }
   };
 
   return (
@@ -214,7 +246,11 @@ export function VendorGeographicRegions() {
           </div>
 
           {/* Regions List */}
-          {regions.length === 0 ? (
+          {loading ? (
+            <div className="text-center py-16">
+              <p className="text-sm text-[#6B7280]">Loading service areas…</p>
+            </div>
+          ) : regions.length === 0 ? (
             <div className="text-center py-16 bg-white border border-[rgba(46,122,217,0.25)] rounded-2xl shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
               <MapPin className="w-12 h-12 text-[#9CA3AF] mx-auto mb-4" />
               <h3 className="text-lg font-bold text-[#1A1A2E] mb-2">
@@ -250,7 +286,7 @@ export function VendorGeographicRegions() {
                       </div>
                     </div>
                     <button
-                      onClick={() => handleToggleActive(region.id)}
+                      onClick={() => handleToggleActive(region)}
                       className={`
                         relative inline-flex h-6 w-11 items-center rounded-full
                         transition-colors focus:outline-none
@@ -363,10 +399,38 @@ export function VendorGeographicRegions() {
               />
             </div>
 
+            {/* City / State */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label htmlFor="region-city" className="mb-1.5">
+                  City <span className="text-[#DC2626]">*</span>
+                </Label>
+                <Input
+                  id="region-city"
+                  type="text"
+                  value={formData.city}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, city: e.target.value }))}
+                  placeholder="San Francisco"
+                />
+              </div>
+              <div>
+                <Label htmlFor="region-state" className="mb-1.5">
+                  State <span className="text-[#DC2626]">*</span>
+                </Label>
+                <Input
+                  id="region-state"
+                  type="text"
+                  value={formData.state}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, state: e.target.value }))}
+                  placeholder="CA"
+                />
+              </div>
+            </div>
+
             {/* ZIP Codes */}
             <div>
               <Label htmlFor="zip-codes" className="mb-1.5">
-                ZIP Codes <span className="text-[#DC2626]">*</span>
+                ZIP Codes
               </Label>
               <Input
                 id="zip-codes"
@@ -418,16 +482,16 @@ export function VendorGeographicRegions() {
               onClick={() => {
                 setDialogOpen(false);
                 setEditingRegion(null);
-                setFormData({ name: "", zipCodes: "", isActive: true });
+                setFormData({ name: "", city: "", state: "", zipCodes: "", isActive: true });
               }}
             >
               Cancel
             </Button>
             <Button
               onClick={handleSaveRegion}
-              disabled={!formData.name || !formData.zipCodes}
+              disabled={saving || !formData.name || !formData.city || !formData.state}
             >
-              {editingRegion ? "Save Changes" : "Add Region"}
+              {saving ? "Saving…" : editingRegion ? "Save Changes" : "Add Region"}
             </Button>
           </DialogFooter>
         </DialogContent>

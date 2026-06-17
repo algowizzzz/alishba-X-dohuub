@@ -1,25 +1,40 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, Modal, ScrollView, Image } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, Modal, ScrollView, Image, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, fontSize } from '../../../src/constants/theme';
+import { getRentalListings } from '../../../src/lib/queries';
 
 const TEAL = '#14B8A6';
 
-const IMAGES = [
+const FALLBACK_IMAGES = [
   require('../../../assets/rental-1.png'),
   require('../../../assets/rental-2.png'),
   require('../../../assets/rental-3.png'),
   require('../../../assets/rental-4.png'),
 ];
 
-export const PROPERTIES = [
-  { id: '1', name: 'Luxury Downtown Apartment', location: 'Manhattan, New York, NY',   pricePerNight: 150, pricePerWeek: 950,  pricePerMonth: 3500, rating: 4.9, reviews: 234, bedrooms: 2, bathrooms: 1, maxGuests: 4, sqft: 1200, propertyType: 'Apartment', amenities: ['WiFi','Parking','Pool','AC','Kitchen','TV'],                          description: 'Stunning city views from this modern apartment. Perfect for families or couples seeking a luxurious stay.', houseRules: ['No smoking inside','No parties or events','Check-in after 3 PM'],           isPoweredByDoHuub: true,  image: 0 },
-  { id: '2', name: 'Cozy Studio Near Central Park', location: 'Upper West Side, New York, NY', pricePerNight: 140, pricePerWeek: 880,  pricePerMonth: 3200, rating: 4.8, reviews: 189, bedrooms: 1, bathrooms: 1, maxGuests: 2, sqft: 600,  propertyType: 'Studio',    amenities: ['WiFi','AC','Kitchen','TV'],                                         description: 'Cozy studio steps from Central Park. Walking distance to top restaurants and attractions.',               houseRules: ['No smoking','Quiet hours after 10 PM','No pets'],                        isPoweredByDoHuub: true,  image: 1 },
-  { id: '3', name: 'Modern Loft in Brooklyn',       location: 'Brooklyn, New York, NY',  pricePerNight: 120, pricePerWeek: 750,  pricePerMonth: 2800, rating: 4.7, reviews: 97,  bedrooms: 2, bathrooms: 1, maxGuests: 4, sqft: 1000, propertyType: 'Loft',      amenities: ['WiFi','Parking','AC','Kitchen','Washer','TV'],                               description: 'Stylish loft in the heart of Brooklyn with exposed brick and modern amenities.',              houseRules: ['No smoking inside','No parties','Pets allowed with prior approval'],   isPoweredByDoHuub: false, image: 2 },
-  { id: '4', name: 'Spacious Family Home',          location: 'Queens, New York, NY',    pricePerNight: 200, pricePerWeek: 1250, pricePerMonth: 4500, rating: 4.6, reviews: 143, bedrooms: 3, bathrooms: 2, maxGuests: 6, sqft: 1800, propertyType: 'House',     amenities: ['WiFi','Parking','AC','Kitchen','Washer','TV'],                               description: 'Spacious family home with backyard. Perfect for larger groups.',               houseRules: ['No smoking inside','Check-out by 11 AM','No events'],                  isPoweredByDoHuub: false, image: 3 },
-  { id: '5', name: 'Midtown Executive Suite',       location: 'Midtown, New York, NY',   pricePerNight: 180, pricePerWeek: 1100, pricePerMonth: 4000, rating: 4.5, reviews: 256, bedrooms: 1, bathrooms: 1, maxGuests: 2, sqft: 750,  propertyType: 'Apartment', amenities: ['WiFi','AC','Kitchen','TV','Parking'],                                        description: 'Modern executive suite in Midtown Manhattan. Ideal for business travellers.',                      houseRules: ['No smoking','No parties','No pets'],                                   isPoweredByDoHuub: false, image: 0 },
-];
+interface Property {
+  id: string;
+  name: string;
+  location: string;
+  pricePerNight: number;
+  pricePerWeek: number;
+  pricePerMonth: number;
+  rating: number;
+  reviews: number;
+  bedrooms: number;
+  bathrooms: number;
+  maxGuests: number;
+  sqft: number;
+  propertyType: string;
+  amenities: string[];
+  description: string;
+  houseRules: string[];
+  isPoweredByDoHuub: boolean;
+  remoteImage?: string;
+  image: number;
+}
 
 const PROPERTY_TYPES = ['All','Apartment','House','Studio','Villa'];
 const BEDROOM_OPTS   = ['Any','1','2','3','4+'];
@@ -33,7 +48,47 @@ export default function RentalPropertiesListScreen() {
   const [bathrooms,  setBathrooms]  = useState('Any');
   const [priceRange, setPriceRange] = useState('Any');
 
-  const filtered = PROPERTIES.filter(p => {
+  const [properties, setProperties] = useState<Property[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const rows = await getRentalListings();
+        const mapped: Property[] = (rows || []).map((r: any, idx: number) => {
+          const vendor = Array.isArray(r.Vendor) ? r.Vendor[0] : r.Vendor;
+          return {
+            id: r.id,
+            name: r.title,
+            location: [r.city, r.state].filter(Boolean).join(', '),
+            pricePerNight: Number(r.pricePerNight) || 0,
+            pricePerWeek: Number(r.pricePerWeek) || 0,
+            pricePerMonth: Number(r.pricePerMonth) || 0,
+            rating: Number(vendor?.rating) || 0,
+            reviews: Number(vendor?.reviewCount) || 0,
+            bedrooms: Number(r.bedrooms) || 0,
+            bathrooms: Number(r.bathrooms) || 0,
+            maxGuests: Number(r.maxGuests) || 0,
+            sqft: 0,
+            propertyType: r.propertyType || 'Apartment',
+            amenities: Array.isArray(r.amenities) ? r.amenities : [],
+            description: r.description || '',
+            houseRules: [],
+            isPoweredByDoHuub: Boolean(vendor?.isMichelle),
+            remoteImage: Array.isArray(r.images) && r.images.length > 0 ? r.images[0] : undefined,
+            image: idx % FALLBACK_IMAGES.length,
+          };
+        });
+        setProperties(mapped);
+      } catch (e) {
+        console.warn('Failed to load rentals:', e);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const filtered = properties.filter(p => {
     if (propType !== 'All' && p.propertyType !== propType) return false;
     if (bedrooms !== 'Any') {
       if (bedrooms === '4+' && p.bedrooms < 4) return false;
@@ -66,7 +121,7 @@ export default function RentalPropertiesListScreen() {
     </View>
   );
 
-  const goToDetail = (item: typeof PROPERTIES[0]) => {
+  const goToDetail = (item: Property) => {
     router.push({ pathname: '/services/rentals/[id]', params: {
       id: item.id, name: item.name, location: item.location,
       pricePerNight: item.pricePerNight, pricePerWeek: item.pricePerWeek, pricePerMonth: item.pricePerMonth,
@@ -91,16 +146,22 @@ export default function RentalPropertiesListScreen() {
         </TouchableOpacity>
       </View>
 
+      {loading ? (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator size="large" color={TEAL} />
+        </View>
+      ) : (
       <FlatList
         data={filtered}
         keyExtractor={i => i.id}
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={<Text style={styles.countText}>{filtered.length} properties available</Text>}
+        ListEmptyComponent={<Text style={[styles.countText, { textAlign: 'center', marginTop: 40 }]}>No rentals match your filters.</Text>}
         renderItem={({ item }) => (
           <TouchableOpacity style={styles.card} activeOpacity={0.9} onPress={() => goToDetail(item)}>
             <View style={styles.imgBox}>
-              <Image source={IMAGES[item.image]} style={styles.img} resizeMode="cover" />
+              <Image source={item.remoteImage ? { uri: item.remoteImage } : FALLBACK_IMAGES[item.image]} style={styles.img} resizeMode="cover" />
               {item.isPoweredByDoHuub && (
                 <View style={styles.dohuubBadge}><Text style={styles.dohuubBadgeText}>Powered by DoHuub</Text></View>
               )}
@@ -131,6 +192,7 @@ export default function RentalPropertiesListScreen() {
           </TouchableOpacity>
         )}
       />
+      )}
 
       <Modal visible={showFilters} animationType="slide" transparent>
         <View style={styles.overlay}>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -7,13 +7,12 @@ import {
   TouchableOpacity,
   TextInput,
   SafeAreaView,
-  Platform,
+  Alert,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, fontSize, borderRadius } from '../../src/constants/theme';
-
-const SERVICE_TYPES = ['Deep Cleaning', 'Laundry', 'Office Cleaning'];
+import { useAuthStore } from '../../src/store/authStore';
 
 const TIME_SLOTS = [
   '9:00 AM',
@@ -26,10 +25,13 @@ const TIME_SLOTS = [
   '5:00 PM',
 ];
 
-const ADDRESSES = [
-  { id: 'home', label: 'Home', detail: '123 Main St, New York' },
-  { id: 'work', label: 'Work', detail: '456 Office Blvd, New York' },
-];
+const SERVICE_TYPES_BY_CATEGORY: Record<string, string[]> = {
+  CLEANING: ['Deep Cleaning', 'Laundry', 'Office Cleaning'],
+  HANDYMAN: ['Plumbing', 'Electrical', 'Installation'],
+  BEAUTY: ['Makeup', 'Hair', 'Nails', 'Wellness'],
+  RIDE_ASSISTANCE: ['Doctor Visit', 'Pharmacy Pickup', 'General'],
+  COMPANIONSHIP: ['Wellness Visit', 'Errand Help'],
+};
 
 /**
  * Booking Customization screen matching wireframe:
@@ -43,17 +45,61 @@ const ADDRESSES = [
  * - Continue to Payment button
  */
 export default function BookingCustomizeScreen() {
-  const { serviceId, category } = useLocalSearchParams();
-  const [serviceType, setServiceType] = useState('Deep Cleaning');
+  const params = useLocalSearchParams<{
+    vendorId?: string;
+    listingId?: string;
+    category?: string;
+    serviceName?: string;
+    amount?: string;
+    serviceFee?: string;
+  }>();
+
+  const { addresses } = useAuthStore();
+
+  const categoryEnum = (params.category || 'CLEANING').toUpperCase();
+  const serviceTypes = SERVICE_TYPES_BY_CATEGORY[categoryEnum] || SERVICE_TYPES_BY_CATEGORY.CLEANING;
+
+  const subtotal = parseFloat(params.amount || '0') || 0;
+  const serviceFee = parseFloat(params.serviceFee || '0') || (subtotal > 0 ? Math.round(subtotal * 0.05 * 100) / 100 : 0);
+  const totalAmount = subtotal + serviceFee;
+
+  const defaultAddress = useMemo(
+    () => addresses?.find((a) => a.isDefault) || addresses?.[0],
+    [addresses]
+  );
+
+  const [serviceType, setServiceType] = useState(serviceTypes[0]);
   const [date, setDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
-  const [selectedAddress, setSelectedAddress] = useState('');
+  const [selectedAddress, setSelectedAddress] = useState<string>(defaultAddress?.id || '');
   const [instructions, setInstructions] = useState('');
 
-  const isValid = date && selectedTime && selectedAddress;
+  const isValid = !!date && !!selectedTime && !!selectedAddress && !!params.vendorId;
 
   const handleContinue = () => {
-    router.push('/checkout/payment');
+    if (!isValid) return;
+    if (!params.vendorId) {
+      Alert.alert('Missing vendor', 'Please open this booking from a listing.');
+      return;
+    }
+    if (subtotal <= 0) {
+      Alert.alert('Missing price', 'Listing price is missing. Please go back and try again.');
+      return;
+    }
+    router.push({
+      pathname: '/checkout/payment',
+      params: {
+        serviceName: params.serviceName || serviceType,
+        amount: subtotal.toString(),
+        serviceFee: serviceFee.toString(),
+        date,
+        time: selectedTime,
+        notes: instructions,
+        vendorId: params.vendorId,
+        category: categoryEnum,
+        listingId: params.listingId || '',
+      },
+    });
   };
 
   return (
@@ -76,7 +122,7 @@ export default function BookingCustomizeScreen() {
           <Text style={styles.sectionTitle}>Service Type</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View style={styles.chipRow}>
-              {SERVICE_TYPES.map((type) => (
+              {serviceTypes.map((type) => (
                 <TouchableOpacity
                   key={type}
                   style={[styles.chip, serviceType === type && styles.chipActive]}
@@ -128,29 +174,46 @@ export default function BookingCustomizeScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Address *</Text>
           <View style={styles.addressList}>
-            {ADDRESSES.map((addr) => (
-              <TouchableOpacity
-                key={addr.id}
-                style={[styles.addressCard, selectedAddress === addr.id && styles.addressCardActive]}
-                onPress={() => setSelectedAddress(addr.id)}
-              >
-                <View style={styles.addressIcon}>
-                  <Ionicons
-                    name={addr.id === 'home' ? 'home' : 'business'}
-                    size={20}
-                    color={selectedAddress === addr.id ? colors.primary : colors.text.muted}
-                  />
-                </View>
-                <View style={styles.addressInfo}>
-                  <Text style={styles.addressLabel}>{addr.label}</Text>
-                  <Text style={styles.addressDetail}>{addr.detail}</Text>
-                </View>
-                {selectedAddress === addr.id && (
-                  <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
-                )}
-              </TouchableOpacity>
-            ))}
-            <TouchableOpacity style={styles.addAddressButton}>
+            {addresses.length === 0 && (
+              <Text style={styles.addressDetail}>
+                No saved addresses. Add one from your profile to continue.
+              </Text>
+            )}
+            {addresses.map((addr) => {
+              const iconName =
+                addr.type === 'HOME'
+                  ? 'home'
+                  : addr.type === 'WORK'
+                  ? 'business'
+                  : 'location';
+              const detail = `${addr.street}${addr.apartment ? ' ' + addr.apartment : ''}, ${addr.city}, ${addr.state}`;
+              return (
+                <TouchableOpacity
+                  key={addr.id}
+                  style={[styles.addressCard, selectedAddress === addr.id && styles.addressCardActive]}
+                  onPress={() => setSelectedAddress(addr.id)}
+                >
+                  <View style={styles.addressIcon}>
+                    <Ionicons
+                      name={iconName as any}
+                      size={20}
+                      color={selectedAddress === addr.id ? colors.primary : colors.text.muted}
+                    />
+                  </View>
+                  <View style={styles.addressInfo}>
+                    <Text style={styles.addressLabel}>{addr.label || addr.type}</Text>
+                    <Text style={styles.addressDetail}>{detail}</Text>
+                  </View>
+                  {selectedAddress === addr.id && (
+                    <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+            <TouchableOpacity
+              style={styles.addAddressButton}
+              onPress={() => router.push('/profile/addresses')}
+            >
               <Ionicons name="add-circle-outline" size={20} color={colors.primary} />
               <Text style={styles.addAddressText}>Add new address</Text>
             </TouchableOpacity>
@@ -182,16 +245,16 @@ export default function BookingCustomizeScreen() {
         <View style={styles.priceSummary}>
           <View style={styles.priceRow}>
             <Text style={styles.priceLabel}>Service</Text>
-            <Text style={styles.priceValue}>$89.00</Text>
+            <Text style={styles.priceValue}>${subtotal.toFixed(2)}</Text>
           </View>
           <View style={styles.priceRow}>
             <Text style={styles.priceLabel}>Service Fee</Text>
-            <Text style={styles.priceValue}>$8.00</Text>
+            <Text style={styles.priceValue}>${serviceFee.toFixed(2)}</Text>
           </View>
           <View style={styles.priceDivider} />
           <View style={styles.priceRow}>
             <Text style={styles.totalLabel}>Total</Text>
-            <Text style={styles.totalValue}>$97.00</Text>
+            <Text style={styles.totalValue}>${totalAmount.toFixed(2)}</Text>
           </View>
         </View>
 

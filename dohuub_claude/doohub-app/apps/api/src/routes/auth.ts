@@ -486,7 +486,13 @@ router.post('/vendor/verify-otp', async (req, res) => {
           data: {
             userId: user.id,
             businessName: businessName || 'My Business',
-            status: 'PENDING',
+            // Auto-approve so the vendor is immediately visible to customers on
+            // the mobile app. Admins can suspend later via the moderation UI.
+            status: 'APPROVED',
+            isActive: true,
+            subscriptionStatus: 'TRIAL',
+            trialStartedAt: new Date(),
+            trialEndsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
           },
         });
 
@@ -613,7 +619,11 @@ router.post('/vendor/google', async (req, res) => {
           data: {
             userId: user.id,
             businessName: businessName || `${user.profile?.firstName || 'My'}'s Business`,
-            status: 'PENDING',
+            status: 'APPROVED',
+            isActive: true,
+            subscriptionStatus: 'TRIAL',
+            trialStartedAt: new Date(),
+            trialEndsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
           },
         });
 

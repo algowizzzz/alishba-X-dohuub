@@ -1,17 +1,26 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, Modal, ScrollView, Image } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, Modal, ScrollView, Image, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, fontSize } from '../../../../src/constants/theme';
+import { getRideListings } from '../../../../src/lib/queries';
 
 const PURPLE = '#A855F7';
 
-const PROVIDERS = [
-  { id: '1', name: 'DoHuub Care Transport',   rating: 4.9, reviews: 234, hourlyRate: 45, vehicleTypes: ['Standard', 'Wheelchair Accessible', 'Pet-Friendly'], wheelchairAccessible: true,  isPoweredByDoHuub: true,  description: 'Professional medical and daily living transportation services with trained drivers', coverageArea: 'All Miami-Dade County',           specialFeatures: ['Medical equipment transport', 'Door-to-door assistance', 'Medication pickup'], image: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?w=200&h=200&fit=crop' },
-  { id: '2', name: 'SafeRide Seniors',         rating: 4.8, reviews: 189, hourlyRate: 40, vehicleTypes: ['Standard', 'Wheelchair Accessible'],                wheelchairAccessible: true,  isPoweredByDoHuub: true,  description: 'Specialized senior transportation with compassionate care', coverageArea: 'Miami Beach & Surrounding Areas',                    specialFeatures: ['Senior specialists', 'Memory care trained', 'Mobility assistance'], image: 'https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?w=200&h=200&fit=crop' },
-  { id: '3', name: 'CareWheels Transportation',rating: 4.7, reviews: 156, hourlyRate: 38, vehicleTypes: ['Standard', 'Pet-Friendly'],                        wheelchairAccessible: false, isPoweredByDoHuub: false, description: 'Reliable transportation for appointments and errands', coverageArea: 'South Florida',                                          specialFeatures: ['Same-day booking', 'Multiple stops included', 'Pet-friendly options'], image: 'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?w=200&h=200&fit=crop' },
-  { id: '4', name: 'Comfort Rides',            rating: 4.6, reviews: 142, hourlyRate: 42, vehicleTypes: ['Standard', 'Wheelchair Accessible'],                wheelchairAccessible: true,  isPoweredByDoHuub: false, description: 'Comfortable and safe rides for all your needs', coverageArea: 'Greater Miami Area',                                           specialFeatures: ['24/7 availability', 'Trained assistants', 'Flexible scheduling'], image: 'https://images.unsplash.com/photo-1494976388531-d1058494cdd8?w=200&h=200&fit=crop' },
-];
+interface RideProvider {
+  id: string;
+  name: string;
+  rating: number;
+  reviews: number;
+  hourlyRate: number;
+  vehicleTypes: string[];
+  wheelchairAccessible: boolean;
+  isPoweredByDoHuub: boolean;
+  description: string;
+  coverageArea: string;
+  specialFeatures: string[];
+  image?: string;
+}
 
 const VEHICLE_TYPES = ['Standard', 'Wheelchair Accessible', 'Pet-Friendly'];
 
@@ -19,11 +28,44 @@ export default function RideProvidersScreen() {
   const [showFilters, setShowFilters] = useState(false);
   const [selectedVehicles, setSelectedVehicles] = useState<string[]>([]);
   const [accessibleOnly, setAccessibleOnly] = useState(false);
+  const [providers, setProviders] = useState<RideProvider[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const rows = await getRideListings();
+        const mapped: RideProvider[] = (rows || []).map((r: any) => {
+          const vendor = Array.isArray(r.Vendor) ? r.Vendor[0] : r.Vendor;
+          const vehicleTypes = Array.isArray(r.vehicleTypes) ? r.vehicleTypes : [];
+          return {
+            id: r.id,
+            name: r.title || vendor?.businessName || 'Ride Provider',
+            rating: Number(vendor?.rating) || 0,
+            reviews: Number(vendor?.reviewCount) || 0,
+            hourlyRate: Number(r.hourlyRate) || 0,
+            vehicleTypes,
+            wheelchairAccessible: vehicleTypes.some((v: string) => /wheel/i.test(v)),
+            isPoweredByDoHuub: Boolean(vendor?.isMichelle),
+            description: r.description || '',
+            coverageArea: r.coverageArea || '',
+            specialFeatures: Array.isArray(r.specialFeatures) ? r.specialFeatures : [],
+            image: r.image || (Array.isArray(r.images) ? r.images[0] : undefined),
+          };
+        });
+        setProviders(mapped);
+      } catch (e) {
+        console.warn('Failed to load ride providers:', e);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
 
   const toggleVehicle = (v: string) =>
     setSelectedVehicles(p => p.includes(v) ? p.filter(x => x !== v) : [...p, v]);
 
-  const filtered = PROVIDERS.filter(p => {
+  const filtered = providers.filter(p => {
     if (selectedVehicles.length > 0 && !selectedVehicles.some(v => p.vehicleTypes.includes(v))) return false;
     if (accessibleOnly && !p.wheelchairAccessible) return false;
     return true;
@@ -31,7 +73,7 @@ export default function RideProvidersScreen() {
 
   const activeCount = selectedVehicles.length + (accessibleOnly ? 1 : 0);
 
-  const goToDetail = (item: typeof PROVIDERS[0]) => {
+  const goToDetail = (item: RideProvider) => {
     router.push({ pathname: '/services/caregiving/rides/[id]', params: {
       id: item.id, name: item.name, rating: item.rating, reviews: item.reviews,
       hourlyRate: item.hourlyRate, vehicleTypes: item.vehicleTypes.join(','),
@@ -54,15 +96,27 @@ export default function RideProvidersScreen() {
         </TouchableOpacity>
       </View>
 
+      {loading ? (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator size="large" color={PURPLE} />
+        </View>
+      ) : (
       <FlatList
         data={filtered}
         keyExtractor={i => i.id}
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
+        ListEmptyComponent={<Text style={{ color: colors.text.secondary, textAlign: 'center', marginTop: 40 }}>No ride providers found.</Text>}
         renderItem={({ item }) => (
           <TouchableOpacity style={styles.card} onPress={() => goToDetail(item)} activeOpacity={0.8}>
             <View style={styles.cardRow}>
-              <Image source={{ uri: item.image }} style={styles.providerImg} resizeMode="cover" />
+              {item.image ? (
+                <Image source={{ uri: item.image }} style={styles.providerImg} resizeMode="cover" />
+              ) : (
+                <View style={[styles.providerImg, { backgroundColor: 'rgba(168,85,247,0.15)', alignItems: 'center', justifyContent: 'center' }]}>
+                  <Ionicons name="car" size={28} color={PURPLE} />
+                </View>
+              )}
               <View style={styles.cardInfo}>
                 <View style={styles.nameRow}>
                   <Text style={styles.providerName}>{item.name}</Text>
@@ -91,6 +145,7 @@ export default function RideProvidersScreen() {
           </TouchableOpacity>
         )}
       />
+      )}
 
       <Modal visible={showFilters} animationType="slide" transparent>
         <View style={styles.overlay}>

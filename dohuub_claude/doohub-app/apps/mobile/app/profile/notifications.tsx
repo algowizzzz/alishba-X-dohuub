@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -6,10 +6,17 @@ import {
   ScrollView,
   TouchableOpacity,
   Platform,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native';
+import {
+  loadNotificationPrefs,
+  saveNotificationPrefs,
+  DEFAULT_SETTINGS,
+  type NotificationSettings,
+} from '../../src/lib/notificationPrefs';
 
 interface NotificationSetting {
   key: string;
@@ -18,22 +25,42 @@ interface NotificationSetting {
   enabled: boolean;
 }
 
+const SETTING_DEFS: { key: keyof NotificationSettings; label: string; description: string }[] = [
+  { key: 'pushNotifications', label: 'Push Notifications', description: 'Enable all notifications' },
+  { key: 'bookingUpdates', label: 'Booking Updates', description: 'Status changes and reminders' },
+  { key: 'promotions', label: 'Promotional Offers', description: 'Discounts and special deals' },
+  { key: 'aiAssistant', label: 'AI Assistant Messages', description: 'Responses and suggestions' },
+  { key: 'payments', label: 'Payment Confirmations', description: 'Receipts and transaction alerts' },
+];
+
 export default function NotificationsScreen() {
   const router = useRouter();
   // SafeAreaView handles insets
 
-  const [settings, setSettings] = useState<NotificationSetting[]>([
-    { key: 'pushNotifications', label: 'Push Notifications', description: 'Enable all notifications', enabled: true },
-    { key: 'bookingUpdates', label: 'Booking Updates', description: 'Status changes and reminders', enabled: true },
-    { key: 'promotions', label: 'Promotional Offers', description: 'Discounts and special deals', enabled: false },
-    { key: 'aiAssistant', label: 'AI Assistant Messages', description: 'Responses and suggestions', enabled: true },
-    { key: 'payments', label: 'Payment Confirmations', description: 'Receipts and transaction alerts', enabled: true },
-  ]);
+  const [prefs, setPrefs] = useState<NotificationSettings>(DEFAULT_SETTINGS);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    loadNotificationPrefs().then(setPrefs);
+  }, []);
+
+  const settings: NotificationSetting[] = SETTING_DEFS.map((d) => ({
+    ...d,
+    enabled: prefs[d.key],
+  }));
 
   const toggleSetting = (key: string) => {
-    setSettings((prev) =>
-      prev.map((s) => (s.key === key ? { ...s, enabled: !s.enabled } : s))
-    );
+    setPrefs((prev) => ({ ...prev, [key]: !prev[key as keyof NotificationSettings] }));
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await saveNotificationPrefs(prefs);
+      Alert.alert('Saved', 'Your notification preferences have been updated.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleBack = () => {
@@ -90,8 +117,13 @@ export default function NotificationsScreen() {
 
       {/* Save Settings Button */}
       <View style={[styles.footer, { paddingBottom: 16 }]}>
-        <TouchableOpacity style={styles.saveButton} activeOpacity={0.85}>
-          <Text style={styles.saveButtonText}>Save Settings</Text>
+        <TouchableOpacity
+          style={[styles.saveButton, saving && { opacity: 0.7 }]}
+          activeOpacity={0.85}
+          onPress={handleSave}
+          disabled={saving}
+        >
+          <Text style={styles.saveButtonText}>{saving ? 'Saving…' : 'Save Settings'}</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

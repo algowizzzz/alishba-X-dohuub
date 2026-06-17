@@ -8,11 +8,13 @@ import {
   TextInput,
   SafeAreaView,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, fontSize, borderRadius } from '../../src/constants/theme';
 import { ScreenHeader } from '../../src/components/composite';
+import api from '../../src/services/api';
 
 const REASONS = [
   'Fraudulent or misleading',
@@ -31,17 +33,37 @@ const REASONS = [
  * - Submit Report + Cancel buttons
  */
 export default function ReportListingScreen() {
-  const { listingId } = useLocalSearchParams<{ listingId: string }>();
+  const { listingId, listingType } = useLocalSearchParams<{
+    listingId: string;
+    listingType?: string;
+  }>();
   const [selectedReason, setSelectedReason] = useState('');
   const [details, setDetails] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = () => {
-    if (!selectedReason) return;
-    Alert.alert(
-      'Report Submitted',
-      'Thank you for your report. We will review it within 24 hours.',
-      [{ text: 'OK', onPress: () => router.back() }]
-    );
+  const handleSubmit = async () => {
+    if (!selectedReason || !listingId || submitting) return;
+    setSubmitting(true);
+    try {
+      await api.post<{ success: boolean }>('/reports', {
+        listingType: listingType || 'VENDOR',
+        listingId,
+        reason: selectedReason,
+        comment: details || undefined,
+      });
+      Alert.alert(
+        'Report Submitted',
+        'Thank you for your report. We will review it within 24 hours.',
+        [{ text: 'OK', onPress: () => router.back() }]
+      );
+    } catch (err: any) {
+      Alert.alert(
+        'Could not submit',
+        err?.response?.data?.error || err?.message || 'Please try again.'
+      );
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -118,17 +140,21 @@ export default function ReportListingScreen() {
         <TouchableOpacity
           style={[
             styles.submitButton,
-            !selectedReason && styles.submitButtonDisabled,
+            (!selectedReason || submitting) && styles.submitButtonDisabled,
           ]}
           onPress={handleSubmit}
-          disabled={!selectedReason}
+          disabled={!selectedReason || submitting}
         >
-          <Text style={[
-            styles.submitButtonText,
-            !selectedReason && styles.submitButtonTextDisabled,
-          ]}>
-            Submit Report
-          </Text>
+          {submitting ? (
+            <ActivityIndicator color="#FFFFFF" size="small" />
+          ) : (
+            <Text style={[
+              styles.submitButtonText,
+              !selectedReason && styles.submitButtonTextDisabled,
+            ]}>
+              Submit Report
+            </Text>
+          )}
         </TouchableOpacity>
         <TouchableOpacity style={styles.cancelButton} onPress={() => router.back()}>
           <Text style={styles.cancelButtonText}>Cancel</Text>

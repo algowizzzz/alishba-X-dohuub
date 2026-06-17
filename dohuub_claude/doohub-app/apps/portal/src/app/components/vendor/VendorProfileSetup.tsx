@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Store, ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
@@ -11,29 +12,76 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
+import api from "../../../services/api";
+import { supabase } from "../../../lib/supabase";
 
 export function VendorProfileSetup() {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
-  
+  const [hasVendor, setHasVendor] = useState(false);
+
   const [formData, setFormData] = useState({
     businessName: "",
     ownerName: "",
-    email: "vendor@example.com", // Pre-filled from signup
+    email: "",
     phone: "",
     businessAddress: "",
     taxId: "",
     businessType: "",
   });
 
+  // Load existing vendor (if any) so profile-setup acts as edit-or-create.
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        const email = user?.email || "";
+        setFormData((p) => ({ ...p, email }));
+
+        const res = await api
+          .get<{ success: boolean; data: any }>("/api/v1/vendors/me")
+          .catch(() => null);
+        if (res?.data) {
+          setHasVendor(true);
+          setFormData((p) => ({
+            ...p,
+            businessName: res.data.businessName || "",
+            phone: res.data.contactPhone || p.phone,
+            businessAddress: res.data.description || "",
+          }));
+        }
+      } catch (e) {
+        // Non-fatal — falls back to create mode.
+      }
+    })();
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      if (hasVendor) {
+        await api.put("/api/v1/vendors/me", {
+          businessName: formData.businessName,
+          contactPhone: formData.phone,
+          description: formData.businessAddress,
+        });
+        toast.success("Profile updated");
+      } else {
+        await api.post("/api/v1/vendors", {
+          businessName: formData.businessName,
+          contactPhone: formData.phone,
+          description: formData.businessAddress,
+          categories: [],
+        });
+        toast.success("Vendor profile created");
+      }
       navigate("/vendor/dashboard");
+    } catch (err: any) {
+      toast.error(err?.response?.data?.error || err?.message || "Failed to save profile");
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   const handleInputChange = (field: string, value: string) => {

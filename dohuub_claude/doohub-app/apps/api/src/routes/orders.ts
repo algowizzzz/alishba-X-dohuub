@@ -193,4 +193,66 @@ router.post('/:id/cancel', authenticate, async (req: AuthRequest, res) => {
   }
 });
 
+// Vendor-facing status transition: Accept / Decline / In Progress / Out for
+// Delivery / Completed / Cancelled. Mirrors the booking status-transition rules.
+router.patch('/:id/status', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body as { status?: string };
+
+    if (!status) {
+      return res.status(400).json({ error: 'status is required' });
+    }
+
+    // The actor must own the vendor that owns the order.
+    const vendor = await prisma.vendor.findFirst({ where: { userId: req.user!.id } });
+    if (!vendor) {
+      return res.status(403).json({ error: 'Vendor profile not found' });
+    }
+
+    const order = await prisma.order.findFirst({
+      where: { id, vendorId: vendor.id },
+    });
+
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    const validTransitions: Record<string, string[]> = {
+      PENDING: ['ACCEPTED', 'DECLINED', 'CANCELLED'],
+      ACCEPTED: ['IN_PROGRESS', 'OUT_FOR_DELIVERY', 'CANCELLED'],
+      IN_PROGRESS: ['OUT_FOR_DELIVERY', 'COMPLETED', 'CANCELLED'],
+      OUT_FOR_DELIVERY: ['COMPLETED', 'CANCELLED'],
+    };
+
+    if (!validTransitions[order.status]?.includes(status)) {
+      return res.status(400).json({
+        error: `Cannot transition from ${order.status} to ${status}`,
+      });
+    }
+
+    const data: any = { status };
+    if (status === 'ACCEPTED') data.acceptedAt = new Date();
+    if (status === 'COMPLETED') data.completedAt = new Date();
+    if (status === 'CANCELLED' || status === 'DECLINED') data.cancelledAt = new Date();
+
+    const updated = await prisma.order.update({
+      where: { id },
+      data,
+      include: {
+        vendor: true,
+        address: true,
+        items: {
+          include: { groceryListing: true, foodListing: true, beautyProductListing: true },
+        },
+      },
+    });
+
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    console.error('Update order status error:', error);
+    res.status(500).json({ error: 'Failed to update order status' });
+  }
+});
+
 export default router;

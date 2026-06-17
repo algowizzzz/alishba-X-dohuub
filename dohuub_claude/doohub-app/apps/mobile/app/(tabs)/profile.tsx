@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -15,8 +15,15 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { Alert } from 'react-native';
 import { useAuthStore } from '../../src/store/authStore';
 import { useRewardsStore } from '../../src/store/rewardsStore';
+import api from '../../src/services/api';
+import { ENDPOINTS } from '../../src/constants/api';
+import {
+  loadNotificationPrefs,
+  saveNotificationPrefs,
+} from '../../src/lib/notificationPrefs';
 
 /* ───────── colours (hardcoded, no theme import) ───────── */
 const C = {
@@ -133,7 +140,7 @@ function DeleteAccountModal({
 }: {
   visible: boolean;
   onClose: () => void;
-  onConfirm: (password: string) => void;
+  onConfirm: () => void;
   loading: boolean;
 }) {
   const handleClose = () => { onClose(); };
@@ -180,7 +187,7 @@ function DeleteAccountModal({
             {/* Buttons stacked */}
             <TouchableOpacity
               style={[modal.btnFull, { backgroundColor: C.destructive }]}
-              onPress={() => onConfirm('')}
+              onPress={() => onConfirm()}
               disabled={loading}
             >
               {loading ? (
@@ -217,6 +224,18 @@ export default function ProfileScreen() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
 
+  // Load + persist the master notifications toggle. This drives `pushNotifications`
+  // on the shared NotificationSettings, so the granular screen stays in sync.
+  useEffect(() => {
+    loadNotificationPrefs().then((p) => setNotificationsEnabled(p.pushNotifications));
+  }, []);
+
+  const handleNotificationsToggle = async (value: boolean) => {
+    setNotificationsEnabled(value);
+    const current = await loadNotificationPrefs();
+    await saveNotificationPrefs({ ...current, pushNotifications: value });
+  };
+
   const handleLogout = async () => {
     setIsLoggingOut(true);
     try {
@@ -228,13 +247,19 @@ export default function ProfileScreen() {
     }
   };
 
-  const handleDeleteAccount = async (password: string) => {
+  const handleDeleteAccount = async () => {
     setIsDeleting(true);
     try {
-      // TODO: Call delete account API with password
+      await api.delete(ENDPOINTS.USERS.ME, { confirm: 'DELETE' });
+      // The server has anonymized the account; tear down the local session too.
       await logout();
       setShowDeleteModal(false);
       router.replace('/(auth)/welcome');
+    } catch (err: any) {
+      const msg =
+        err?.response?.data?.error ||
+        'We could not delete your account right now. Please try again or contact support.';
+      Alert.alert('Delete failed', msg);
     } finally {
       setIsDeleting(false);
     }
@@ -267,7 +292,7 @@ export default function ProfileScreen() {
       {item.toggle ? (
         <Switch
           value={notificationsEnabled}
-          onValueChange={setNotificationsEnabled}
+          onValueChange={handleNotificationsToggle}
           trackColor={{ false: '#CBD5E1', true: '#2E7AD9' }}
           thumbColor="#FFFFFF"
         />

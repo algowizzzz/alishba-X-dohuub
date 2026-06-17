@@ -199,13 +199,47 @@ export default function BookingDetailScreen() {
           </TouchableOpacity>
         )}
         {booking.status === 'COMPLETED' && (
-          <TouchableOpacity
-            style={s.completeBtn}
-            onPress={() => router.push(`/review/${id}?serviceName=${encodeURIComponent(serviceName)}&scheduledDate=${encodeURIComponent(booking.scheduledDate || '')}&scheduledTime=${encodeURIComponent(booking.scheduledTime || '')}` as any)}
-          >
-            <Ionicons name="star" size={20} color="#FFF" />
-            <Text style={s.completeBtnText}>Leave a Review</Text>
-          </TouchableOpacity>
+          <>
+            <TouchableOpacity
+              style={s.completeBtn}
+              onPress={() => router.push(`/review/${id}?serviceName=${encodeURIComponent(serviceName)}&scheduledDate=${encodeURIComponent(booking.scheduledDate || '')}&scheduledTime=${encodeURIComponent(booking.scheduledTime || '')}` as any)}
+            >
+              <Ionicons name="star" size={20} color="#FFF" />
+              <Text style={s.completeBtnText}>Leave a Review</Text>
+            </TouchableOpacity>
+
+            {/* Re-order CTA — routes the user back to the same vendor's booking
+                flow for the same category. Vendor + category are enough to
+                reach the right book screen; price + slots are re-fetched. */}
+            <TouchableOpacity
+              style={[s.completeBtn, { backgroundColor: '#1A1A2E', marginTop: 8 }]}
+              onPress={() => {
+                const vendorId = booking.vendorId || booking.vendor?.id;
+                if (!vendorId) {
+                  Alert.alert('Cannot re-book', 'Vendor info is missing for this booking.');
+                  return;
+                }
+                const cat = String(booking.category || '').toUpperCase();
+                const path: Record<string, string> = {
+                  CLEANING: `/services/cleaning/${vendorId}/book`,
+                  HANDYMAN: `/services/handyman/${vendorId}/book`,
+                  BEAUTY: `/services/beauty/${vendorId}`,
+                  RENTALS: `/services/rentals/${vendorId}`,
+                  RIDE_ASSISTANCE: `/services/caregiving/rides/${vendorId}/book`,
+                  COMPANIONSHIP: `/services/caregiving/companions/${vendorId}/book`,
+                };
+                const target = path[cat];
+                if (!target) {
+                  Alert.alert('Cannot re-book', 'This service type does not support quick re-booking.');
+                  return;
+                }
+                router.push(target as any);
+              }}
+            >
+              <Ionicons name="refresh" size={20} color="#FFF" />
+              <Text style={s.completeBtnText}>Book Again</Text>
+            </TouchableOpacity>
+          </>
         )}
       </ScrollView>
     </SafeAreaView>

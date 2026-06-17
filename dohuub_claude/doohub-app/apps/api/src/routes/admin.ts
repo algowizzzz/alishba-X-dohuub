@@ -738,9 +738,14 @@ router.patch('/vendors/:id/status', authenticate, requireAdmin, async (req: Auth
       return res.status(400).json({ error: 'Valid status is required' });
     }
 
+    // Keep the legacy `isActive` boolean in sync. Mobile listing queries filter
+    // by `isActive=true`, so suspending without flipping this would leave the
+    // vendor visible in the customer app.
+    const isActive = status === 'APPROVED';
+
     const vendor = await prisma.vendor.update({
       where: { id },
-      data: { status },
+      data: { status, isActive },
       include: {
         user: { select: { id: true, email: true, profile: true } },
       },

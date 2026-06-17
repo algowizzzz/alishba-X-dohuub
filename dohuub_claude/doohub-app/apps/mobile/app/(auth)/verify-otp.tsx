@@ -83,18 +83,12 @@ export default function VerifyOTPScreen() {
         router.replace('/(tabs)');
       }
     } catch (error: any) {
-      if (__DEV__ || process.env.NODE_ENV === 'development') {
-        console.log('DEV MODE: Backend unavailable, skipping OTP verification');
-        if (isRegistration === 'true') {
-          router.replace('/(auth)/profile-setup');
-        } else {
-          router.replace('/(tabs)');
-        }
-        return;
-      }
-
-      console.error('OTP verification error:', error);
-      setError('Invalid code. Please try again');
+      const status = error?.response?.status;
+      const message =
+        status && status >= 500
+          ? 'We could not reach the verification service. Please try again in a moment.'
+          : 'Invalid code. Please try again.';
+      setError(message);
       setOtp(Array(OTP_LENGTH).fill(''));
       inputRefs.current[0]?.focus();
     }
@@ -186,15 +180,6 @@ export default function VerifyOTPScreen() {
           )}
         </TouchableOpacity>
 
-        {/* DEV ONLY: Skip OTP button */}
-        {__DEV__ && (
-          <TouchableOpacity
-            style={styles.devSkipButton}
-            onPress={() => handleVerify('000000')}
-          >
-            <Text style={styles.devSkipText}>DEV: Skip OTP</Text>
-          </TouchableOpacity>
-        )}
       </View>
     </SafeAreaView>
   );
@@ -328,20 +313,5 @@ const styles = StyleSheet.create({
   },
   verifyButtonTextDisabled: {
     color: colors.text.muted,
-  },
-  devSkipButton: {
-    marginTop: spacing.xl,
-    padding: spacing.md,
-    backgroundColor: 'rgba(46, 122, 217, 0.08)',
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: 'rgba(46, 122, 217, 0.2)',
-    alignSelf: 'center',
-  },
-  devSkipText: {
-    color: colors.primary,
-    fontSize: fontSize.md,
-    fontWeight: '600',
-    textAlign: 'center',
   },
 });

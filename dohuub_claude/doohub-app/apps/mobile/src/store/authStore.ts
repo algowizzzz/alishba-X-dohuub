@@ -54,6 +54,7 @@ interface AuthState {
   // Auth actions (Supabase)
   login: (email: string, password: string) => Promise<User>;
   register: (email: string, password: string) => Promise<User>;
+  verifyOtp: (email: string, code: string, isRegistration: boolean) => Promise<User>;
   logout: () => Promise<void>;
   fetchUser: () => Promise<void>;
   setSession: (session: Session) => void;
@@ -204,6 +205,40 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isEmailVerified: false,
         profile: { firstName: '', lastName: '' },
       };
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  verifyOtp: async (email: string, code: string, isRegistration: boolean) => {
+    set({ isLoading: true });
+    try {
+      const { data, error } = await supabase.auth.verifyOtp({
+        email,
+        token: code,
+        type: 'email',
+      });
+
+      if (error) throw error;
+      if (!data.session || !data.user) {
+        throw new Error('Verification did not return a session');
+      }
+
+      const user = await fetchUserFromDb(data.user.id, data.user.email || email);
+
+      set({
+        user,
+        session: data.session,
+        isAuthenticated: true,
+      });
+      await syncApiToken(data.session);
+
+      // Load addresses in background — new registrations won't have any yet
+      loadAddresses(data.user.id).then(({ addresses, selectedId }) => {
+        set({ addresses, selectedAddressId: selectedId });
+      });
+
+      return user;
     } finally {
       set({ isLoading: false });
     }

@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
-import { Search, User, Calendar, DollarSign, Package, Clock, Check, ChevronRight } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { Search, User, Calendar, DollarSign, Package, Clock, Check, ChevronRight, X } from "lucide-react";
+import { toast } from "sonner";
 import api from "../../../services/api";
 import { parseISO, isWithinInterval } from "date-fns";
 import { VendorSidebar } from "./VendorSidebar";
@@ -16,7 +17,19 @@ import {
   SelectValue,
 } from "../ui/select";
 
-type OrderStatus = "accepted" | "in-progress" | "completed";
+type OrderStatus = "pending" | "accepted" | "in-progress" | "completed" | "declined" | "cancelled";
+
+// Map server enum (BookingStatus / OrderStatus) → UI tab key
+const toUiStatus = (server: string | undefined): OrderStatus => {
+  const s = (server || "").toUpperCase();
+  if (s === "PENDING") return "pending";
+  if (s === "ACCEPTED") return "accepted";
+  if (s === "IN_PROGRESS") return "in-progress";
+  if (s === "COMPLETED") return "completed";
+  if (s === "DECLINED") return "declined";
+  if (s === "CANCELLED") return "cancelled";
+  return "pending";
+};
 
 interface OrderItem {
   name: string;
@@ -57,6 +70,8 @@ interface Order {
   type: "service" | "delivery";
   serviceDetails?: ServiceDetails;
   deliveryDetails?: DeliveryDetails;
+  // Discriminator — bookings use PUT /bookings/:id/status, orders use PATCH /orders/:id/status.
+  kind: "booking" | "order";
 }
 
 export function VendorOrders() {
@@ -73,66 +88,94 @@ export function VendorOrders() {
     }
   };
 
-  const [activeTab, setActiveTab] = useState<OrderStatus>("accepted");
+  const [activeTab, setActiveTab] = useState<OrderStatus>("pending");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStore, setSelectedStore] = useState<string>("all");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+  const [actingId, setActingId] = useState<string | null>(null);
 
   const [orders, setOrders] = useState<Order[]>([]);
 
-  useEffect(() => {
-    Promise.all([
+  const loadOrders = useCallback(async () => {
+    const [bookingsRes, ordersRes] = await Promise.all([
       api.get<{ success: boolean; data: any[] }>("/api/v1/vendors/me/bookings?limit=200").catch(() => null),
       api.get<{ success: boolean; data: any[] }>("/api/v1/vendors/me/orders?limit=200").catch(() => null),
-    ]).then(([bookingsRes, ordersRes]) => {
-      const fromBookings: Order[] = ((bookingsRes as any)?.data || []).map((b: any) => ({
-        id: b.id,
-        orderNumber: `BK-${b.id.slice(-6).toUpperCase()}`,
-        storeName: b.vendor?.businessName || "Your Store",
-        customerName: b.user?.profile ? `${b.user.profile.firstName ?? ""} ${b.user.profile.lastName ?? ""}`.trim() || b.user.email : b.user?.email || "Customer",
-        customerEmail: b.user?.email || "",
-        customerPhone: b.user?.phone || "",
-        total: Number(b.total || 0),
-        date: b.scheduledDate || b.createdAt,
+    ]);
+    const fromBookings = ((bookingsRes as any)?.data || []).map((b: any) => ({
+      kind: "booking" as const,
+      id: b.id,
+      orderNumber: `BK-${b.id.slice(-6).toUpperCase()}`,
+      storeName: b.vendor?.businessName || "Your Store",
+      customerName: b.user?.profile ? `${b.user.profile.firstName ?? ""} ${b.user.profile.lastName ?? ""}`.trim() || b.user.email : b.user?.email || "Customer",
+      customerEmail: b.user?.email || "",
+      customerPhone: b.user?.phone || "",
+      total: Number(b.total || 0),
+      date: b.scheduledDate || b.createdAt,
+      time: b.scheduledTime || "—",
+      status: toUiStatus(b.status),
+      serviceName: b.beautyListing?.title || b.cleaningListing?.title || b.handymanListing?.title || b.category,
+      type: "service" as const,
+      serviceDetails: {
+        service: b.beautyListing?.title || b.cleaningListing?.title || b.handymanListing?.title || b.category,
+        category: b.category,
+        scheduledDate: b.scheduledDate || b.createdAt,
         time: b.scheduledTime || "—",
-        status: ((b.status || "ACCEPTED").toLowerCase().replace("_", "-")) as OrderStatus,
-        serviceName: b.beautyListing?.title || b.cleaningListing?.title || b.handymanListing?.title || b.category,
-        type: "service",
-        serviceDetails: {
-          service: b.beautyListing?.title || b.cleaningListing?.title || b.handymanListing?.title || b.category,
-          category: b.category,
-          scheduledDate: b.scheduledDate || b.createdAt,
-          time: b.scheduledTime || "—",
-          duration: b.duration ? `${b.duration} min` : "—",
-          serviceAddress: b.address ? `${b.address.street}, ${b.address.city}, ${b.address.state}` : "—",
-          specialInstructions: b.specialInstructions || "",
-        },
-      }));
-      const fromOrders: Order[] = ((ordersRes as any)?.data || []).map((o: any) => ({
-        id: o.id,
-        orderNumber: `OR-${o.id.slice(-6).toUpperCase()}`,
-        storeName: o.vendor?.businessName || "Your Store",
-        customerName: o.user?.email || "Customer",
-        customerEmail: o.user?.email || "",
-        customerPhone: o.user?.phone || "",
-        total: Number(o.total || 0),
-        date: o.createdAt,
-        time: "—",
-        status: ((o.status || "ACCEPTED").toLowerCase().replace("_", "-")) as OrderStatus,
-        serviceName: "Order",
-        itemCount: o.items?.length ?? 0,
-        type: "delivery",
-        deliveryDetails: {
-          items: (o.items || []).map((i: any) => ({ name: i.name || "Item", quantity: i.quantity, price: Number(i.price || 0) })),
-          deliveryAddress: o.address ? `${o.address.street}, ${o.address.city}, ${o.address.state}` : "—",
-          deliveryWindow: "—",
-          specialInstructions: "",
-        },
-      }));
-      setOrders([...fromBookings, ...fromOrders]);
-    });
+        duration: b.duration ? `${b.duration} min` : "—",
+        serviceAddress: b.address ? `${b.address.street}, ${b.address.city}, ${b.address.state}` : "—",
+        specialInstructions: b.specialInstructions || "",
+      },
+    }));
+    const fromOrders = ((ordersRes as any)?.data || []).map((o: any) => ({
+      kind: "order" as const,
+      id: o.id,
+      orderNumber: `OR-${o.id.slice(-6).toUpperCase()}`,
+      storeName: o.vendor?.businessName || "Your Store",
+      customerName: o.user?.email || "Customer",
+      customerEmail: o.user?.email || "",
+      customerPhone: o.user?.phone || "",
+      total: Number(o.total || 0),
+      date: o.createdAt,
+      time: "—",
+      status: toUiStatus(o.status),
+      serviceName: "Order",
+      itemCount: o.items?.length ?? 0,
+      type: "delivery" as const,
+      deliveryDetails: {
+        items: (o.items || []).map((i: any) => ({ name: i.name || "Item", quantity: i.quantity, price: Number(i.price || 0) })),
+        deliveryAddress: o.address ? `${o.address.street}, ${o.address.city}, ${o.address.state}` : "—",
+        deliveryWindow: "—",
+        specialInstructions: "",
+      },
+    }));
+    setOrders([...fromBookings, ...fromOrders]);
   }, []);
+
+  useEffect(() => {
+    loadOrders();
+  }, [loadOrders]);
+
+  const transition = useCallback(
+    async (row: Order, nextStatus: "ACCEPTED" | "DECLINED" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED") => {
+      if (actingId) return;
+      setActingId(row.id);
+      try {
+        if (row.kind === "booking") {
+          await api.put(`/api/v1/bookings/${row.id}/status`, { status: nextStatus });
+        } else {
+          await api.patch(`/api/v1/orders/${row.id}/status`, { status: nextStatus });
+        }
+        toast.success(`Order ${nextStatus.toLowerCase().replace("_", " ")}`);
+        setSelectedOrder(null);
+        await loadOrders();
+      } catch (e: any) {
+        toast.error(e?.response?.data?.error || e?.message || "Failed to update status");
+      } finally {
+        setActingId(null);
+      }
+    },
+    [actingId, loadOrders]
+  );
 
   // Get unique stores
   const stores = Array.from(new Set(orders.map((order) => order.storeName)));
@@ -176,19 +219,16 @@ export function VendorOrders() {
 
   const getCountsByStatus = () => {
     return {
+      pending: orders.filter((o) => o.status === "pending").length,
       accepted: orders.filter((o) => o.status === "accepted").length,
       "in-progress": orders.filter((o) => o.status === "in-progress").length,
       completed: orders.filter((o) => o.status === "completed").length,
+      declined: orders.filter((o) => o.status === "declined").length,
+      cancelled: orders.filter((o) => o.status === "cancelled").length,
     };
   };
 
   const counts = getCountsByStatus();
-
-  const handleMarkInProgress = (orderId: string, e?: React.MouseEvent) => {
-    e?.stopPropagation();
-    // Handle mark in progress logic
-    console.log("Mark in progress:", orderId);
-  };
 
   return (
     <div className="min-h-screen bg-[#F0F7FF]">
@@ -227,10 +267,17 @@ export function VendorOrders() {
 
           {/* Tab Navigation — mobile-style pill segment control */}
           <div className="bg-white border border-[rgba(46,122,217,0.25)] rounded-2xl shadow-[0_4px_16px_rgba(46,122,217,0.18)] overflow-hidden">
-            <div className="flex gap-2 p-3">
-              {(["accepted", "in-progress", "completed"] as const).map((tab) => {
+            <div className="flex gap-2 p-3 overflow-x-auto">
+              {(["pending", "accepted", "in-progress", "completed"] as const).map((tab) => {
                 const isActive = activeTab === tab;
-                const label = tab === "accepted" ? "Accepted" : tab === "in-progress" ? "In Progress" : "Completed";
+                const label =
+                  tab === "pending"
+                    ? "Pending"
+                    : tab === "accepted"
+                    ? "Accepted"
+                    : tab === "in-progress"
+                    ? "In Progress"
+                    : "Completed";
                 const count = counts[tab];
                 return (
                   <button
@@ -383,10 +430,32 @@ export function VendorOrders() {
                                 </div>
                               </div>
 
-                              {/* Action Button */}
+                              {/* Action Buttons */}
+                              {activeTab === "pending" && (
+                                <div className="flex gap-2 shrink-0 w-full sm:w-auto">
+                                  <Button
+                                    onClick={(e) => { e.stopPropagation(); transition(order, "ACCEPTED"); }}
+                                    disabled={actingId === order.id}
+                                    className="flex-1 sm:flex-none bg-[#2E7AD9] hover:bg-[#1E5DB0] text-white h-10 px-4 text-sm"
+                                  >
+                                    <Check className="w-4 h-4 mr-2" />
+                                    Accept
+                                  </Button>
+                                  <Button
+                                    onClick={(e) => { e.stopPropagation(); transition(order, "DECLINED"); }}
+                                    disabled={actingId === order.id}
+                                    variant="outline"
+                                    className="flex-1 sm:flex-none h-10 px-4 text-sm border-[#DC2626] text-[#DC2626] hover:bg-[#FEE2E2]"
+                                  >
+                                    <X className="w-4 h-4 mr-2" />
+                                    Decline
+                                  </Button>
+                                </div>
+                              )}
                               {activeTab === "accepted" && (
                                 <Button
-                                  onClick={(e) => handleMarkInProgress(order.id, e)}
+                                  onClick={(e) => { e.stopPropagation(); transition(order, "IN_PROGRESS"); }}
+                                  disabled={actingId === order.id}
                                   className="bg-[#2E7AD9] hover:bg-[#1E5DB0] text-white h-10 px-4 shrink-0 w-full sm:w-auto text-sm"
                                 >
                                   <Clock className="w-4 h-4 mr-2" />
@@ -397,7 +466,8 @@ export function VendorOrders() {
                               )}
                               {activeTab === "in-progress" && (
                                 <Button
-                                  onClick={(e) => handleMarkInProgress(order.id, e)}
+                                  onClick={(e) => { e.stopPropagation(); transition(order, "COMPLETED"); }}
+                                  disabled={actingId === order.id}
                                   className="bg-[#2E7AD9] hover:bg-[#1E5DB0] text-white h-10 px-4 shrink-0 w-full sm:w-auto text-sm"
                                 >
                                   <Check className="w-4 h-4 mr-2" />
@@ -424,10 +494,15 @@ export function VendorOrders() {
         order={selectedOrder}
         onClose={() => setSelectedOrder(null)}
         onMarkInProgress={() => {
-          if (selectedOrder) {
-            handleMarkInProgress(selectedOrder.id);
-            setSelectedOrder(null);
-          }
+          if (!selectedOrder) return;
+          // From modal we advance the most likely next state for the current status.
+          const next: "ACCEPTED" | "IN_PROGRESS" | "COMPLETED" =
+            selectedOrder.status === "pending"
+              ? "ACCEPTED"
+              : selectedOrder.status === "accepted"
+              ? "IN_PROGRESS"
+              : "COMPLETED";
+          transition(selectedOrder, next);
         }}
       />
     </div>

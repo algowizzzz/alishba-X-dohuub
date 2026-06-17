@@ -1,19 +1,16 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, TextInput, Switch, Modal } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, fontSize } from '../../../../../src/constants/theme';
+import { useAuthStore } from '../../../../../src/store/authStore';
+import { getPaymentMethods } from '../../../../../src/lib/queries';
 
 const PURPLE = '#A855F7';
 
-const ADDRESSES = [
-  { id: '1', label: 'Home', address: '123 Main St, Miami, FL 33101' },
-  { id: '2', label: 'Work', address: '456 Business Ave, Miami, FL 33102' },
-];
-const CARDS = [
-  { id: '1', type: 'Visa', last4: '4242' },
-  { id: '2', type: 'Mastercard', last4: '5555' },
-];
+interface AddressRow { id: string; label: string; address: string; }
+interface CardRow { id: string; type: string; last4: string; }
+
 const DURATIONS = ['1', '2', '3', '4', '6', '8', '12'];
 
 type Step = 'booking' | 'confirm' | 'tracking';
@@ -25,18 +22,45 @@ export default function RideBookScreen() {
   const hourlyRate = parseFloat(params.hourlyRate || '40');
   const vehicleTypes = params.vehicleTypes ? params.vehicleTypes.split(',') : ['Standard'];
 
+  const { user, addresses: rawAddresses } = useAuthStore();
+  const addresses: AddressRow[] = useMemo(
+    () =>
+      (rawAddresses || []).map((a) => ({
+        id: a.id,
+        label: a.label || a.type,
+        address: `${a.street}${a.apartment ? ' ' + a.apartment : ''}, ${a.city}, ${a.state} ${a.zipCode}`,
+      })),
+    [rawAddresses]
+  );
+
+  const [cards, setCards] = useState<CardRow[]>([]);
+  useEffect(() => {
+    if (!user?.id) return;
+    getPaymentMethods(user.id)
+      .then((rows) =>
+        setCards(
+          (rows || []).map((r: any) => ({
+            id: r.id,
+            type: r.brand || r.type || 'Card',
+            last4: r.last4 || r.lastFour || '••••',
+          }))
+        )
+      )
+      .catch((e) => console.warn('Failed to load payment methods:', e));
+  }, [user?.id]);
+
   const [step, setStep] = useState<Step>('booking');
   const [passengerName, setPassengerName] = useState('');
   const [passengerPhone, setPassengerPhone] = useState('');
   const [vehicleType, setVehicleType] = useState(vehicleTypes[0]);
-  const [pickupAddr, setPickupAddr] = useState(ADDRESSES[0].id);
+  const [pickupAddr, setPickupAddr] = useState('');
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
   const [duration, setDuration] = useState('2');
   const [isRoundTrip, setIsRoundTrip] = useState(false);
   const [stops, setStops] = useState<Stop[]>([]);
   const [requests, setRequests] = useState('');
-  const [selectedCard, setSelectedCard] = useState(CARDS[0].id);
+  const [selectedCard, setSelectedCard] = useState('');
   const [showStopModal, setShowStopModal] = useState(false);
   const [newStopAddr, setNewStopAddr] = useState('');
   const [newStopPurpose, setNewStopPurpose] = useState('Pharmacy');
@@ -44,10 +68,18 @@ export default function RideBookScreen() {
   const [showDurationSheet, setShowDurationSheet] = useState(false);
   const refNum = `CG${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 
+  // Auto-select first available address/card once they load.
+  useEffect(() => {
+    if (!pickupAddr && addresses.length > 0) setPickupAddr(addresses[0].id);
+  }, [addresses, pickupAddr]);
+  useEffect(() => {
+    if (!selectedCard && cards.length > 0) setSelectedCard(cards[0].id);
+  }, [cards, selectedCard]);
+
   const total = hourlyRate * parseInt(duration);
-  const selectedAddress = ADDRESSES.find(a => a.id === pickupAddr);
-  const selectedCardObj = CARDS.find(c => c.id === selectedCard);
-  const isValid = passengerName && passengerPhone && date && time && selectedCard;
+  const selectedAddress = addresses.find((a) => a.id === pickupAddr);
+  const selectedCardObj = cards.find((c) => c.id === selectedCard);
+  const isValid = passengerName && passengerPhone && date && time && selectedCard && pickupAddr;
 
   const addStop = () => {
     if (newStopAddr.trim()) {
@@ -207,12 +239,16 @@ export default function RideBookScreen() {
         {/* Pickup Address */}
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Pickup Address *</Text>
-          {ADDRESSES.map(a => (
-            <TouchableOpacity key={a.id} style={[styles.optionBtn, pickupAddr === a.id && styles.optionBtnActive]} onPress={() => setPickupAddr(a.id)}>
-              <Text style={[styles.optionTxt, pickupAddr === a.id && styles.optionTxtActive]}>{a.label}</Text>
-              <Text style={[styles.optionSub, pickupAddr === a.id && { color: PURPLE }]}>{a.address}</Text>
-            </TouchableOpacity>
-          ))}
+          {addresses.length === 0 ? (
+            <Text style={styles.emptyTxt}>No saved addresses. Add one from your profile.</Text>
+          ) : (
+            addresses.map((a) => (
+              <TouchableOpacity key={a.id} style={[styles.optionBtn, pickupAddr === a.id && styles.optionBtnActive]} onPress={() => setPickupAddr(a.id)}>
+                <Text style={[styles.optionTxt, pickupAddr === a.id && styles.optionTxtActive]}>{a.label}</Text>
+                <Text style={[styles.optionSub, pickupAddr === a.id && { color: PURPLE }]}>{a.address}</Text>
+              </TouchableOpacity>
+            ))
+          )}
         </View>
 
         {/* Date & Time */}
@@ -284,13 +320,17 @@ export default function RideBookScreen() {
         {/* Payment */}
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Payment Method *</Text>
-          <TouchableOpacity style={styles.selectBtn} onPress={() => setShowCardSheet(true)}>
-            <View style={styles.cardRow}>
-              <Ionicons name="card-outline" size={18} color={PURPLE} />
-              <Text style={styles.selectBtnTxt}>{selectedCardObj?.type} •••• {selectedCardObj?.last4}</Text>
-            </View>
-            <Ionicons name="chevron-down" size={18} color={colors.text.secondary} />
-          </TouchableOpacity>
+          {cards.length === 0 ? (
+            <Text style={styles.emptyTxt}>No saved cards. Add one from your profile.</Text>
+          ) : (
+            <TouchableOpacity style={styles.selectBtn} onPress={() => setShowCardSheet(true)}>
+              <View style={styles.cardRow}>
+                <Ionicons name="card-outline" size={18} color={PURPLE} />
+                <Text style={styles.selectBtnTxt}>{selectedCardObj?.type} •••• {selectedCardObj?.last4}</Text>
+              </View>
+              <Ionicons name="chevron-down" size={18} color={colors.text.secondary} />
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Price Summary */}
@@ -345,7 +385,7 @@ export default function RideBookScreen() {
                 <Ionicons name="close" size={20} color={colors.text.primary} />
               </TouchableOpacity>
             </View>
-            {CARDS.map(c => (
+            {cards.map((c) => (
               <TouchableOpacity key={c.id} style={[styles.sheetItem, selectedCard === c.id && styles.sheetItemActive]} onPress={() => { setSelectedCard(c.id); setShowCardSheet(false); }}>
                 <Ionicons name="card-outline" size={18} color={selectedCard === c.id ? PURPLE : colors.text.secondary} />
                 <Text style={[styles.sheetItemTxt, selectedCard === c.id && styles.sheetItemTxtActive]}>{c.type} •••• {c.last4}</Text>

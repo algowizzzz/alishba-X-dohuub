@@ -8,6 +8,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, fontSize, borderRadius, borderWidth } from '../../../../src/constants/theme';
 import { getHandymanListings, getVendorById } from '../../../../src/lib/queries';
 import { useAuthStore } from '../../../../src/store/authStore';
+import { pickAndUploadImage } from '../../../../src/services/uploadImage';
+
+const MAX_PROBLEM_PHOTOS = 3;
 
 const TIME_SLOTS = [
   '8:00 AM', '9:00 AM', '10:00 AM', '11:00 AM',
@@ -28,6 +31,19 @@ export default function HandymanBookingScreen() {
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [showDurationPicker, setShowDurationPicker] = useState(false);
   const [notes, setNotes] = useState('');
+  const [problemPhotos, setProblemPhotos] = useState<string[]>([]);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
+  const handlePickProblemPhoto = async () => {
+    if (problemPhotos.length >= MAX_PROBLEM_PHOTOS || uploadingPhoto) return;
+    setUploadingPhoto(true);
+    try {
+      const url = await pickAndUploadImage({ type: 'review' });
+      if (url) setProblemPhotos((p) => [...p, url]);
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
 
   const defaultAddress = addresses?.find((a: any) => a.isDefault) || addresses?.[0];
 
@@ -54,12 +70,17 @@ export default function HandymanBookingScreen() {
 
   const handleConfirm = () => {
     if (!selectedDate || !selectedTime) { Alert.alert('Missing Info', 'Please select a date and time'); return; }
+    // Append uploaded problem photos to notes so the vendor sees them on the
+    // booking detail — no schema change needed.
+    const notesWithPhotos = problemPhotos.length > 0
+      ? `${notes}\n\nProblem photos:\n${problemPhotos.join('\n')}`
+      : notes;
     router.push({
       pathname: '/checkout/payment',
       params: {
         serviceName: listing?.title || 'Handyman Service',
         amount: (listing?.hourlyRate || listing?.basePrice || 0).toString(),
-        date: selectedDate, time: selectedTime, notes,
+        date: selectedDate, time: selectedTime, notes: notesWithPhotos,
         vendorId: id, category: 'HANDYMAN', listingId: listing?.id || '', serviceFee: '10',
       },
     });
@@ -208,6 +229,38 @@ export default function HandymanBookingScreen() {
             numberOfLines={3}
             textAlignVertical="top"
           />
+        </View>
+
+        {/* Problem Photos */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>
+            Problem Photos (Optional){problemPhotos.length > 0 ? ` · ${problemPhotos.length}/${MAX_PROBLEM_PHOTOS}` : ''}
+          </Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+            {problemPhotos.map((url) => (
+              <View key={url} style={{ width: 72, height: 72, borderRadius: 8, overflow: 'hidden', position: 'relative' }}>
+                <Image source={{ uri: url }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                <TouchableOpacity
+                  onPress={() => setProblemPhotos((p) => p.filter((u) => u !== url))}
+                  style={{ position: 'absolute', top: 4, right: 4, width: 22, height: 22, borderRadius: 11, backgroundColor: 'rgba(0,0,0,0.7)', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <Ionicons name="close" size={14} color="#FFFFFF" />
+                </TouchableOpacity>
+              </View>
+            ))}
+            {problemPhotos.length < MAX_PROBLEM_PHOTOS && (
+              <TouchableOpacity
+                style={{ width: 72, height: 72, borderRadius: 8, borderWidth: 1, borderColor: colors.border.default, alignItems: 'center', justifyContent: 'center', opacity: uploadingPhoto ? 0.6 : 1 }}
+                onPress={handlePickProblemPhoto}
+                disabled={uploadingPhoto}
+              >
+                <Ionicons name={uploadingPhoto ? 'cloud-upload-outline' : 'image-outline'} size={26} color={colors.text.secondary} />
+                <Text style={{ fontSize: 10, color: colors.text.secondary, marginTop: 2 }}>
+                  {uploadingPhoto ? 'Uploading' : 'Add'}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
 
         {/* Price Summary */}

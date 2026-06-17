@@ -6,7 +6,7 @@
 // Must live inside a Stack/Router so the navigate() call works. We mount it
 // once from app/_layout.tsx. It returns nothing.
 import { useEffect } from 'react';
-import { Alert, Platform } from 'react-native';
+import { Platform, ToastAndroid } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import { usePushToken } from '../hooks/usePushToken';
@@ -23,8 +23,14 @@ export function MobileBackgroundServices() {
 
     const receivedSub = Notifications.addNotificationReceivedListener((notification) => {
       const { title, body } = notification.request.content;
-      // Lightweight alert — nicer toast UX can replace this later.
-      Alert.alert(title || 'Notification', body || '');
+      // Non-blocking surface so we don't interrupt whatever the user is doing.
+      // On Android use the native Toast; on iOS the system itself shows an
+      // in-app banner for foreground notifications when the handler routes
+      // them through (configured in usePushToken's setNotificationHandler).
+      if (Platform.OS === 'android') {
+        const msg = title && body ? `${title}\n${body}` : title || body || '';
+        if (msg) ToastAndroid.show(msg, ToastAndroid.SHORT);
+      }
     });
 
     const responseSub = Notifications.addNotificationResponseReceivedListener((response) => {

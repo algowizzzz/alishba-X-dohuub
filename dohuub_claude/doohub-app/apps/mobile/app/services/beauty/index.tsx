@@ -1,33 +1,67 @@
-import React from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, Image } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, Image, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, fontSize } from '../../../src/constants/theme';
+import { getBeautyListings } from '../../../src/lib/queries';
 
-const BEAUTY_PHOTOS = [
-  'https://images.unsplash.com/photo-1560066984-138dadb4c035?w=200&h=200&fit=crop',
-  'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?w=200&h=200&fit=crop',
-  'https://images.unsplash.com/photo-1487412947147-5cebf100ffc2?w=200&h=200&fit=crop',
-  'https://images.unsplash.com/photo-1519014816548-bf5fe059798b?w=200&h=200&fit=crop',
-  'https://images.unsplash.com/photo-1516975080664-ed2fc6a32937?w=200&h=200&fit=crop',
-  'https://images.unsplash.com/photo-1571875257727-256c39da42af?w=200&h=200&fit=crop',
-];
-
-const BEAUTY_SERVICE_PROVIDERS = [
-  { id: '1', name: 'Beauty on DE Run', rating: 4.9, reviews: 1250, services: ['Makeup', 'Hairstyling', 'Skincare', 'Nail Art', 'Spa Services'], isPoweredByDoHuub: true },
-  { id: '2', name: 'Glam Studio',      rating: 4.8, reviews: 892,  services: ['Bridal Makeup', 'Hair Coloring', 'Extensions', 'Styling'],       isPoweredByDoHuub: false },
-  { id: '3', name: 'Beauty Lounge',    rating: 4.7, reviews: 654,  services: ['Facials', 'Waxing', 'Threading', 'Pedicure', 'Manicure'],         isPoweredByDoHuub: false },
-  { id: '4', name: 'Elite Salon & Spa',rating: 4.6, reviews: 523,  services: ['Hair Treatments', 'Massage', 'Body Treatments', 'Makeup'],        isPoweredByDoHuub: false },
-  { id: '5', name: 'Radiance Beauty',  rating: 4.5, reviews: 431,  services: ['Skin Care', 'Anti-Aging', 'Laser Treatments', 'Botox'],           isPoweredByDoHuub: false },
-  { id: '6', name: 'Nail Art Studio',  rating: 4.7, reviews: 389,  services: ['Nail Extensions', 'Gel Polish', 'Nail Art', 'Pedicure'],          isPoweredByDoHuub: false },
-];
+interface BeautyProvider {
+  id: string;
+  name: string;
+  rating: number;
+  reviews: number;
+  services: string[];
+  isPoweredByDoHuub: boolean;
+  image?: string;
+}
 
 export default function BeautyServicesVendorsList() {
-  const navigateToServices = (item: typeof BEAUTY_SERVICE_PROVIDERS[0]) => {
+  const [providers, setProviders] = useState<BeautyProvider[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const rows = await getBeautyListings();
+        // Group listings by vendor — each vendor card aggregates the services they offer.
+        const byVendor = new Map<string, BeautyProvider>();
+        for (const r of rows || []) {
+          const vendor = Array.isArray(r.Vendor) ? r.Vendor[0] : r.Vendor;
+          if (!vendor) continue;
+          const existing = byVendor.get(vendor.id);
+          if (existing) {
+            if (r.beautyType && !existing.services.includes(r.beautyType)) {
+              existing.services.push(r.beautyType);
+            }
+          } else {
+            byVendor.set(vendor.id, {
+              id: vendor.id,
+              name: vendor.businessName,
+              rating: Number(vendor.rating) || 0,
+              reviews: Number(vendor.reviewCount) || 0,
+              services: r.beautyType ? [r.beautyType] : [],
+              isPoweredByDoHuub: Boolean(vendor.isMichelle),
+              image: vendor.logo || vendor.coverImage || undefined,
+            });
+          }
+        }
+        const list = Array.from(byVendor.values()).sort(
+          (a, b) => Number(b.isPoweredByDoHuub) - Number(a.isPoweredByDoHuub) || b.rating - a.rating
+        );
+        setProviders(list);
+      } catch (e) {
+        console.warn('Failed to load beauty providers:', e);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const navigateToServices = (item: BeautyProvider) => {
     router.push({ pathname: '/services/beauty/[id]', params: { id: item.id, name: item.name, isPoweredByDoHuub: String(item.isPoweredByDoHuub), rating: String(item.rating), reviews: String(item.reviews) } } as any);
   };
 
-  const navigateToProfile = (item: typeof BEAUTY_SERVICE_PROVIDERS[0]) => {
+  const navigateToProfile = (item: BeautyProvider) => {
     router.push({ pathname: '/services/beauty/profile', params: { id: item.id, name: item.name, isPoweredByDoHuub: String(item.isPoweredByDoHuub), rating: String(item.rating), reviews: String(item.reviews), services: item.services.join(',') } } as any);
   };
 
@@ -43,15 +77,27 @@ export default function BeautyServicesVendorsList() {
         </View>
       </View>
 
+      {loading ? (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      ) : (
       <FlatList
-        data={BEAUTY_SERVICE_PROVIDERS}
+        data={providers}
         keyExtractor={item => item.id}
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
-        renderItem={({ item, index }) => (
+        ListEmptyComponent={<Text style={{ color: colors.text.secondary, textAlign: 'center', marginTop: 40 }}>No beauty providers found.</Text>}
+        renderItem={({ item }) => (
           <View style={styles.card}>
             <View style={styles.cardTop}>
-              <Image source={{ uri: BEAUTY_PHOTOS[index % BEAUTY_PHOTOS.length] }} style={styles.vendorImg} resizeMode="cover" />
+              {item.image ? (
+                <Image source={{ uri: item.image }} style={styles.vendorImg} resizeMode="cover" />
+              ) : (
+                <View style={[styles.vendorImg, { backgroundColor: 'rgba(46,122,217,0.15)', alignItems: 'center', justifyContent: 'center' }]}>
+                  <Ionicons name="sparkles" size={28} color={colors.primary} />
+                </View>
+              )}
               <View style={styles.vendorInfo}>
                 <View style={styles.nameRow}>
                   <Text style={styles.vendorName}>{item.name}</Text>
@@ -78,6 +124,7 @@ export default function BeautyServicesVendorsList() {
           </View>
         )}
       />
+      )}
     </SafeAreaView>
   );
 }

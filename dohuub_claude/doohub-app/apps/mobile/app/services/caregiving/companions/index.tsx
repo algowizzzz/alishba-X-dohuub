@@ -1,29 +1,70 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, Modal, ScrollView, Image } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, Modal, ScrollView, Image, ActivityIndicator } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, fontSize } from '../../../../src/constants/theme';
+import { getCompanionListings } from '../../../../src/lib/queries';
 
 const PINK = '#EC4899';
 
-const COMPANIONS = [
-  { id: '1', name: 'Maria Garcia',     rating: 4.9, reviews: 187, hourlyRate: 35, yearsExperience: 8,  specialties: ['Dementia Care', 'Mobility Assistance', 'Medication Management'], isPoweredByDoHuub: true,  bio: 'Certified caregiver with extensive experience in senior care and companionship', certifications: ['Certified Nursing Assistant', 'CPR & First Aid', 'Dementia Care Specialist'], languages: ['English', 'Spanish'], image: 'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=200&h=200&fit=crop' },
-  { id: '2', name: 'Patricia Johnson', rating: 4.8, reviews: 156, hourlyRate: 32, yearsExperience: 6,  specialties: ['Personal Care', 'Meal Preparation', 'Light Housekeeping'],            isPoweredByDoHuub: true,  bio: 'Compassionate caregiver dedicated to improving quality of life for seniors', certifications: ['Certified Home Health Aide', 'CPR & First Aid'], languages: ['English'], image: 'https://images.unsplash.com/photo-1594824476967-48c8b964273f?w=200&h=200&fit=crop' },
-  { id: '3', name: 'Susan Williams',   rating: 4.7, reviews: 134, hourlyRate: 30, yearsExperience: 5,  specialties: ['Companionship', 'Activities & Games', 'Transportation'],              isPoweredByDoHuub: false, bio: 'Friendly and patient companion specializing in social engagement', certifications: ['CPR & First Aid', 'Senior Companion Certification'], languages: ['English'], image: 'https://images.unsplash.com/photo-1607746882042-944635dfe10e?w=200&h=200&fit=crop' },
-  { id: '4', name: 'Jennifer Martinez',rating: 4.9, reviews: 201, hourlyRate: 38, yearsExperience: 10, specialties: ["Alzheimer's Care", 'End-of-Life Care', 'Physical Therapy Support'],  isPoweredByDoHuub: false, bio: 'Experienced caregiver with special training in memory care and rehabilitation', certifications: ['Licensed Practical Nurse', "Alzheimer's Care Specialist", 'CPR & First Aid'], languages: ['English', 'Spanish', 'French'], image: 'https://images.unsplash.com/photo-1551836022-4c4c79ecde51?w=200&h=200&fit=crop' },
-];
-
-const ALL_SPECIALTIES = [...new Set(COMPANIONS.flatMap(c => c.specialties))];
+interface Companion {
+  id: string;
+  name: string;
+  rating: number;
+  reviews: number;
+  hourlyRate: number;
+  yearsExperience: number;
+  specialties: string[];
+  isPoweredByDoHuub: boolean;
+  bio: string;
+  certifications: string[];
+  languages: string[];
+  image?: string;
+}
 
 export default function CompanionsListScreen() {
   const [showFilters, setShowFilters] = useState(false);
   const [selectedSpecialties, setSelectedSpecialties] = useState<string[]>([]);
   const [minExperience, setMinExperience] = useState('');
+  const [companions, setCompanions] = useState<Companion[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const rows = await getCompanionListings();
+        const mapped: Companion[] = (rows || []).map((r: any) => {
+          const vendor = Array.isArray(r.Vendor) ? r.Vendor[0] : r.Vendor;
+          return {
+            id: r.id,
+            name: r.title || vendor?.businessName || 'Caregiver',
+            rating: Number(vendor?.rating) || 0,
+            reviews: Number(vendor?.reviewCount) || 0,
+            hourlyRate: Number(r.hourlyRate) || 0,
+            yearsExperience: Number(r.yearsOfExperience) || 0,
+            specialties: Array.isArray(r.specialties) ? r.specialties : [],
+            isPoweredByDoHuub: Boolean(vendor?.isMichelle),
+            bio: r.description || '',
+            certifications: Array.isArray(r.certifications) ? r.certifications : [],
+            languages: Array.isArray(r.languages) ? r.languages : [],
+            image: r.image || vendor?.logo || vendor?.coverImage || undefined,
+          };
+        });
+        setCompanions(mapped);
+      } catch (e) {
+        console.warn('Failed to load companions:', e);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const ALL_SPECIALTIES = useMemo(() => [...new Set(companions.flatMap(c => c.specialties))], [companions]);
 
   const toggleSpecialty = (s: string) =>
     setSelectedSpecialties(p => p.includes(s) ? p.filter(x => x !== s) : [...p, s]);
 
-  const filtered = COMPANIONS.filter(c => {
+  const filtered = companions.filter(c => {
     if (selectedSpecialties.length > 0 && !selectedSpecialties.some(s => c.specialties.includes(s))) return false;
     if (minExperience && c.yearsExperience < parseInt(minExperience)) return false;
     return true;
@@ -31,7 +72,7 @@ export default function CompanionsListScreen() {
 
   const activeCount = selectedSpecialties.length + (minExperience ? 1 : 0);
 
-  const goToDetail = (item: typeof COMPANIONS[0]) => {
+  const goToDetail = (item: Companion) => {
     router.push({ pathname: '/services/caregiving/companions/[id]', params: {
       id: item.id, name: item.name, rating: item.rating, reviews: item.reviews,
       hourlyRate: item.hourlyRate, yearsExperience: item.yearsExperience,
@@ -54,15 +95,27 @@ export default function CompanionsListScreen() {
         </TouchableOpacity>
       </View>
 
+      {loading ? (
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator size="large" color={PINK} />
+        </View>
+      ) : (
       <FlatList
         data={filtered}
         keyExtractor={i => i.id}
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
+        ListEmptyComponent={<Text style={{ color: colors.text.secondary, textAlign: 'center', marginTop: 40 }}>No caregivers found.</Text>}
         renderItem={({ item }) => (
           <TouchableOpacity style={styles.card} onPress={() => goToDetail(item)} activeOpacity={0.8}>
             <View style={styles.cardRow}>
-              <Image source={{ uri: item.image }} style={styles.companionImg} resizeMode="cover" />
+              {item.image ? (
+                <Image source={{ uri: item.image }} style={styles.companionImg} resizeMode="cover" />
+              ) : (
+                <View style={[styles.companionImg, { backgroundColor: 'rgba(236,72,153,0.15)', alignItems: 'center', justifyContent: 'center' }]}>
+                  <Ionicons name="person" size={28} color={PINK} />
+                </View>
+              )}
               <View style={styles.cardInfo}>
                 <View style={styles.nameRow}>
                   <Text style={styles.companionName}>{item.name}</Text>
@@ -90,6 +143,7 @@ export default function CompanionsListScreen() {
           </TouchableOpacity>
         )}
       />
+      )}
 
       <Modal visible={showFilters} animationType="slide" transparent>
         <View style={styles.overlay}>
