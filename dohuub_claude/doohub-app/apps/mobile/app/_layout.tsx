@@ -8,6 +8,9 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuthStore } from '../src/store/authStore';
 import { supabase } from '../src/lib/supabase';
 import { MobileBackgroundServices } from '../src/components/MobileBackgroundServices';
+import { initSentry, Sentry } from '../src/lib/sentry';
+
+initSentry();
 
 // Keep splash screen visible while loading
 SplashScreen.preventAutoHideAsync();
@@ -23,7 +26,7 @@ const queryClient = new QueryClient({
   },
 });
 
-export default function RootLayout() {
+function RootLayout() {
   const { fetchUser, setOnboardingComplete } = useAuthStore();
 
   // Listen to Supabase auth state changes
@@ -74,4 +77,8 @@ export default function RootLayout() {
     </QueryClientProvider>
   );
 }
+
+// Wrap with Sentry so unhandled errors and navigation get instrumented.
+// If no DSN is configured, this is effectively a no-op wrapper.
+export default Sentry.wrap(RootLayout);
 

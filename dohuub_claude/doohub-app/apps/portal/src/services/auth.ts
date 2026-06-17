@@ -8,38 +8,38 @@ export interface SessionUser {
   role: Role;
 }
 
-const ROLE_KEY = 'dohuub_user_role';
-
-function cacheRole(role: Role | null) {
-  if (typeof window === 'undefined') return;
-  if (role) localStorage.setItem(ROLE_KEY, role);
-  else localStorage.removeItem(ROLE_KEY);
-}
-
-export function getCachedRole(): Role | null {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem(ROLE_KEY) as Role | null;
+/**
+ * Resolve the user's role strictly from the Supabase session's server-signed
+ * app_metadata. user_metadata is writable by the user and must NOT be trusted
+ * for role decisions. If no role is set in app_metadata, we default to the
+ * least-privileged role (CUSTOMER). The API enforces RBAC on every protected
+ * route, so a wrongly-elevated UI cannot fetch privileged data anyway.
+ */
+function roleFromSession(user: { app_metadata?: Record<string, unknown> } | null | undefined): Role {
+  const r = user?.app_metadata?.role;
+  if (r === 'ADMIN' || r === 'VENDOR' || r === 'CUSTOMER') return r;
+  return 'CUSTOMER';
 }
 
 /**
  * Sign in with email + password.
  *
- * We trust Supabase Auth's success and assume the role matches the requested
- * portal — the role is also encoded in the user's app_metadata when admins
- * create them. The API enforces RBAC server-side on every protected route,
- * so a CUSTOMER signing into /admin can technically reach the UI but every
- * data call to `/api/v1/admin/*` will return 403. Reading public.User from
- * the browser is blocked by RLS on the anon key, so we don't try.
+ * The portal the user signed in from (admin vs vendor) is irrelevant — the
+ * server-signed role in app_metadata is the source of truth. If the resolved
+ * role is not allowed for the portal they targeted, the caller should refuse
+ * and sign them out.
  */
 export async function signInAs(email: string, password: string, requiredRole: Role): Promise<SessionUser> {
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) throw new Error(error.message);
   if (!data.user) throw new Error('No session returned');
 
-  // Best-effort: read role from auth metadata if it was set there.
-  const metaRole = (data.user.app_metadata?.role || data.user.user_metadata?.role) as Role | undefined;
-  const role = metaRole ?? requiredRole;
-  cacheRole(role);
+  const role = roleFromSession(data.user);
+  if (role !== requiredRole) {
+    // Don't leave them holding a session for the wrong portal.
+    await supabase.auth.signOut();
+    throw new Error(`This account is not a ${requiredRole.toLowerCase()} account.`);
+  }
 
   return {
     id: data.user.id,
@@ -48,10 +48,9 @@ export async function signInAs(email: string, password: string, requiredRole: Ro
   };
 }
 
-/** Sign out + clear local cache. */
+/** Sign out. */
 export async function signOut() {
   await supabase.auth.signOut();
-  cacheRole(null);
 }
 
 /** Resolve current session user from Supabase. Returns null if not logged in. */
@@ -59,6 +58,5 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
   const { data } = await supabase.auth.getSession();
   if (!data.session) return null;
   const u = data.session.user;
-  const role = ((u.app_metadata?.role || u.user_metadata?.role) as Role) || (getCachedRole() ?? 'CUSTOMER');
-  return { id: u.id, email: u.email || '', role };
+  return { id: u.id, email: u.email || '', role: roleFromSession(u) };
 }
