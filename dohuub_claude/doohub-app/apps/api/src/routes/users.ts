@@ -153,11 +153,28 @@ router.delete('/me', authenticate, async (req: AuthRequest, res) => {
     const anonEmail = `deleted-${userId}@deleted.local`;
 
     await prisma.$transaction([
-      // Drop everything that is pure PII or session/device data.
-      prisma.address.deleteMany({ where: { userId } }),
+      // Drop session/device data + payment instruments. These never have
+      // outbound FK references.
       prisma.paymentMethod.deleteMany({ where: { userId } }),
       prisma.pushToken.deleteMany({ where: { userId } }),
       prisma.notification.deleteMany({ where: { userId } }),
+      // Addresses can't be hard-deleted: any past Booking holds an FK to the
+      // address (required, non-nullable). Anonymize PII in place instead so
+      // historical bookings keep their relations intact.
+      prisma.address.updateMany({
+        where: { userId },
+        data: {
+          label: 'Deleted',
+          street: '[deleted]',
+          apartment: null,
+          city: '[deleted]',
+          state: '[deleted]',
+          zipCode: '[deleted]',
+          latitude: null,
+          longitude: null,
+          isDefault: false,
+        },
+      }),
       // Clear profile name + avatar but keep the row so FK references survive.
       prisma.userProfile.updateMany({
         where: { userId },
