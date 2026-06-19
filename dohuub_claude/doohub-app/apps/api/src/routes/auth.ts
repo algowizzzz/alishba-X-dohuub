@@ -3,6 +3,7 @@ import { prisma } from '@doohub/database';
 import { generateTokens } from '../utils/jwt';
 import { createOtp, verifyOtp, sendOtpEmail } from '../utils/otp';
 import { authenticate, AuthRequest } from '../middleware/auth';
+import { setAuthUserRole } from '../utils/supabase';
 
 const router = Router();
 
@@ -496,6 +497,9 @@ router.post('/vendor/verify-otp', async (req, res) => {
           },
         });
 
+        // Stamp the role onto Supabase auth metadata for portal access.
+        await setAuthUserRole(user.id, 'VENDOR');
+
         user = await prisma.user.findUnique({
           where: { id: user.id },
           include: { profile: true, vendor: true },
@@ -626,6 +630,8 @@ router.post('/vendor/google', async (req, res) => {
             trialEndsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
           },
         });
+
+        await setAuthUserRole(user.id, 'VENDOR');
 
         user = await prisma.user.findUnique({
           where: { id: user.id },

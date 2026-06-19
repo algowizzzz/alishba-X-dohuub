@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '@doohub/database';
 import { optionalAuth, authenticate, requireRole, AuthRequest } from '../middleware/auth';
+import { setAuthUserRole } from '../utils/supabase';
 
 const router = Router();
 
@@ -141,6 +142,11 @@ router.post('/', authenticate, async (req: AuthRequest, res) => {
       where: { id: userId },
       data: { role: 'VENDOR' },
     });
+
+    // Mirror the role onto Supabase auth.app_metadata so the portal's
+    // ProtectedRoute (which trusts only server-signed metadata) lets the
+    // new vendor into the protected vendor routes after sign-in.
+    await setAuthUserRole(userId, 'VENDOR');
 
     res.status(201).json({ success: true, data: vendor });
   } catch (error) {
