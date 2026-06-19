@@ -47,6 +47,13 @@ const app = express();
 // Railway uses PORT, locally we use API_PORT
 const PORT = process.env.PORT || process.env.API_PORT || 3001;
 
+// Trust the proxy chain so express-rate-limit + req.ip read the real client
+// address from X-Forwarded-For (Railway, Cloudflare, etc.). Without this every
+// request appears to come from the proxy's IP and the rate limiter buckets
+// every user into the same key — abusive traffic from one source slips
+// through and legitimate traffic from another gets blocked.
+app.set('trust proxy', 1);
+
 // Sentry request handler must come BEFORE other middleware to capture context.
 if (process.env.SENTRY_DSN) {
   app.use(Sentry.Handlers.requestHandler());

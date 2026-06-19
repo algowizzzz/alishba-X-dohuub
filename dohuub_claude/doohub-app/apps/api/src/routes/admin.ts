@@ -1717,8 +1717,15 @@ router.patch('/bookings/:id/status', authenticate, requireAdmin, async (req: Aut
       where: { id },
       data: {
         status,
+        ...(status === 'ACCEPTED' && { acceptedAt: new Date() }),
         ...(status === 'COMPLETED' && { completedAt: new Date() }),
         ...(status === 'CANCELLED' && { cancelledAt: new Date() }),
+        // Same audit trail the vendor endpoint writes — the customer's
+        // mobile tracking screen reads from BookingStatusHistory, so without
+        // this the timeline only shows the initial PENDING entry.
+        statusHistory: {
+          create: { status, note: 'Updated by admin' },
+        },
       },
       include: {
         user: { select: { id: true, email: true, profile: true } },

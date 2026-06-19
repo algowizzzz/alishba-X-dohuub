@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '@doohub/database';
 import { authenticate, requireRole, AuthRequest } from '../middleware/auth';
+import { supabase as supabaseAdmin } from '../utils/supabase';
 
 const router = Router();
 
@@ -142,6 +143,10 @@ router.put('/me', authenticate, async (req: AuthRequest, res) => {
 // the schema clean up profile/addresses/etc. The caller must confirm by
 // sending { confirm: "DELETE" } in the body so accidental DELETEs from a
 // stolen-session attacker have at least one extra hop.
+//
+// We also remove the Supabase auth row so the deleted account can never
+// sign in again with the old credentials — without that the user is just
+// anonymized inside our DB but auth still works.
 router.delete('/me', authenticate, async (req: AuthRequest, res) => {
   try {
     const { confirm } = req.body as { confirm?: string };
@@ -194,6 +199,19 @@ router.delete('/me', authenticate, async (req: AuthRequest, res) => {
         },
       }),
     ]);
+
+    // Sever the auth.users row so the old credentials can't sign in again.
+    // Best-effort: if Supabase service-role isn't configured locally we still
+    // want the public-DB anonymization to commit. The next sign-in attempt
+    // would fail at the API-side status check, but better to also kill the
+    // auth row.
+    if (supabaseAdmin) {
+      try {
+        await supabaseAdmin.auth.admin.deleteUser(userId);
+      } catch (e) {
+        console.error('[delete /users/me] failed to remove auth.users row:', e);
+      }
+    }
 
     res.json({ success: true, message: 'Account deleted' });
   } catch (error) {

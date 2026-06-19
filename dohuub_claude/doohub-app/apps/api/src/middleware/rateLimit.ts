@@ -16,10 +16,13 @@ export const globalLimiter = isProd
   : noop;
 
 // Tight limiter for credential / OTP endpoints — abuse magnet.
+// 5 attempts per 15 minutes per (IP, target email/phone). With 6-digit OTPs
+// that's a max of 5/1,000,000 ≈ 0.0005% chance per window — far below
+// brute-force feasibility. Legitimate users only need 1-2 tries.
 export const authLimiter = isProd
   ? rateLimit({
       windowMs: 15 * 60 * 1000,
-      max: 10,
+      max: 5,
       standardHeaders: true,
       legacyHeaders: false,
       keyGenerator: (req) => {
