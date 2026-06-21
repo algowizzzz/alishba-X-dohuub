@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Upload, X, Plus, Save, Send } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "../../ui/button";
 import { Input } from "../../ui/input";
 import { Label } from "../../ui/label";
 import { Textarea } from "../../ui/textarea";
+import { pickAndUploadListingImage } from "./uploadHelper";
 import {
   Select,
   SelectContent,
@@ -122,16 +124,16 @@ export function VendorRentalPropertyForm({
     }));
   };
 
-  const handleImageUpload = () => {
-    alert("Image upload functionality - to be implemented");
+  const handleImageUpload = async () => {
+    if (formData.propertyImages.length >= 5) return;
+    const url = await pickAndUploadListingImage();
+    if (url) setFormData((prev) => ({ ...prev, propertyImages: [...prev.propertyImages, url] }));
   };
 
-  const handleGalleryImageAdd = () => {
-    if (formData.propertyImages.length < 5) {
-      alert("Gallery image upload functionality - to be implemented");
-    } else {
-      alert("Maximum 5 images allowed");
-    }
+  const handleGalleryImageAdd = async () => {
+    if (formData.propertyImages.length >= 5) return;
+    const url = await pickAndUploadListingImage();
+    if (url) setFormData((prev) => ({ ...prev, propertyImages: [...prev.propertyImages, url] }));
   };
 
   const handleRemoveGalleryImage = (index: number) => {
@@ -142,10 +144,19 @@ export function VendorRentalPropertyForm({
   };
 
   const handleSave = async (isDraft: boolean) => {
+    if (!formData.propertyTitle.trim()) {
+      toast.error("Property title is required");
+      return;
+    }
+    if (!isDraft && (!formData.pricePerNight || parseFloat(formData.pricePerNight) <= 0)) {
+      toast.error("Price per night must be greater than 0 to publish");
+      return;
+    }
+
     setIsSaving(true);
 
     const listingData = {
-      id: isEditing ? initialData?.id : Date.now().toString(),
+      id: isEditing ? initialData?.id : undefined,
       title: formData.propertyTitle,
       description: formData.shortDescription,
       fullDescription: formData.longDescription,
@@ -164,20 +175,18 @@ export function VendorRentalPropertyForm({
       cleaningFee: parseFloat(formData.cleaningFee) || 0,
       serviceFee: parseFloat(formData.serviceFee) || 0,
       unavailableDates: formData.unavailableDates,
-      bookings: initialData?.bookings || 0,
-      bookingTrend: initialData?.bookingTrend || 0,
       status: isDraft ? "inactive" : "active",
-      rating: initialData?.rating || 0,
-      reviews: initialData?.reviews || 0,
-      regions: 1,
       serviceRegions: [formData.region],
+      propertyThumbnail: formData.propertyThumbnail,
+      propertyImages: formData.propertyImages,
     };
 
-    setTimeout(() => {
-      setIsSaving(false);
-      onSave(listingData, isDraft);
+    try {
+      await onSave(listingData, isDraft);
       navigate(`/vendor/services/${storeId}/listings`);
-    }, 500);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (

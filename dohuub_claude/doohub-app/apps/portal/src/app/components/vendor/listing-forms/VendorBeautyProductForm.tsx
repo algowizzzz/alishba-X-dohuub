@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Upload, Save, Send } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "../../ui/button";
 import { Input } from "../../ui/input";
 import { Label } from "../../ui/label";
 import { Textarea } from "../../ui/textarea";
+import { pickAndUploadListingImage } from "./uploadHelper";
 import {
   Select,
   SelectContent,
@@ -72,35 +74,41 @@ export function VendorBeautyProductForm({
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleImageUpload = () => {
-    alert("Image upload functionality - to be implemented");
+  const handleImageUpload = async () => {
+    const url = await pickAndUploadListingImage();
+    if (url) setFormData((prev) => ({ ...prev, productThumbnail: url }));
   };
 
   const handleSave = async (isDraft: boolean) => {
+    if (!formData.itemName.trim()) {
+      toast.error("Item name is required");
+      return;
+    }
+    if (!isDraft && (!formData.price || parseFloat(formData.price) <= 0)) {
+      toast.error("Price must be greater than 0 to publish");
+      return;
+    }
+
     setIsSaving(true);
 
     const listingData = {
-      id: isEditing ? initialData?.id : Date.now().toString(),
+      id: isEditing ? initialData?.id : undefined,
       title: formData.itemName,
       description: formData.shortDescription,
       category: formData.productCategory,
       price: parseFloat(formData.price) || 0,
       quantityAmount: parseFloat(formData.quantityAmount) || 0,
       quantityUnit: formData.quantityUnit,
-      bookings: initialData?.bookings || 0,
-      bookingTrend: initialData?.bookingTrend || 0,
       status: isDraft ? "inactive" : "active",
-      rating: initialData?.rating || 0,
-      reviews: initialData?.reviews || 0,
-      regions: initialData?.regions || 2,
-      serviceRegions: initialData?.serviceRegions || ["New York, NY", "Brooklyn, NY"],
+      productThumbnail: formData.productThumbnail,
     };
 
-    setTimeout(() => {
-      setIsSaving(false);
-      onSave(listingData, isDraft);
+    try {
+      await onSave(listingData, isDraft);
       navigate(`/vendor/services/${storeId}/listings`);
-    }, 500);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (

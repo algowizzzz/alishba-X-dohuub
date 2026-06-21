@@ -1,4 +1,4 @@
-import { X, User, MapPin, Clock } from "lucide-react";
+import { X, User, MapPin, Clock, Check, CheckCircle2 } from "lucide-react";
 import { Button } from "../ui/button";
 
 interface OrderItem {
@@ -51,6 +51,11 @@ export function VendorOrderDetailModal({
 
   const getStatusBadge = (status: string) => {
     const badges: Record<string, { bg: string; text: string; label: string }> = {
+      pending: {
+        bg: "bg-[#FEF9C3]",
+        text: "text-[#854D0E]",
+        label: "Pending",
+      },
       accepted: {
         bg: "bg-[#FEF3C7]",
         text: "text-[#92400E]",
@@ -66,9 +71,14 @@ export function VendorOrderDetailModal({
         text: "text-[#065F46]",
         label: "Completed",
       },
+      cancelled: {
+        bg: "bg-[#FEE2E2]",
+        text: "text-[#991B1B]",
+        label: "Cancelled",
+      },
     };
 
-    const badge = badges[status] || badges.accepted;
+    const badge = badges[status] || badges.pending;
     return (
       <span
         className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${badge.bg} ${badge.text}`}
@@ -264,7 +274,15 @@ export function VendorOrderDetailModal({
             </div>
           </div>
 
-          {/* Action Button */}
+          {order.status === "pending" && (
+            <Button
+              onClick={onMarkInProgress}
+              className="w-full h-12 bg-[#2E7AD9] hover:bg-[#1E5DB0]"
+            >
+              <Check className="w-4 h-4 mr-2" />
+              Accept Order
+            </Button>
+          )}
           {order.status === "accepted" && (
             <Button
               onClick={onMarkInProgress}
@@ -272,6 +290,15 @@ export function VendorOrderDetailModal({
             >
               <Clock className="w-4 h-4 mr-2" />
               Mark In Progress
+            </Button>
+          )}
+          {order.status === "in-progress" && (
+            <Button
+              onClick={onMarkInProgress}
+              className="w-full h-12 bg-[#10B981] hover:bg-[#059669]"
+            >
+              <CheckCircle2 className="w-4 h-4 mr-2" />
+              Mark Complete
             </Button>
           )}
         </div>

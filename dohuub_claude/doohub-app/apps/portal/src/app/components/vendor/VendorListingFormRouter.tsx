@@ -97,24 +97,48 @@ export function VendorListingFormRouter() {
   }, [storeId]);
 
   const category = storeData?.category || "";
+  const categoryEnumForFetch = CATEGORY_TO_ENUM[category] || null;
 
-  // Mock initial data for editing
-  const initialData = isEditing
-    ? {
-        id: listingId,
-        title: "Sample Service",
-        description: "Sample description",
-        fullDescription: "Sample full description",
-        price: 100,
-        bookings: 25,
-        bookingTrend: 10,
-        rating: 4.8,
-        reviews: 15,
-        regions: 2,
-        whatsIncluded: ["Professional equipment & supplies", "Trained professionals"],
-        serviceRegions: ["New York, NY", "Brooklyn, NY"],
-      }
-    : undefined;
+  // Real initial data when editing — fetched from the API. Previously this
+  // was a hardcoded "Sample Service" fixture, so every edit opened with
+  // pre-filled fake values that overwrote the listing on save.
+  const [initialData, setInitialData] = useState<any | undefined>(undefined);
+  const [listingLoading, setListingLoading] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!isEditing || !listingId || !categoryEnumForFetch) return;
+    let cancelled = false;
+    setListingLoading(true);
+    api
+      .get<{ success: boolean; data: any }>(
+        `/api/v1/vendors/listings/${categoryEnumForFetch}/${listingId}`
+      )
+      .then((r) => {
+        if (cancelled) return;
+        const d = (r as any)?.data;
+        if (!d) return;
+        // Normalize back into the field shape the child forms expect.
+        // Product-style tables use `name`; service-style use `title`.
+        setInitialData({
+          id: d.id,
+          title: d.title || d.name || "",
+          description: d.description || "",
+          fullDescription: d.longDescription || d.description || "",
+          price: d.basePrice ?? d.price ?? d.hourlyRate ?? 0,
+          images: Array.isArray(d.images) ? d.images : d.image ? [d.image] : [],
+          whatsIncluded: Array.isArray(d.whatsIncluded) ? d.whatsIncluded : [],
+          // category-specific raw pass-through so each form can read what it needs
+          ...d,
+        });
+      })
+      .catch((e: any) => {
+        toast.error(e?.response?.data?.error || e?.message || "Failed to load listing");
+      })
+      .finally(() => {
+        if (!cancelled) setListingLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [isEditing, listingId, categoryEnumForFetch]);
 
   const handleSave = async (data: any, isDraft: boolean) => {
     const categoryEnum = CATEGORY_TO_ENUM[category];
@@ -123,10 +147,7 @@ export function VendorListingFormRouter() {
       return;
     }
     try {
-      // The child forms pass a flat object with field names like
-      // { title, description, fullDescription, price, whatsIncluded, ... }
-      // POST to the backend, which switches on `category`.
-      await api.post("/api/v1/vendors/listings", {
+      const payload = {
         category: categoryEnum,
         title: data.title || data.name || "",
         description: data.description || data.shortDescription || "",
@@ -176,9 +197,14 @@ export function VendorListingFormRouter() {
         specialties: data.specialties,
         supportTypes: data.supportTypes,
         languages: data.languages,
-      });
-      toast.success(isDraft ? "Saved as draft" : "Listing published");
-      navigate(`/vendor/services/${storeId}/listings`);
+      };
+      if (isEditing && listingId) {
+        await api.put(`/api/v1/vendors/listings/${categoryEnum}/${listingId}`, payload);
+        toast.success("Listing updated");
+      } else {
+        await api.post("/api/v1/vendors/listings", payload);
+        toast.success(isDraft ? "Saved as draft" : "Listing published");
+      }
     } catch (e: any) {
       toast.error(e?.response?.data?.error || e?.message || "Failed to save listing");
     }
@@ -186,10 +212,10 @@ export function VendorListingFormRouter() {
 
   // Render appropriate form based on category
   const renderForm = () => {
-    if (storeLoading) {
+    if (storeLoading || (isEditing && listingLoading)) {
       return (
         <div className="max-w-[900px] mx-auto text-center py-12">
-          <p className="text-sm text-[#6B7280]">Loading store…</p>
+          <p className="text-sm text-[#6B7280]">Loading…</p>
         </div>
       );
     }

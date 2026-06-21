@@ -62,11 +62,29 @@ export function VendorSettings() {
   };
 
   const handleTest = () => {
-    if (!stripePublishableKey.trim() || !stripeSecretKey.trim()) {
+    const pk = stripePublishableKey.trim();
+    const sk = stripeSecretKey.trim();
+    if (!pk || !sk) {
       toast.error("Both keys are required to test the connection");
       return;
     }
-    toast.success("Stripe keys look valid — Connected");
+    const pkOk = /^pk_(test|live)_[A-Za-z0-9]+$/.test(pk);
+    const skOk = /^sk_(test|live)_[A-Za-z0-9]+$/.test(sk);
+    if (!pkOk) {
+      toast.error("Publishable key should start with pk_test_ or pk_live_");
+      return;
+    }
+    if (!skOk) {
+      toast.error("Secret key should start with sk_test_ or sk_live_");
+      return;
+    }
+    const pkMode = pk.startsWith("pk_test_") ? "test" : "live";
+    const skMode = sk.startsWith("sk_test_") ? "test" : "live";
+    if (pkMode !== skMode) {
+      toast.error(`Mode mismatch: publishable is ${pkMode}, secret is ${skMode}`);
+      return;
+    }
+    toast.success(`Keys look valid (${pkMode} mode). Save to verify with Stripe.`);
   };
 
   return (

@@ -614,14 +614,27 @@ router.get('/listings', authenticate, async (req: AuthRequest, res) => {
       return res.status(403).json({ error: 'Vendor profile not found' });
     }
 
-    // Fetch all listing types for this vendor
-    const [cleaning, handyman, beauty, rentals, caregiving, groceryStores] = await Promise.all([
+    // Fetch all 9 listing types for this vendor
+    const [
+      cleaning,
+      handyman,
+      beauty,
+      beautyProducts,
+      rentals,
+      groceryStores,
+      foodItems,
+      rideAssistance,
+      companionship,
+    ] = await Promise.all([
       prisma.cleaningListing.findMany({ where: { vendorId: vendor.id } }),
       prisma.handymanListing.findMany({ where: { vendorId: vendor.id } }),
       prisma.beautyListing.findMany({ where: { vendorId: vendor.id } }),
+      (prisma as any).beautyProductListing.findMany({ where: { vendorId: vendor.id } }),
       prisma.rentalListing.findMany({ where: { vendorId: vendor.id } }),
-      prisma.caregivingListing.findMany({ where: { vendorId: vendor.id } }),
       prisma.groceryListing.findMany({ where: { vendorId: vendor.id } }),
+      (prisma as any).foodListing.findMany({ where: { vendorId: vendor.id } }),
+      (prisma as any).rideAssistanceListing.findMany({ where: { vendorId: vendor.id } }),
+      (prisma as any).companionshipListing.findMany({ where: { vendorId: vendor.id } }),
     ]);
 
     // Normalize into a single array with category info
@@ -629,9 +642,12 @@ router.get('/listings', authenticate, async (req: AuthRequest, res) => {
       ...cleaning.map((l: any) => ({ ...l, category: 'CLEANING' })),
       ...handyman.map((l: any) => ({ ...l, category: 'HANDYMAN' })),
       ...beauty.map((l: any) => ({ ...l, category: 'BEAUTY' })),
+      ...beautyProducts.map((l: any) => ({ ...l, category: 'BEAUTY_PRODUCTS' })),
       ...rentals.map((l: any) => ({ ...l, category: 'RENTALS' })),
-      ...caregiving.map((l: any) => ({ ...l, category: 'CAREGIVING' })),
       ...groceryStores.map((l: any) => ({ ...l, category: 'GROCERIES' })),
+      ...foodItems.map((l: any) => ({ ...l, category: 'FOOD' })),
+      ...rideAssistance.map((l: any) => ({ ...l, category: 'RIDE_ASSISTANCE' })),
+      ...companionship.map((l: any) => ({ ...l, category: 'COMPANIONSHIP' })),
     ];
 
     res.json({ success: true, data: listings });
@@ -885,6 +901,203 @@ router.post('/listings', authenticate, async (req: AuthRequest, res) => {
   } catch (error: any) {
     console.error('Create vendor listing error:', error);
     res.status(500).json({ error: error?.message || 'Failed to create listing' });
+  }
+});
+
+/* ============================================================
+   Single-listing operations — GET / PUT / PATCH status / DELETE
+   ============================================================
+   Each branches on the `:type` URL param so the right Prisma model
+   gets touched. Ownership is verified by joining vendorId = me.
+*/
+
+async function getOwnVendorId(userId: string): Promise<string | null> {
+  const v = await prisma.vendor.findFirst({ where: { userId }, select: { id: true } });
+  return v?.id || null;
+}
+
+const LISTING_MODELS: Record<string, any> = {
+  CLEANING: 'cleaningListing',
+  HANDYMAN: 'handymanListing',
+  BEAUTY: 'beautyListing',
+  BEAUTY_PRODUCTS: 'beautyProductListing',
+  GROCERIES: 'groceryListing',
+  FOOD: 'foodListing',
+  RENTALS: 'rentalListing',
+  RIDE_ASSISTANCE: 'rideAssistanceListing',
+  COMPANIONSHIP: 'companionshipListing',
+};
+
+function resolveModelKey(typeRaw: string | undefined): string | null {
+  if (!typeRaw) return null;
+  const upper = String(typeRaw).toUpperCase();
+  return LISTING_MODELS[upper] || null;
+}
+
+// GET single listing (vendor's own)
+router.get('/listings/:type/:id', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const vendorId = await getOwnVendorId(req.user!.id);
+    if (!vendorId) return res.status(403).json({ error: 'Vendor profile not found' });
+
+    const modelKey = resolveModelKey(req.params.type);
+    if (!modelKey) return res.status(400).json({ error: 'Invalid listing type' });
+
+    const row: any = await (prisma as any)[modelKey].findFirst({
+      where: { id: req.params.id, vendorId },
+    });
+    if (!row) return res.status(404).json({ error: 'Listing not found' });
+
+    res.json({ success: true, data: { ...row, category: String(req.params.type).toUpperCase() } });
+  } catch (e: any) {
+    console.error('Get vendor listing error:', e);
+    res.status(500).json({ error: 'Failed to get listing' });
+  }
+});
+
+// PUT — replace updatable fields on a vendor listing. Same field set as POST
+// minus required-on-create fields. Same category-specific branches.
+router.put('/listings/:type/:id', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const vendorId = await getOwnVendorId(req.user!.id);
+    if (!vendorId) return res.status(403).json({ error: 'Vendor profile not found' });
+
+    const modelKey = resolveModelKey(req.params.type);
+    if (!modelKey) return res.status(400).json({ error: 'Invalid listing type' });
+
+    const existing: any = await (prisma as any)[modelKey].findFirst({
+      where: { id: req.params.id, vendorId },
+    });
+    if (!existing) return res.status(404).json({ error: 'Listing not found' });
+
+    const {
+      title, description, fullDescription, price, images, whatsIncluded, status,
+      cleaningType, handymanType, beautyType, duration, portfolio, services,
+      cuisines, portionSize, productCategory, brand, quantityAmount, quantityUnit,
+      propertyType, address, city, state, zipCode, bedrooms, bathrooms, maxGuests,
+      amenities, pricePerNight, pricePerWeek, pricePerMonth, cleaningFee, rules,
+      minStay, maxStay, hourlyRate, vehicleTypes, specialFeatures, coverageArea,
+      totalSeats, yearsOfExperience, credentialImages, certifications, specialties,
+      supportTypes, languages,
+    } = req.body;
+
+    // Pick the right "title" column per model: product-style tables use `name`,
+    // service-style use `title`. Same with `image` (single) vs `images` (array).
+    const usesName = ['BEAUTY_PRODUCTS', 'GROCERIES', 'FOOD'].includes(String(req.params.type).toUpperCase());
+    const apiStatus = status === 'inactive' || status === 'DRAFT' ? 'DRAFT' : status === 'PAUSED' ? 'PAUSED' : 'ACTIVE';
+    const desc = description ?? fullDescription;
+    const numPrice = price !== undefined ? Number(price) : undefined;
+    const imgs = Array.isArray(images) ? images : undefined;
+    const included = Array.isArray(whatsIncluded) ? whatsIncluded : undefined;
+
+    const data: any = {
+      ...(title !== undefined && (usesName ? { name: title } : { title })),
+      ...(desc !== undefined && { description: desc }),
+      ...(numPrice !== undefined && (usesName ? { price: numPrice } : { basePrice: numPrice })),
+      ...(imgs !== undefined && (usesName ? { image: imgs[0] || null } : { images: imgs })),
+      ...(included !== undefined && !usesName && { whatsIncluded: included }),
+      ...(status !== undefined && { status: apiStatus as any }),
+      // category-specific
+      ...(cleaningType !== undefined && { cleaningType }),
+      ...(handymanType !== undefined && { handymanType }),
+      ...(beautyType !== undefined && { beautyType }),
+      ...(duration !== undefined && { duration: duration ? Number(duration) : null }),
+      ...(portfolio !== undefined && Array.isArray(portfolio) && { portfolio }),
+      ...(services !== undefined && Array.isArray(services) && { services }),
+      ...(cuisines !== undefined && Array.isArray(cuisines) && { cuisines }),
+      ...(portionSize !== undefined && { portionSize }),
+      ...(productCategory !== undefined && { category: productCategory }),
+      ...(brand !== undefined && { brand }),
+      ...(quantityAmount !== undefined && { quantityAmount: quantityAmount ? Number(quantityAmount) : null }),
+      ...(quantityUnit !== undefined && (usesName ? { unit: quantityUnit } : { quantityUnit })),
+      ...(propertyType !== undefined && { propertyType }),
+      ...(address !== undefined && { address }),
+      ...(city !== undefined && { city }),
+      ...(state !== undefined && { state }),
+      ...(zipCode !== undefined && { zipCode }),
+      ...(bedrooms !== undefined && { bedrooms: Number(bedrooms) }),
+      ...(bathrooms !== undefined && { bathrooms: Number(bathrooms) }),
+      ...(maxGuests !== undefined && { maxGuests: Number(maxGuests) }),
+      ...(amenities !== undefined && Array.isArray(amenities) && { amenities }),
+      ...(pricePerNight !== undefined && { pricePerNight: Number(pricePerNight) }),
+      ...(pricePerWeek !== undefined && { pricePerWeek: Number(pricePerWeek) }),
+      ...(pricePerMonth !== undefined && { pricePerMonth: Number(pricePerMonth) }),
+      ...(cleaningFee !== undefined && { cleaningFee: Number(cleaningFee) }),
+      ...(rules !== undefined && Array.isArray(rules) && { rules }),
+      ...(minStay !== undefined && { minStay: Number(minStay) }),
+      ...(maxStay !== undefined && { maxStay: Number(maxStay) }),
+      ...(hourlyRate !== undefined && { hourlyRate: Number(hourlyRate) }),
+      ...(vehicleTypes !== undefined && Array.isArray(vehicleTypes) && { vehicleTypes }),
+      ...(specialFeatures !== undefined && { specialFeatures }),
+      ...(coverageArea !== undefined && { coverageArea }),
+      ...(totalSeats !== undefined && { totalSeats: Number(totalSeats) }),
+      ...(yearsOfExperience !== undefined && { yearsOfExperience: Number(yearsOfExperience) }),
+      ...(credentialImages !== undefined && Array.isArray(credentialImages) && { credentialImages }),
+      ...(certifications !== undefined && Array.isArray(certifications) && { certifications }),
+      ...(specialties !== undefined && Array.isArray(specialties) && { specialties }),
+      ...(supportTypes !== undefined && Array.isArray(supportTypes) && { supportTypes }),
+      ...(languages !== undefined && Array.isArray(languages) && { languages }),
+    };
+
+    const updated: any = await (prisma as any)[modelKey].update({
+      where: { id: req.params.id },
+      data,
+    });
+
+    res.json({ success: true, data: { ...updated, category: String(req.params.type).toUpperCase() } });
+  } catch (e: any) {
+    console.error('Update vendor listing error:', e);
+    res.status(500).json({ error: e?.message || 'Failed to update listing' });
+  }
+});
+
+// PATCH status (toggle ACTIVE / PAUSED / DRAFT)
+router.patch('/listings/:type/:id/status', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const vendorId = await getOwnVendorId(req.user!.id);
+    if (!vendorId) return res.status(403).json({ error: 'Vendor profile not found' });
+    const modelKey = resolveModelKey(req.params.type);
+    if (!modelKey) return res.status(400).json({ error: 'Invalid listing type' });
+
+    const { status } = req.body;
+    if (!['ACTIVE', 'PAUSED', 'DRAFT'].includes(status)) {
+      return res.status(400).json({ error: 'Valid status is required (ACTIVE | PAUSED | DRAFT)' });
+    }
+
+    const existing: any = await (prisma as any)[modelKey].findFirst({
+      where: { id: req.params.id, vendorId },
+    });
+    if (!existing) return res.status(404).json({ error: 'Listing not found' });
+
+    const updated: any = await (prisma as any)[modelKey].update({
+      where: { id: req.params.id },
+      data: { status: status as any },
+    });
+    res.json({ success: true, data: updated });
+  } catch (e: any) {
+    console.error('Patch vendor listing status error:', e);
+    res.status(500).json({ error: 'Failed to update status' });
+  }
+});
+
+// DELETE a vendor listing
+router.delete('/listings/:type/:id', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const vendorId = await getOwnVendorId(req.user!.id);
+    if (!vendorId) return res.status(403).json({ error: 'Vendor profile not found' });
+    const modelKey = resolveModelKey(req.params.type);
+    if (!modelKey) return res.status(400).json({ error: 'Invalid listing type' });
+
+    const existing: any = await (prisma as any)[modelKey].findFirst({
+      where: { id: req.params.id, vendorId },
+    });
+    if (!existing) return res.status(404).json({ error: 'Listing not found' });
+
+    await (prisma as any)[modelKey].delete({ where: { id: req.params.id } });
+    res.json({ success: true });
+  } catch (e: any) {
+    console.error('Delete vendor listing error:', e);
+    res.status(500).json({ error: e?.message || 'Failed to delete listing' });
   }
 });
 

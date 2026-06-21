@@ -5,6 +5,8 @@ import { Button } from "../../ui/button";
 import { Input } from "../../ui/input";
 import { Label } from "../../ui/label";
 import { Textarea } from "../../ui/textarea";
+import { toast } from "sonner";
+import { pickAndUploadListingImage } from "./uploadHelper";
 
 interface IncludedItem {
   id: string;
@@ -107,16 +109,15 @@ export function VendorBeautyServiceForm({
     }));
   };
 
-  const handleImageUpload = () => {
-    alert("Image upload functionality - to be implemented");
+  const handleImageUpload = async () => {
+    const url = await pickAndUploadListingImage();
+    if (url) setFormData({ ...formData, thumbnailImage: url });
   };
 
-  const handleGalleryImageAdd = () => {
-    if (formData.imageGallery.length < 5) {
-      alert("Gallery image upload functionality - to be implemented");
-    } else {
-      alert("Maximum 5 images allowed");
-    }
+  const handleGalleryImageAdd = async () => {
+    if (formData.imageGallery.length >= 5) return;
+    const url = await pickAndUploadListingImage();
+    if (url) setFormData({ ...formData, imageGallery: [...formData.imageGallery, url] });
   };
 
   const handleRemoveGalleryImage = (index: number) => {
@@ -127,6 +128,15 @@ export function VendorBeautyServiceForm({
   };
 
   const handleSave = async (isDraft: boolean) => {
+    if (!formData.serviceTitle.trim()) {
+      toast.error("Service title is required");
+      return;
+    }
+    if (!isDraft && (!formData.price || parseFloat(formData.price) <= 0)) {
+      toast.error("Price must be greater than 0 to publish");
+      return;
+    }
+
     setIsSaving(true);
 
     const allIncludedItems = [
@@ -137,30 +147,24 @@ export function VendorBeautyServiceForm({
     ];
 
     const listingData = {
-      id: isEditing ? initialData?.id : Date.now().toString(),
+      id: isEditing ? initialData?.id : undefined,
       title: formData.serviceTitle,
       description: formData.shortDescription,
       fullDescription: formData.longDescription,
       price: parseFloat(formData.price) || 0,
       duration: parseInt(formData.duration) || 0,
-      bookings: initialData?.bookings || 0,
-      bookingTrend: initialData?.bookingTrend || 0,
       status: isDraft ? "inactive" : "active",
-      rating: initialData?.rating || 0,
-      reviews: initialData?.reviews || 0,
-      regions: initialData?.regions || 2,
       whatsIncluded: allIncludedItems,
-      serviceRegions: initialData?.serviceRegions || [
-        "New York, NY",
-        "Brooklyn, NY",
-      ],
+      thumbnailImage: formData.thumbnailImage,
+      images: formData.imageGallery,
     };
 
-    setTimeout(() => {
-      setIsSaving(false);
-      onSave(listingData, isDraft);
+    try {
+      await onSave(listingData, isDraft);
       navigate(`/vendor/services/${storeId}/listings`);
-    }, 500);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (

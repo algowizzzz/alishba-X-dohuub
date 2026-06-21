@@ -13,16 +13,17 @@ import { colors, spacing, borderRadius, fontSize, fontWeight, borderWidth } from
 interface DeleteAccountModalProps {
   visible: boolean;
   onClose: () => void;
-  onConfirm: (password: string) => void;
+  /** Called when the user typed DELETE and tapped the destructive button. */
+  onConfirm: () => void;
   loading?: boolean;
 }
 
+const CONFIRM_WORD = 'DELETE';
+
 /**
- * Delete Account Modal matching wireframes
- * - Warning icon
- * - Consequences description
- * - Password confirmation input
- * - Cancel/Delete buttons
+ * Delete-account confirmation modal. We use typed confirmation rather than a
+ * password because this app authenticates via email + OTP and stores no
+ * password hash for most users — a password input would be theatre.
  */
 export function DeleteAccountModal({
   visible,
@@ -30,17 +31,15 @@ export function DeleteAccountModal({
   onConfirm,
   loading = false,
 }: DeleteAccountModalProps) {
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
+  const [confirmText, setConfirmText] = useState('');
+  const matches = confirmText.trim().toUpperCase() === CONFIRM_WORD;
 
   const handleConfirm = () => {
-    if (password.trim()) {
-      onConfirm(password);
-    }
+    if (matches) onConfirm();
   };
 
   const handleClose = () => {
-    setPassword('');
+    setConfirmText('');
     onClose();
   };
 
@@ -52,43 +51,35 @@ export function DeleteAccountModal({
       size="md"
     >
       <View style={styles.content}>
-        {/* Warning Icon */}
         <View style={styles.iconContainer}>
           <Ionicons name="warning" size={32} color={colors.status.error} />
         </View>
 
-        {/* Title */}
         <Text style={styles.title}>Delete Account</Text>
 
-        {/* Description */}
         <Text style={styles.description}>
-          This action is permanent and cannot be undone. All your data, bookings, 
-          and payment information will be permanently deleted.
+          This is permanent. We will erase your name, contact info, addresses, payment methods,
+          and notification tokens. Your past bookings and orders will remain on file in an
+          anonymized form for our records.
         </Text>
 
-        {/* Password Input */}
         <View style={styles.inputContainer}>
-          <Text style={styles.inputLabel}>Enter your password to confirm</Text>
-          <View style={styles.passwordInput}>
+          <Text style={styles.inputLabel}>
+            Type <Text style={styles.inputLabelEmphasis}>{CONFIRM_WORD}</Text> to confirm
+          </Text>
+          <View style={styles.confirmInput}>
             <TextInput
               style={styles.input}
-              placeholder="Password"
+              placeholder={CONFIRM_WORD}
               placeholderTextColor={colors.text.muted}
-              secureTextEntry={!showPassword}
-              value={password}
-              onChangeText={setPassword}
-              autoCapitalize="none"
-            />
-            <Ionicons
-              name={showPassword ? 'eye-off' : 'eye'}
-              size={20}
-              color={colors.text.secondary}
-              onPress={() => setShowPassword(!showPassword)}
+              value={confirmText}
+              onChangeText={setConfirmText}
+              autoCapitalize="characters"
+              autoCorrect={false}
             />
           </View>
         </View>
 
-        {/* Actions */}
         <View style={styles.actions}>
           <Button
             title="Cancel"
@@ -100,7 +91,7 @@ export function DeleteAccountModal({
             title="Delete Account"
             onPress={handleConfirm}
             loading={loading}
-            disabled={!password.trim()}
+            disabled={!matches}
             style={styles.deleteButton}
           />
         </View>
@@ -146,7 +137,11 @@ const styles = StyleSheet.create({
     color: colors.text.primary,
     marginBottom: spacing.sm,
   },
-  passwordInput: {
+  inputLabelEmphasis: {
+    fontWeight: fontWeight.semibold,
+    color: colors.status.error,
+  },
+  confirmInput: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: borderWidth.default,
@@ -159,6 +154,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     fontSize: fontSize.md,
     color: colors.text.primary,
+    letterSpacing: 1,
   },
   actions: {
     flexDirection: 'row',
@@ -174,4 +170,3 @@ const styles = StyleSheet.create({
     borderColor: colors.status.error,
   },
 });
-

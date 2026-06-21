@@ -88,7 +88,13 @@ export function VendorChangePlan() {
       <VendorSidebar
         isOpen={sidebarOpen}
         isCollapsed={sidebarCollapsed}
-        onClose={() => setSidebarOpen(false)}
+        onClose={() => {
+          if (typeof window !== "undefined" && window.innerWidth >= 1024) {
+            setSidebarCollapsed(!sidebarCollapsed);
+          } else {
+            setSidebarOpen(false);
+          }
+        }}
         activeMenu="subscription"
       />
 

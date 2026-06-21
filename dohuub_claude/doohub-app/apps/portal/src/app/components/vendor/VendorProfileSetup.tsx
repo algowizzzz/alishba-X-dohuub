@@ -5,15 +5,18 @@ import { toast } from "sonner";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../ui/select";
+import { Textarea } from "../ui/textarea";
 import api from "../../../services/api";
 import { supabase } from "../../../lib/supabase";
+
+function splitName(full: string) {
+  const trimmed = (full || "").trim();
+  if (!trimmed) return { firstName: "", lastName: "" };
+  const parts = trimmed.split(/\s+/);
+  const firstName = parts.shift() || "";
+  const lastName = parts.join(" ");
+  return { firstName, lastName };
+}
 
 export function VendorProfileSetup() {
   const navigate = useNavigate();
@@ -25,12 +28,9 @@ export function VendorProfileSetup() {
     ownerName: "",
     email: "",
     phone: "",
-    businessAddress: "",
-    taxId: "",
-    businessType: "",
+    description: "",
   });
 
-  // Load existing vendor (if any) so profile-setup acts as edit-or-create.
   useEffect(() => {
     (async () => {
       try {
@@ -38,17 +38,32 @@ export function VendorProfileSetup() {
         const email = user?.email || "";
         setFormData((p) => ({ ...p, email }));
 
-        const res = await api
-          .get<{ success: boolean; data: any }>("/api/v1/vendors/me")
-          .catch(() => null);
-        if (res?.data) {
+        const [vendorRes, userRes] = await Promise.all([
+          api
+            .get<{ success: boolean; data: any }>("/api/v1/vendors/me")
+            .catch(() => null),
+          api
+            .get<{ success: boolean; data: any }>("/api/v1/users/me")
+            .catch(() => null),
+        ]);
+        const vendor = (vendorRes as any)?.data?.data || (vendorRes as any)?.data;
+        const userData = (userRes as any)?.data?.data || (userRes as any)?.data;
+        if (vendor) {
           setHasVendor(true);
           setFormData((p) => ({
             ...p,
-            businessName: res.data.businessName || "",
-            phone: res.data.contactPhone || p.phone,
-            businessAddress: res.data.description || "",
+            businessName: vendor.businessName || "",
+            phone: vendor.contactPhone || userData?.phone || p.phone,
+            description: vendor.description || "",
           }));
+        }
+        if (userData?.profile) {
+          const f = userData.profile.firstName || "";
+          const l = userData.profile.lastName || "";
+          const full = `${f} ${l}`.trim();
+          if (full) {
+            setFormData((p) => ({ ...p, ownerName: p.ownerName || full }));
+          }
         }
       } catch (e) {
         // Non-fatal — falls back to create mode.
@@ -58,20 +73,34 @@ export function VendorProfileSetup() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.businessName.trim() || !formData.ownerName.trim() || !formData.phone.trim()) {
+      toast.error("Business name, owner name, and phone are required");
+      return;
+    }
     setIsLoading(true);
     try {
+      const { firstName, lastName } = splitName(formData.ownerName);
+
+      // Persist owner name + phone on the user profile.
+      await api.put("/api/v1/users/me", {
+        firstName,
+        lastName,
+        phone: formData.phone,
+      });
+
+      // Persist the vendor record itself.
       if (hasVendor) {
         await api.put("/api/v1/vendors/me", {
           businessName: formData.businessName,
           contactPhone: formData.phone,
-          description: formData.businessAddress,
+          description: formData.description,
         });
         toast.success("Profile updated");
       } else {
         await api.post("/api/v1/vendors", {
           businessName: formData.businessName,
           contactPhone: formData.phone,
-          description: formData.businessAddress,
+          description: formData.description,
           categories: [],
         });
         toast.success("Vendor profile created");
@@ -91,35 +120,20 @@ export function VendorProfileSetup() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#F8FAFF] to-[#F0F7FF] flex items-center justify-center p-4">
       <div className="w-full max-w-[600px]">
-        {/* Setup Card */}
         <div className="bg-white rounded-2xl border border-[rgba(46,122,217,0.25)] p-8 shadow-[0_4px_16px_rgba(46,122,217,0.20)]">
-          {/* Header */}
           <div className="text-center mb-8">
             <div className="w-16 h-16 rounded-2xl bg-[#F0F7FF] flex items-center justify-center mx-auto mb-4">
               <Store className="w-8 h-8 text-[#1A1A2E]" />
             </div>
             <h1 className="text-2xl font-bold text-[#1A1A2E] mb-2">
-              Set Up Your Business Profile
+              {hasVendor ? "Edit Your Business Profile" : "Set Up Your Business Profile"}
             </h1>
             <p className="text-sm text-[#6B7280]">
               Tell us about your business to get started
             </p>
           </div>
 
-          {/* Progress Indicator */}
-          <div className="mb-8">
-            <div className="flex items-center justify-between text-xs text-[#6B7280] mb-2">
-              <span>Step 1 of 1</span>
-              <span>Business Information</span>
-            </div>
-            <div className="w-full h-2 bg-[rgba(46, 122, 217, 0.12)] rounded-full overflow-hidden">
-              <div className="h-full bg-[#2E7AD9] rounded-full w-full"></div>
-            </div>
-          </div>
-
-          {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Business Name - Required */}
             <div>
               <Label htmlFor="businessName" className="mb-1.5">
                 Business Name <span className="text-[#DC2626]">*</span>
@@ -134,7 +148,6 @@ export function VendorProfileSetup() {
               />
             </div>
 
-            {/* Owner Name - Required */}
             <div>
               <Label htmlFor="ownerName" className="mb-1.5">
                 Owner Name <span className="text-[#DC2626]">*</span>
@@ -149,10 +162,9 @@ export function VendorProfileSetup() {
               />
             </div>
 
-            {/* Email - Pre-filled, Required */}
             <div>
               <Label htmlFor="email" className="mb-1.5">
-                Email Address <span className="text-[#DC2626]">*</span>
+                Email Address
               </Label>
               <Input
                 id="email"
@@ -163,7 +175,6 @@ export function VendorProfileSetup() {
               />
             </div>
 
-            {/* Phone - Required */}
             <div>
               <Label htmlFor="phone" className="mb-1.5">
                 Phone Number <span className="text-[#DC2626]">*</span>
@@ -178,70 +189,30 @@ export function VendorProfileSetup() {
               />
             </div>
 
-            {/* Divider */}
             <div className="border-t border-[rgba(46,122,217,0.25)] my-6"></div>
 
-            {/* Optional Fields Header */}
             <div>
               <h3 className="text-sm font-semibold text-[#1A1A2E] mb-1">
                 Optional Information
               </h3>
               <p className="text-xs text-[#6B7280]">
-                You can skip these and add them later in your profile settings
+                You can skip this and add it later in your profile settings
               </p>
             </div>
 
-            {/* Business Address - Optional */}
             <div>
-              <Label htmlFor="businessAddress" className="mb-1.5">
-                Business Address
+              <Label htmlFor="description" className="mb-1.5">
+                Business Description
               </Label>
-              <Input
-                id="businessAddress"
-                type="text"
-                value={formData.businessAddress}
-                onChange={(e) => handleInputChange("businessAddress", e.target.value)}
-                placeholder="123 Main Street, City, State, ZIP"
+              <Textarea
+                id="description"
+                value={formData.description}
+                onChange={(e) => handleInputChange("description", e.target.value)}
+                placeholder="Tell customers about your business, services, address, and what makes you stand out"
+                rows={4}
               />
             </div>
 
-            {/* Tax ID - Optional */}
-            <div>
-              <Label htmlFor="taxId" className="mb-1.5">
-                Tax ID / EIN
-              </Label>
-              <Input
-                id="taxId"
-                type="text"
-                value={formData.taxId}
-                onChange={(e) => handleInputChange("taxId", e.target.value)}
-                placeholder="12-3456789"
-              />
-            </div>
-
-            {/* Business Type - Optional */}
-            <div>
-              <Label htmlFor="businessType" className="mb-1.5">
-                Business Type
-              </Label>
-              <Select
-                value={formData.businessType}
-                onValueChange={(value) => handleInputChange("businessType", value)}
-              >
-                <SelectTrigger id="businessType">
-                  <SelectValue placeholder="Select business type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="sole-proprietor">Sole Proprietor</SelectItem>
-                  <SelectItem value="llc">LLC</SelectItem>
-                  <SelectItem value="corporation">Corporation</SelectItem>
-                  <SelectItem value="partnership">Partnership</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Submit Button */}
             <Button
               type="submit"
               className="w-full"
@@ -253,10 +224,10 @@ export function VendorProfileSetup() {
               }
             >
               {isLoading ? (
-                "Creating Profile..."
+                hasVendor ? "Saving..." : "Creating Profile..."
               ) : (
                 <>
-                  Complete Setup
+                  {hasVendor ? "Save Changes" : "Complete Setup"}
                   <ArrowRight className="w-4 h-4 ml-2" />
                 </>
               )}

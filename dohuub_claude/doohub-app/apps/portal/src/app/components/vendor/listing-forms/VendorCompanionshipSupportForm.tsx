@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Upload, X, Plus, Save, Send } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "../../ui/button";
 import { Input } from "../../ui/input";
 import { Label } from "../../ui/label";
 import { Textarea } from "../../ui/textarea";
+import { pickAndUploadListingImage } from "./uploadHelper";
 
 interface FormData {
   companionPhoto: string | null;
@@ -108,12 +110,15 @@ export function VendorCompanionshipSupportForm({
     }));
   };
 
-  const handleImageUpload = () => {
-    alert("Image upload functionality - to be implemented");
+  const handleImageUpload = async () => {
+    const url = await pickAndUploadListingImage();
+    if (url) setFormData((prev) => ({ ...prev, companionPhoto: url }));
   };
 
-  const handleCredentialImageAdd = () => {
-    alert("Credential image upload functionality - to be implemented");
+  const handleCredentialImageAdd = async () => {
+    if (formData.credentialImages.length >= 5) return;
+    const url = await pickAndUploadListingImage();
+    if (url) setFormData((prev) => ({ ...prev, credentialImages: [...prev.credentialImages, url] }));
   };
 
   const handleRemoveCredentialImage = (index: number) => {
@@ -124,6 +129,15 @@ export function VendorCompanionshipSupportForm({
   };
 
   const handleSave = async (isDraft: boolean) => {
+    if (!formData.companionName.trim()) {
+      toast.error("Companion name is required");
+      return;
+    }
+    if (!isDraft && (!formData.hourlyRate || parseFloat(formData.hourlyRate) <= 0)) {
+      toast.error("Hourly rate must be greater than 0 to publish");
+      return;
+    }
+
     setIsSaving(true);
 
     const allCertifications = [
@@ -142,7 +156,7 @@ export function VendorCompanionshipSupportForm({
     ];
 
     const listingData = {
-      id: isEditing ? initialData?.id : Date.now().toString(),
+      id: isEditing ? initialData?.id : undefined,
       title: formData.companionName,
       description: formData.about,
       yearsOfExperience: parseInt(formData.yearsOfExperience) || 0,
@@ -151,20 +165,17 @@ export function VendorCompanionshipSupportForm({
       specialties: allSpecialties,
       supportTypes: allSupportTypes,
       languages: formData.languages,
-      bookings: initialData?.bookings || 0,
-      bookingTrend: initialData?.bookingTrend || 0,
       status: isDraft ? "inactive" : "active",
-      rating: initialData?.rating || 0,
-      reviews: initialData?.reviews || 0,
-      regions: initialData?.regions || 2,
-      serviceRegions: initialData?.serviceRegions || ["New York, NY", "Brooklyn, NY"],
+      companionPhoto: formData.companionPhoto,
+      credentialImages: formData.credentialImages,
     };
 
-    setTimeout(() => {
-      setIsSaving(false);
-      onSave(listingData, isDraft);
+    try {
+      await onSave(listingData, isDraft);
       navigate(`/vendor/services/${storeId}/listings`);
-    }, 500);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (

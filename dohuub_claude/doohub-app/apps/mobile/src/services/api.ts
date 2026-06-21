@@ -106,9 +106,9 @@ class ApiService {
     return response.data;
   }
 
-  // DELETE request
-  async delete<T>(url: string): Promise<T> {
-    const response = await this.client.delete<T>(url);
+  // DELETE request (body is optional — needed for confirmation flows like account deletion)
+  async delete<T>(url: string, body?: object): Promise<T> {
+    const response = await this.client.delete<T>(url, body ? { data: body } : undefined);
     return response.data;
   }
 }

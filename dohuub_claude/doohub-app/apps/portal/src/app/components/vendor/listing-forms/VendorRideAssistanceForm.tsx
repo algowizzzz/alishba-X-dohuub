@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Upload, X, Plus, Save, Send } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "../../ui/button";
 import { Input } from "../../ui/input";
 import { Label } from "../../ui/label";
 import { Textarea } from "../../ui/textarea";
+import { pickAndUploadListingImage } from "./uploadHelper";
 import {
   Select,
   SelectContent,
@@ -73,16 +75,16 @@ export function VendorRideAssistanceForm({
     }));
   };
 
-  const handleImageUpload = () => {
-    alert("Image upload functionality - to be implemented");
+  const handleImageUpload = async () => {
+    if (formData.vehicleImages.length >= 5) return;
+    const url = await pickAndUploadListingImage();
+    if (url) setFormData((prev) => ({ ...prev, vehicleImages: [...prev.vehicleImages, url] }));
   };
 
-  const handleGalleryImageAdd = () => {
-    if (formData.vehicleImages.length < 5) {
-      alert("Gallery image upload functionality - to be implemented");
-    } else {
-      alert("Maximum 5 images allowed");
-    }
+  const handleGalleryImageAdd = async () => {
+    if (formData.vehicleImages.length >= 5) return;
+    const url = await pickAndUploadListingImage();
+    if (url) setFormData((prev) => ({ ...prev, vehicleImages: [...prev.vehicleImages, url] }));
   };
 
   const handleRemoveGalleryImage = (index: number) => {
@@ -93,10 +95,19 @@ export function VendorRideAssistanceForm({
   };
 
   const handleSave = async (isDraft: boolean) => {
+    if (!formData.coverageArea.trim()) {
+      toast.error("Coverage area is required");
+      return;
+    }
+    if (!isDraft && (!formData.hourlyRate || parseFloat(formData.hourlyRate) <= 0)) {
+      toast.error("Hourly rate must be greater than 0 to publish");
+      return;
+    }
+
     setIsSaving(true);
 
     const listingData = {
-      id: isEditing ? initialData?.id : Date.now().toString(),
+      id: isEditing ? initialData?.id : undefined,
       title: `Ride Assistance Service - ${formData.coverageArea}`,
       description: formData.shortDescription,
       fullDescription: formData.longDescription,
@@ -105,20 +116,18 @@ export function VendorRideAssistanceForm({
       specialFeatures: formData.specialFeatures,
       coverageArea: formData.coverageArea,
       totalSeats: parseInt(formData.totalSeats) || 0,
-      bookings: initialData?.bookings || 0,
-      bookingTrend: initialData?.bookingTrend || 0,
       status: isDraft ? "inactive" : "active",
-      rating: initialData?.rating || 0,
-      reviews: initialData?.reviews || 0,
-      regions: 1,
       serviceRegions: [formData.coverageArea],
+      serviceThumbnail: formData.serviceThumbnail,
+      vehicleImages: formData.vehicleImages,
     };
 
-    setTimeout(() => {
-      setIsSaving(false);
-      onSave(listingData, isDraft);
+    try {
+      await onSave(listingData, isDraft);
       navigate(`/vendor/services/${storeId}/listings`);
-    }, 500);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (

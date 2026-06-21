@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import api from "../../../services/api";
 import {
   Plus,
-  Search,
   Building2,
   Sparkles,
   Wrench,
@@ -56,127 +56,6 @@ interface VendorStore {
   logoUrl?: string | null;
 }
 
-// Mock data - same structure as Michelle's profiles
-const mockStores: VendorStore[] = [
-  {
-    id: "1",
-    businessName: "Sparkle Clean Co.",
-    category: "Cleaning Services",
-    status: "active",
-    regions: 3,
-    bookings: 156,
-    bookingTrend: 12,
-    rating: 4.8,
-    reviews: 245,
-    revenue: 12450,
-    revenueTrend: 18,
-  },
-  {
-    id: "2",
-    businessName: "Fix-It Pro Services",
-    category: "Handyman Services",
-    status: "active",
-    regions: 2,
-    bookings: 89,
-    bookingTrend: 6,
-    rating: 4.9,
-    reviews: 187,
-    revenue: 11200,
-    revenueTrend: 8,
-  },
-  {
-    id: "3",
-    businessName: "Fresh Harvest Groceries",
-    category: "Groceries",
-    status: "active",
-    regions: 4,
-    bookings: 203,
-    bookingTrend: 15,
-    rating: 4.7,
-    reviews: 312,
-    revenue: 15650,
-    revenueTrend: 22,
-  },
-  {
-    id: "4",
-    businessName: "Mama's Kitchen",
-    category: "Food",
-    status: "active",
-    regions: 2,
-    bookings: 312,
-    bookingTrend: 42,
-    rating: 4.9,
-    reviews: 567,
-    revenue: 31200,
-    revenueTrend: 48,
-  },
-  {
-    id: "5",
-    businessName: "Glam Beauty Studio",
-    category: "Beauty Services",
-    status: "active",
-    regions: 3,
-    bookings: 189,
-    bookingTrend: 28,
-    rating: 4.8,
-    reviews: 356,
-    revenue: 18920,
-    revenueTrend: 30,
-  },
-  {
-    id: "6",
-    businessName: "Pure Skincare Boutique",
-    category: "Beauty Products",
-    status: "active",
-    regions: 2,
-    bookings: 234,
-    bookingTrend: 35,
-    rating: 4.8,
-    reviews: 412,
-    revenue: 23450,
-    revenueTrend: 40,
-  },
-  {
-    id: "7",
-    businessName: "Urban Stays Properties",
-    category: "Rental Properties",
-    status: "active",
-    regions: 1,
-    bookings: 45,
-    bookingTrend: 10,
-    rating: 4.9,
-    reviews: 89,
-    revenue: 45000,
-    revenueTrend: 12,
-  },
-  {
-    id: "8",
-    businessName: "CareWheels Transportation",
-    category: "Ride Assistance",
-    status: "active",
-    regions: 3,
-    bookings: 178,
-    bookingTrend: 15,
-    rating: 4.7,
-    reviews: 234,
-    revenue: 8900,
-    revenueTrend: 18,
-  },
-  {
-    id: "9",
-    businessName: "Caring Companions",
-    category: "Companionship Support",
-    status: "active",
-    regions: 2,
-    bookings: 67,
-    bookingTrend: 8,
-    rating: 4.9,
-    reviews: 145,
-    revenue: 10200,
-    revenueTrend: 10,
-  },
-];
-
 function getCategoryIcon(category: string) {
   const iconClass = "w-4 h-4";
   switch (category) {
@@ -209,6 +88,8 @@ interface StoreCardProps {
   onDelete: (profile: VendorStore) => void;
   onViewDetails: (id: string) => void;
   onManageListings: (id: string) => void;
+  onManageRegions: (id: string) => void;
+  onToggleStatus: (id: string, nextActive: boolean) => Promise<void>;
 }
 
 function StoreCard({
@@ -217,8 +98,21 @@ function StoreCard({
   onDelete,
   onViewDetails,
   onManageListings,
+  onManageRegions,
+  onToggleStatus,
 }: StoreCardProps) {
-  const [isActive, setIsActive] = useState(profile.status === "active");
+  const isActive = profile.status === "active";
+  const [toggling, setToggling] = useState(false);
+
+  const handleSwitch = async (next: boolean) => {
+    if (toggling) return;
+    setToggling(true);
+    try {
+      await onToggleStatus(profile.id, next);
+    } finally {
+      setToggling(false);
+    }
+  };
 
   return (
     <div className="bg-white border border-[rgba(46,122,217,0.25)] rounded-2xl p-4 sm:p-6 lg:p-8 hover:shadow-[0_8px_24px_rgba(46,122,217,0.25)] transition-shadow">
@@ -249,7 +143,11 @@ function StoreCard({
               <span className="text-[13px] text-[#6B7280] hidden sm:inline">
                 {isActive ? "Active" : "Inactive"}
               </span>
-              <Switch checked={isActive} onCheckedChange={setIsActive} />
+              <Switch
+                checked={isActive}
+                disabled={toggling}
+                onCheckedChange={handleSwitch}
+              />
             </div>
           </div>
 
@@ -345,8 +243,11 @@ function StoreCard({
 
             <div>
               <p className="text-[13px] text-[#6B7280] mb-1">Active Regions</p>
-              <button className="text-base text-[#2E7AD9] font-semibold hover:underline">
-                {profile.regions} regions
+              <button
+                onClick={() => onManageRegions(profile.id)}
+                className="text-base text-[#2E7AD9] font-semibold hover:underline"
+              >
+                {profile.regions} {profile.regions === 1 ? "region" : "regions"}
               </button>
             </div>
           </div>
@@ -379,6 +280,15 @@ function StoreCard({
               <List className="w-4 h-4" />
               <span className="hidden sm:inline">Manage Listings</span>
               <span className="sm:hidden">Listings</span>
+            </Button>
+            <Button
+              variant="outline"
+              className="h-10 px-5 flex items-center justify-center gap-2 text-sm w-full sm:w-auto text-[#DC2626] border-[#FCA5A5] hover:bg-[#FEF2F2]"
+              onClick={() => onDelete(profile)}
+            >
+              <Trash2 className="w-4 h-4" />
+              <span className="hidden sm:inline">Delete</span>
+              <span className="sm:hidden">Delete</span>
             </Button>
           </div>
         </div>
@@ -489,19 +399,57 @@ export function VendorServices() {
     setDeleteDialogOpen(true);
   };
 
-  const handleConfirmDelete = () => {
-    // Handle delete logic here
-    setDeleteDialogOpen(false);
-    setStoreToDelete(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleConfirmDelete = async () => {
+    if (!storeToDelete) return;
+    setDeleting(true);
+    try {
+      await api.delete(`/api/v1/stores/${storeToDelete.id}`);
+      setStores((prev) => prev.filter((s) => s.id !== storeToDelete.id));
+      toast.success("Store deleted");
+      setDeleteDialogOpen(false);
+      setStoreToDelete(null);
+    } catch (e: any) {
+      toast.error(
+        e?.response?.data?.error || e?.message || "Failed to delete store"
+      );
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleToggleStatus = async (id: string, nextActive: boolean) => {
+    const nextStatus = nextActive ? "ACTIVE" : "PAUSED";
+    const prevStatus = stores.find((s) => s.id === id)?.status;
+    setStores((prev) =>
+      prev.map((s) =>
+        s.id === id ? { ...s, status: nextActive ? "active" : "inactive" } : s
+      )
+    );
+    try {
+      await api.patch(`/api/v1/stores/${id}/status`, { status: nextStatus });
+      toast.success(nextActive ? "Store activated" : "Store paused");
+    } catch (e: any) {
+      setStores((prev) =>
+        prev.map((s) => (s.id === id ? { ...s, status: prevStatus || s.status } : s))
+      );
+      toast.error(
+        e?.response?.data?.error || e?.message || "Failed to update status"
+      );
+    }
   };
 
   const handleViewDetails = (id: string) => {
-    // Navigate to store details or show details dialog
     navigate(`/vendor/services/${id}/details`);
   };
 
   const handleManageListings = (id: string) => {
     navigate(`/vendor/services/${id}/listings`);
+  };
+
+  const handleManageRegions = (id: string) => {
+    navigate(`/vendor/services/${id}/regions`);
   };
 
   return (
@@ -588,6 +536,8 @@ export function VendorServices() {
                   onDelete={handleDelete}
                   onViewDetails={handleViewDetails}
                   onManageListings={handleManageListings}
+                  onManageRegions={handleManageRegions}
+                  onToggleStatus={handleToggleStatus}
                 />
               ))}
             </div>
@@ -619,9 +569,10 @@ export function VendorServices() {
             <Button
               variant="destructive"
               onClick={handleConfirmDelete}
+              disabled={deleting}
               className="bg-[#DC2626] hover:bg-[#B91C1C]"
             >
-              Delete Store
+              {deleting ? "Deleting..." : "Delete Store"}
             </Button>
           </DialogFooter>
         </DialogContent>

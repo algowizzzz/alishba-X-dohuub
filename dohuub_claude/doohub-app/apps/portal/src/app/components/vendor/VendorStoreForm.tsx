@@ -68,11 +68,7 @@ export function VendorStoreForm() {
   const [logoPreview, setLogoPreview] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
   const [isUploading, setIsUploading] = useState(false);
-  const [regions, setRegions] = useState<RegionWithCountry[]>([
-    { id: "1", name: "New York, NY", countryCode: "US", countryName: "United States", countryFlag: "🇺🇸", isActive: true },
-    { id: "2", name: "Los Angeles, CA", countryCode: "US", countryName: "United States", countryFlag: "🇺🇸", isActive: true },
-    { id: "3", name: "Chicago, IL", countryCode: "US", countryName: "United States", countryFlag: "🇺🇸", isActive: false },
-  ]);
+  const [regions, setRegions] = useState<RegionWithCountry[]>([]);
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [activateNow, setActivateNow] = useState("active");
