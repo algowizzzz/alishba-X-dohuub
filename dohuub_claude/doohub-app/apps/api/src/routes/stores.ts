@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { prisma } from '@doohub/database';
-import { authenticate, AuthRequest } from '../middleware/auth';
+import { authenticate, requireActiveVendor, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
@@ -108,7 +108,7 @@ router.get('/', authenticate, async (req: AuthRequest, res) => {
 });
 
 // Create a new store
-router.post('/', authenticate, async (req: AuthRequest, res) => {
+router.post('/', authenticate, requireActiveVendor, async (req: AuthRequest, res) => {
   try {
     const vendor = await prisma.vendor.findFirst({
       where: { userId: req.user!.id },
@@ -216,7 +216,7 @@ router.get('/:id', authenticate, async (req: AuthRequest, res) => {
 });
 
 // Update store
-router.put('/:id', authenticate, async (req: AuthRequest, res) => {
+router.put('/:id', authenticate, requireActiveVendor, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
 
@@ -294,7 +294,7 @@ router.put('/:id', authenticate, async (req: AuthRequest, res) => {
 });
 
 // Delete store
-router.delete('/:id', authenticate, async (req: AuthRequest, res) => {
+router.delete('/:id', authenticate, requireActiveVendor, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
 
@@ -324,7 +324,7 @@ router.delete('/:id', authenticate, async (req: AuthRequest, res) => {
 });
 
 // Add regions to store
-router.post('/:id/regions', authenticate, async (req: AuthRequest, res) => {
+router.post('/:id/regions', authenticate, requireActiveVendor, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     const { regionIds } = req.body;
@@ -376,7 +376,7 @@ router.post('/:id/regions', authenticate, async (req: AuthRequest, res) => {
 });
 
 // Remove region from store
-router.delete('/:id/regions/:regionId', authenticate, async (req: AuthRequest, res) => {
+router.delete('/:id/regions/:regionId', authenticate, requireActiveVendor, async (req: AuthRequest, res) => {
   try {
     const { id, regionId } = req.params;
 
@@ -417,7 +417,7 @@ router.delete('/:id/regions/:regionId', authenticate, async (req: AuthRequest, r
 });
 
 // Update store status (activate/deactivate)
-router.patch('/:id/status', authenticate, async (req: AuthRequest, res) => {
+router.patch('/:id/status', authenticate, requireActiveVendor, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;

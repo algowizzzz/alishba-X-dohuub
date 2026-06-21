@@ -163,6 +163,7 @@ model User {
   pointsTransactions PointsTransaction[]
   referralsMade      Referral[]          @relation("Referrer")
   referralsReceived  Referral[]          @relation("Referee")
+  scheduledPushes    ScheduledPushNotification[] @relation("ScheduledPushCreatedBy")
 
   @@index([email])
   @@index([firebaseUid])
@@ -437,6 +438,7 @@ model Region {
   id          String    @id @default(cuid())
   name        String    // "New York, NY" or "Toronto, ON"
   city        String    // "New York" or "Toronto"
+  notes       String?
   state       String?   // US states: "NY", "CA", etc. (nullable)
   province    String?   // Canadian provinces: "ON", "BC", etc. (nullable)
   country     String    @default("USA")  // "USA" or "Canada"
@@ -1051,25 +1053,118 @@ model ChatMessage {
 // ============================================
 
 model PlatformSettings {
-  id                    String   @id @default(cuid())
-  platformName          String   @default("DoHuub")
-  platformFeePercentage Float    @default(10)
-  deliveryFeeDefault    Float    @default(5.99)
-  serviceFeePercentage  Float    @default(5)
-  minOrderAmount        Float    @default(10)
-  maxDeliveryRadius     Float    @default(25)
-  supportEmail          String   @default("support@doohub.com")
-  supportPhone          String   @default("+1-800-DOOHUB")
-  termsUrl              String   @default("https://doohub.com/terms")
-  privacyUrl            String   @default("https://doohub.com/privacy")
-  termsContent          String?
-  privacyContent        String?
-  stripePublishableKey  String?
-  stripeSecretKey       String?
-  maintenanceMode       Boolean  @default(false)
-  features              Json     @default("{}")
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  id                              String   @id @default(cuid())
+  platformName                    String   @default("DoHuub")
+  platformFeePercentage           Float    @default(10)
+  deliveryFeeDefault              Float    @default(5.99)
+  serviceFeePercentage            Float    @default(5)
+  minOrderAmount                  Float    @default(10)
+  maxDeliveryRadius               Float    @default(25)
+  supportEmail                    String   @default("support@doohub.com")
+  supportPhone                    String   @default("+1-800-DOOHUB")
+  termsUrl                        String   @default("https://doohub.com/terms")
+  privacyUrl                      String   @default("https://doohub.com/privacy")
+  termsContent                    String?
+  privacyContent                  String?
+  stripePublishableKey            String?
+  stripeSecretKey                 String?
+  maintenanceMode                 Boolean  @default(false)
+  features                        Json     @default("{}")
+
+  // About + contact + social (editable from admin About tab)
+  mission                         String?
+  serviceOffers                   Json     @default("[]")
+  benefitPoints                   Json     @default("[]")
+  addressLine1                    String?
+  addressLine2                    String?
+  website                         String?
+  phoneNumeric                    String?
+  socialInstagram                 String?
+  socialFacebook                  String?
+  socialTwitter                   String?
+  socialLinkedin                  String?
+
+  // Trial configuration (editable from admin SubscriptionSettings)
+  trialDurationDays               Int      @default(30)
+  trialGracePeriodDays            Int      @default(7)
+  trialReminderDaysBefore         Int      @default(3)
+  trialRequirePaymentMethod       Boolean  @default(false)
+  trialSendWelcomeEmail           Boolean  @default(true)
+  trialAfterExpiry                String   @default("PAUSE")
+  trialOnExpiryDeactivateListings Boolean  @default(true)
+  trialOnExpiryBlockNewListings   Boolean  @default(true)
+  trialOnExpirySendNotification   Boolean  @default(true)
+  trialOnExpirySuspendAccount     Boolean  @default(false)
+
+  createdAt                       DateTime @default(now())
+  updatedAt                       DateTime @updatedAt
+}
+
+model FAQ {
+  id          String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  question    String
+  answer      String
+  category    String?
+  order       Int      @default(0)
+  isPublished Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([order])
+  @@index([isPublished])
+}
+
+model MilestoneConfig {
+  id             String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  category       String
+  tier           Int
+  orderThreshold Int
+  bonusPoints    Int
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([category, tier], name: "MilestoneConfig_category_tier_unique")
+  @@index([category])
+}
+
+model SubscriptionPlan {
+  id            String   @id @default(dbgenerated("(gen_random_uuid())::text"))
+  key           String   @unique
+  name          String
+  priceCents    Int
+  billingPeriod String
+  savingsLabel  String?
+  features      Json     @default("[]")
+  stripePriceId String?
+  isActive      Boolean  @default(true)
+  displayOrder  Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([isActive])
+}
+
+model ScheduledPushNotification {
+  id             String    @id @default(dbgenerated("(gen_random_uuid())::text"))
+  title          String
+  body           String
+  link           String?
+  targetType     String    @default("ALL")
+  targetIds      String[]  @default([])
+  scheduledFor   DateTime?
+  status         String    @default("SCHEDULED")
+  sentAt         DateTime?
+  recipientCount Int?
+  errorMessage   String?
+  createdById    String
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  createdBy User @relation("ScheduledPushCreatedBy", fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([scheduledFor])
+  @@index([createdById])
 }
 
 

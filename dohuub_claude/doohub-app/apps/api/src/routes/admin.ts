@@ -120,6 +120,8 @@ router.get('/michelle-profiles', authenticate, requireAdmin, async (req: AuthReq
             bookings: true,
             orders: true,
             reviews: true,
+            serviceAreas: true,
+            stores: true,
           },
         },
       },
@@ -249,6 +251,7 @@ router.get('/michelle-profiles/:id', authenticate, requireAdmin, async (req: Aut
         user: {
           select: { id: true, email: true, phone: true, profile: true },
         },
+        categories: true,
         stores: {
           include: {
             regions: { include: { region: true } },
@@ -379,11 +382,24 @@ router.delete('/michelle-profiles/:id', authenticate, requireAdmin, async (req: 
       return res.status(404).json({ error: 'Michelle profile not found' });
     }
 
-    // Soft delete - set status to SUSPENDED
-    await prisma.vendor.update({
-      where: { id },
-      data: { status: 'SUSPENDED' },
-    });
+    // Soft delete — suspend the vendor AND cascade to child listings so the
+    // mobile customer app stops surfacing them. Without the listing pass,
+    // a deleted Michelle vendor's items kept showing in customer browse.
+    await prisma.$transaction([
+      prisma.vendor.update({
+        where: { id },
+        data: { status: 'SUSPENDED', isActive: false },
+      }),
+      prisma.cleaningListing.updateMany({ where: { vendorId: id, status: 'ACTIVE' }, data: { status: 'PAUSED' } }),
+      prisma.handymanListing.updateMany({ where: { vendorId: id, status: 'ACTIVE' }, data: { status: 'PAUSED' } }),
+      prisma.beautyListing.updateMany({ where: { vendorId: id, status: 'ACTIVE' }, data: { status: 'PAUSED' } }),
+      prisma.groceryListing.updateMany({ where: { vendorId: id, status: 'ACTIVE' }, data: { status: 'PAUSED' } }),
+      prisma.rentalListing.updateMany({ where: { vendorId: id, status: 'ACTIVE' }, data: { status: 'PAUSED' } }),
+      (prisma as any).foodListing.updateMany({ where: { vendorId: id, status: 'ACTIVE' }, data: { status: 'PAUSED' } }),
+      (prisma as any).beautyProductListing.updateMany({ where: { vendorId: id, status: 'ACTIVE' }, data: { status: 'PAUSED' } }),
+      (prisma as any).rideAssistanceListing.updateMany({ where: { vendorId: id, status: 'ACTIVE' }, data: { status: 'PAUSED' } }),
+      (prisma as any).companionshipListing.updateMany({ where: { vendorId: id, status: 'ACTIVE' }, data: { status: 'PAUSED' } }),
+    ]);
 
     res.json({ success: true, message: 'Michelle profile deleted' });
   } catch (error) {
@@ -644,12 +660,28 @@ router.get('/vendors', authenticate, requireAdmin, async (req: AuthRequest, res)
         user: {
           select: { id: true, email: true, profile: true },
         },
+        categories: true,
+        serviceAreas: true,
+        subscription: true,
+        stores: {
+          include: { regions: { include: { region: true } } },
+        },
         _count: {
           select: {
             bookings: true,
             orders: true,
             reviews: true,
             stores: true,
+            serviceAreas: true,
+            cleaningListings: true,
+            handymanListings: true,
+            beautyListings: true,
+            groceryListings: true,
+            rentalListings: true,
+            foodListings: true,
+            beautyProductListings: true,
+            rideAssistanceListings: true,
+            companionshipListings: true,
           },
         },
       },
@@ -687,6 +719,8 @@ router.get('/vendors/:id', authenticate, requireAdmin, async (req: AuthRequest, 
         user: {
           select: { id: true, email: true, phone: true, profile: true, createdAt: true },
         },
+        categories: true,
+        serviceAreas: true,
         stores: {
           include: {
             regions: { include: { region: true } },
@@ -866,7 +900,9 @@ router.get('/customers/:id', authenticate, requireAdmin, async (req: AuthRequest
   }
 });
 
-// Update customer status
+// Update customer status. Writes BOTH `status` (the moderation enum) and
+// `isActive` (the access-control flag). The auth middleware reads isActive,
+// so without this dual-write a SUSPENDED customer would keep using the app.
 router.patch('/customers/:id/status', authenticate, requireAdmin, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
@@ -878,7 +914,7 @@ router.patch('/customers/:id/status', authenticate, requireAdmin, async (req: Au
 
     const customer = await prisma.user.update({
       where: { id, role: 'CUSTOMER' },
-      data: { status },
+      data: { status, isActive: status === 'ACTIVE' },
       include: { profile: true },
     });
 
@@ -1126,12 +1162,13 @@ router.get('/reports', authenticate, requireAdmin, async (req: AuthRequest, res)
           else if (lt === 'companionship')   listing = await prisma.companionshipListing.findUnique({ where: { id: rep.listingId }, include });
           return {
             ...rep,
+            description: rep.comment, // UI reads `description`; schema column is `comment`
             targetTitle: listing?.title ?? null,
             vendorId: listing?.vendor?.id ?? null,
             vendorName: listing?.vendor?.businessName ?? null,
           };
         } catch {
-          return { ...rep, targetTitle: null, vendorId: null, vendorName: null };
+          return { ...rep, description: rep.comment, targetTitle: null, vendorId: null, vendorName: null };
         }
       })
     );
@@ -1176,6 +1213,44 @@ router.patch('/reports/:id/status', authenticate, requireAdmin, async (req: Auth
   } catch (error) {
     console.error('Update report status error:', error);
     res.status(500).json({ error: 'Failed to update report status' });
+  }
+});
+
+// Restore a listing back to ACTIVE after a report is dismissed. The report
+// pipeline auto-PAUSEs listings on report creation; without this admin had
+// no way to bring a wrongly-reported listing back.
+router.post('/reports/:id/restore-listing', authenticate, requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const report = await prisma.report.findUnique({ where: { id } });
+    if (!report) return res.status(404).json({ error: 'Report not found' });
+
+    const lt = String(report.listingType || '').toLowerCase();
+    const map: Record<string, string> = {
+      cleaning: 'cleaningListing', handyman: 'handymanListing', beauty: 'beautyListing',
+      grocery: 'groceryListing', groceries: 'groceryListing',
+      food: 'foodListing', rental: 'rentalListing', rentals: 'rentalListing',
+      beauty_product: 'beautyProductListing', beauty_products: 'beautyProductListing',
+      ride_assistance: 'rideAssistanceListing', companionship: 'companionshipListing',
+    };
+    const modelKey = map[lt];
+    if (!modelKey) return res.status(400).json({ error: `Unknown listing type: ${report.listingType}` });
+
+    await (prisma as any)[modelKey].update({
+      where: { id: report.listingId },
+      data: { status: 'ACTIVE' },
+    });
+
+    // Also mark the report as DISMISSED so it disappears from pending queue.
+    await prisma.report.update({
+      where: { id },
+      data: { status: 'DISMISSED', reviewedAt: new Date(), reviewedBy: req.user!.id },
+    });
+
+    res.json({ success: true });
+  } catch (e: any) {
+    console.error('Restore listing error:', e);
+    res.status(500).json({ error: e?.message || 'Failed to restore listing' });
   }
 });
 
@@ -1501,7 +1576,13 @@ router.get('/orders', authenticate, requireAdmin, async (req: AuthRequest, res) 
         user: { select: { id: true, email: true, profile: true } },
         vendor: { select: { id: true, businessName: true } },
         address: true,
-        items: true,
+        items: {
+          include: {
+            groceryListing: { select: { id: true, name: true, image: true } },
+            foodListing: { select: { id: true, name: true, image: true } },
+            beautyProductListing: { select: { id: true, name: true, image: true } },
+          },
+        },
       },
       orderBy: { createdAt: 'desc' },
       skip,
@@ -1565,7 +1646,7 @@ router.patch('/orders/:id/status', authenticate, requireAdmin, async (req: AuthR
     const { id } = req.params;
     const { status } = req.body;
 
-    const validStatuses = ['PENDING', 'ACCEPTED', 'PREPARING', 'READY', 'OUT_FOR_DELIVERY', 'COMPLETED', 'CANCELLED'];
+    const validStatuses = ['PENDING', 'ACCEPTED', 'IN_PROGRESS', 'OUT_FOR_DELIVERY', 'COMPLETED', 'CANCELLED'];
     if (!status || !validStatuses.includes(status)) {
       return res.status(400).json({ error: 'Valid status is required' });
     }
@@ -1645,6 +1726,12 @@ router.get('/bookings', authenticate, requireAdmin, async (req: AuthRequest, res
         user: { select: { id: true, email: true, profile: true } },
         vendor: { select: { id: true, businessName: true } },
         address: true,
+        cleaningListing: { select: { id: true, title: true } },
+        handymanListing: { select: { id: true, title: true } },
+        beautyListing: { select: { id: true, title: true } },
+        rentalListing: { select: { id: true, title: true } },
+        rideAssistanceListing: { select: { id: true, title: true } },
+        companionshipListing: { select: { id: true, title: true } },
       },
       orderBy: { createdAt: 'desc' },
       skip,
@@ -1838,7 +1925,7 @@ router.post('/regions', authenticate, requireAdmin, async (req: AuthRequest, res
 router.put('/regions/:id', authenticate, requireAdmin, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
-    const { name, city, state, province, country, countryCode, isActive } = req.body;
+    const { name, city, state, province, country, countryCode, isActive, notes } = req.body;
 
     const region = await prisma.region.update({
       where: { id },
@@ -1847,6 +1934,7 @@ router.put('/regions/:id', authenticate, requireAdmin, async (req: AuthRequest, 
         ...(city && { city }),
         ...(state !== undefined && { state }),
         ...(province !== undefined && { province }),
+        ...(notes !== undefined && { notes }),
         ...(country && { country }),
         ...(countryCode && { countryCode }),
         ...(isActive !== undefined && { isActive }),
@@ -1926,66 +2014,32 @@ router.get('/settings', authenticate, requireAdmin, async (req: AuthRequest, res
 // Update platform settings
 router.put('/settings', authenticate, requireAdmin, async (req: AuthRequest, res) => {
   try {
-    const {
-      platformName,
-      platformFeePercentage,
-      deliveryFeeDefault,
-      serviceFeePercentage,
-      minOrderAmount,
-      maxDeliveryRadius,
-      supportEmail,
-      supportPhone,
-      termsUrl,
-      privacyUrl,
-      termsContent,
-      privacyContent,
-      stripePublishableKey,
-      stripeSecretKey,
-      maintenanceMode,
-      features,
-    } = req.body;
+    const b = req.body || {};
 
     let settings = await prisma.platformSettings.findFirst();
 
+    const updatableFields = [
+      'platformName', 'platformFeePercentage', 'deliveryFeeDefault', 'serviceFeePercentage',
+      'minOrderAmount', 'maxDeliveryRadius', 'supportEmail', 'supportPhone', 'termsUrl',
+      'privacyUrl', 'termsContent', 'privacyContent', 'stripePublishableKey', 'stripeSecretKey',
+      'maintenanceMode', 'features',
+      'mission', 'serviceOffers', 'benefitPoints', 'addressLine1', 'addressLine2',
+      'website', 'phoneNumeric', 'socialInstagram', 'socialFacebook', 'socialTwitter', 'socialLinkedin',
+      'trialDurationDays', 'trialGracePeriodDays', 'trialReminderDaysBefore',
+      'trialRequirePaymentMethod', 'trialSendWelcomeEmail', 'trialAfterExpiry',
+      'trialOnExpiryDeactivateListings', 'trialOnExpiryBlockNewListings',
+      'trialOnExpirySendNotification', 'trialOnExpirySuspendAccount',
+    ];
+
+    const data: any = {};
+    for (const f of updatableFields) {
+      if (b[f] !== undefined) data[f] = b[f];
+    }
+
     if (!settings) {
-      settings = await prisma.platformSettings.create({
-        data: {
-          platformName: platformName || 'DoHuub',
-          platformFeePercentage: platformFeePercentage ?? 10,
-          deliveryFeeDefault: deliveryFeeDefault ?? 5.99,
-          serviceFeePercentage: serviceFeePercentage ?? 5,
-          minOrderAmount: minOrderAmount ?? 10,
-          maxDeliveryRadius: maxDeliveryRadius ?? 25,
-          supportEmail: supportEmail || 'support@doohub.com',
-          supportPhone: supportPhone || '+1-800-DOOHUB',
-          termsUrl: termsUrl || 'https://doohub.com/terms',
-          privacyUrl: privacyUrl || 'https://doohub.com/privacy',
-          maintenanceMode: maintenanceMode ?? false,
-          features: features || {},
-        },
-      });
+      settings = await prisma.platformSettings.create({ data });
     } else {
-      settings = await prisma.platformSettings.update({
-        where: { id: settings.id },
-        data: {
-          ...(platformName !== undefined && { platformName }),
-          ...(platformFeePercentage !== undefined && { platformFeePercentage }),
-          ...(deliveryFeeDefault !== undefined && { deliveryFeeDefault }),
-          ...(serviceFeePercentage !== undefined && { serviceFeePercentage }),
-          ...(minOrderAmount !== undefined && { minOrderAmount }),
-          ...(maxDeliveryRadius !== undefined && { maxDeliveryRadius }),
-          ...(supportEmail !== undefined && { supportEmail }),
-          ...(supportPhone !== undefined && { supportPhone }),
-          ...(termsUrl !== undefined && { termsUrl }),
-          ...(privacyUrl !== undefined && { privacyUrl }),
-          ...(termsContent !== undefined && { termsContent }),
-          ...(privacyContent !== undefined && { privacyContent }),
-          ...(stripePublishableKey !== undefined && { stripePublishableKey }),
-          ...(stripeSecretKey !== undefined && { stripeSecretKey }),
-          ...(maintenanceMode !== undefined && { maintenanceMode }),
-          ...(features !== undefined && { features }),
-        },
-      });
+      settings = await prisma.platformSettings.update({ where: { id: settings.id }, data });
     }
 
     res.json({ success: true, data: settings });
@@ -2002,7 +2056,25 @@ router.put('/settings', authenticate, requireAdmin, async (req: AuthRequest, res
 // Aggregate rewards stats for the admin overview page.
 router.get('/rewards/summary', authenticate, requireAdmin, async (req: AuthRequest, res) => {
   try {
-    const [walletAgg, txAgg, streakAgg, milestonesAchieved, referralsAgg, topEarnersRaw] =
+    const { timeRange = 'month' } = req.query;
+    const now = new Date();
+    const periodStart = new Date(now);
+    const prevStart = new Date(now);
+    if (timeRange === 'week') {
+      periodStart.setDate(now.getDate() - 7);
+      prevStart.setDate(now.getDate() - 14);
+    } else if (timeRange === 'year') {
+      periodStart.setFullYear(now.getFullYear() - 1);
+      prevStart.setFullYear(now.getFullYear() - 2);
+    } else {
+      periodStart.setMonth(now.getMonth() - 1);
+      prevStart.setMonth(now.getMonth() - 2);
+    }
+
+    const [
+      walletAgg, txAgg, streakAgg, milestonesAchieved, referralsAgg, topEarnersRaw,
+      thisPeriodEarn, prevPeriodEarn, thisPeriodRedeem, prevPeriodRedeem,
+    ] =
       await Promise.all([
         prisma.rewardsWallet.aggregate({
           _sum: { totalPoints: true, pendingPoints: true, expiringPoints: true },
@@ -2036,10 +2108,34 @@ router.get('/rewards/summary', authenticate, requireAdmin, async (req: AuthReque
             },
           },
         }),
+        prisma.pointsTransaction.aggregate({
+          where: { amount: { gt: 0 }, createdAt: { gte: periodStart } },
+          _sum: { amount: true },
+        }),
+        prisma.pointsTransaction.aggregate({
+          where: { amount: { gt: 0 }, createdAt: { gte: prevStart, lt: periodStart } },
+          _sum: { amount: true },
+        }),
+        prisma.pointsTransaction.aggregate({
+          where: { amount: { lt: 0 }, createdAt: { gte: periodStart } },
+          _sum: { amount: true },
+        }),
+        prisma.pointsTransaction.aggregate({
+          where: { amount: { lt: 0 }, createdAt: { gte: prevStart, lt: periodStart } },
+          _sum: { amount: true },
+        }),
       ]);
 
     const earnRow = txAgg.find((r) => r.type === 'EARN' || r.type === 'earn');
     const redeemRow = txAgg.find((r) => r.type === 'REDEEM' || r.type === 'redeem');
+
+    const pctChange = (curr: number, prev: number) =>
+      prev === 0 ? (curr > 0 ? 100 : 0) : Math.round(((curr - prev) / prev) * 100);
+
+    const thisEarn = Number(thisPeriodEarn._sum.amount || 0);
+    const prevEarn = Number(prevPeriodEarn._sum.amount || 0);
+    const thisRedeem = Math.abs(Number(thisPeriodRedeem._sum.amount || 0));
+    const prevRedeem = Math.abs(Number(prevPeriodRedeem._sum.amount || 0));
 
     res.json({
       success: true,
@@ -2055,6 +2151,17 @@ router.get('/rewards/summary', authenticate, requireAdmin, async (req: AuthReque
           totalRedeemed: redeemRow?._sum.amount ?? 0,
           earnEvents: earnRow?._count._all ?? 0,
           redeemEvents: redeemRow?._count._all ?? 0,
+          lifetimeEarned: thisEarn + prevEarn + Number(earnRow?._sum.amount || 0),
+          lifetimeRedeemed: thisRedeem + prevRedeem + Math.abs(Number(redeemRow?._sum.amount || 0)),
+        },
+        period: {
+          timeRange,
+          earnedThisPeriod: thisEarn,
+          earnedPrevPeriod: prevEarn,
+          earnGrowthPct: pctChange(thisEarn, prevEarn),
+          redeemedThisPeriod: thisRedeem,
+          redeemedPrevPeriod: prevRedeem,
+          redeemGrowthPct: pctChange(thisRedeem, prevRedeem),
         },
         streaks: {
           tracked: streakAgg._count._all,
@@ -2123,6 +2230,363 @@ router.get('/customers/:id/rewards', authenticate, requireAdmin, async (req: Aut
   } catch (error: any) {
     console.error('Get customer rewards error:', error);
     res.status(500).json({ error: 'Failed to get customer rewards' });
+  }
+});
+
+// Manual point adjustment by admin (credit or debit a customer)
+router.post('/customers/:id/rewards/adjust', authenticate, requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { amount, reason } = req.body || {};
+    const n = Number(amount);
+    if (!n || Number.isNaN(n)) return res.status(400).json({ error: 'amount must be a non-zero number' });
+
+    const wallet = await prisma.rewardsWallet.upsert({
+      where: { userId: id },
+      update: { totalPoints: { increment: n } },
+      create: { userId: id, totalPoints: Math.max(0, n) },
+    });
+
+    const tx = await prisma.pointsTransaction.create({
+      data: {
+        userId: id,
+        type: n >= 0 ? 'ADMIN_CREDIT' : 'ADMIN_DEBIT',
+        amount: n,
+        description: reason || (n >= 0 ? 'Admin manual credit' : 'Admin manual debit'),
+      },
+    });
+
+    res.json({ success: true, data: { wallet, transaction: tx } });
+  } catch (e: any) {
+    console.error('Admin rewards adjust error:', e);
+    res.status(500).json({ error: 'Failed to adjust rewards' });
+  }
+});
+
+// Recent points activity feed for admin RewardsOverview
+router.get('/rewards/transactions', authenticate, requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const limit = Math.min(Number(req.query.limit) || 20, 100);
+    const txs = await prisma.pointsTransaction.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      include: {
+        user: { select: { id: true, email: true, profile: { select: { firstName: true, lastName: true } } } },
+      },
+    });
+    res.json({ success: true, data: txs });
+  } catch (e: any) {
+    console.error('Admin rewards transactions error:', e);
+    res.status(500).json({ error: 'Failed to load transactions' });
+  }
+});
+
+// ========================================
+// FAQ (admin CRUD; published FAQs are public-readable via /faqs)
+// ========================================
+router.get('/faqs', authenticate, requireAdmin, async (_req: AuthRequest, res) => {
+  try {
+    const faqs = await prisma.fAQ.findMany({ orderBy: [{ order: 'asc' }, { createdAt: 'desc' }] });
+    res.json({ success: true, data: faqs });
+  } catch (e: any) {
+    console.error('List FAQs error:', e);
+    res.status(500).json({ error: 'Failed to load FAQs' });
+  }
+});
+
+router.post('/faqs', authenticate, requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const { question, answer, category, order, isPublished } = req.body || {};
+    if (!question || !answer) return res.status(400).json({ error: 'question and answer are required' });
+    const faq = await prisma.fAQ.create({
+      data: {
+        question, answer,
+        category: category || null,
+        order: typeof order === 'number' ? order : 0,
+        isPublished: isPublished !== false,
+      },
+    });
+    res.json({ success: true, data: faq });
+  } catch (e: any) {
+    console.error('Create FAQ error:', e);
+    res.status(500).json({ error: 'Failed to create FAQ' });
+  }
+});
+
+router.put('/faqs/:id', authenticate, requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { question, answer, category, order, isPublished } = req.body || {};
+    const faq = await prisma.fAQ.update({
+      where: { id },
+      data: {
+        ...(question !== undefined && { question }),
+        ...(answer !== undefined && { answer }),
+        ...(category !== undefined && { category }),
+        ...(order !== undefined && { order }),
+        ...(isPublished !== undefined && { isPublished }),
+      },
+    });
+    res.json({ success: true, data: faq });
+  } catch (e: any) {
+    console.error('Update FAQ error:', e);
+    res.status(500).json({ error: 'Failed to update FAQ' });
+  }
+});
+
+router.delete('/faqs/:id', authenticate, requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    await prisma.fAQ.delete({ where: { id: req.params.id } });
+    res.json({ success: true });
+  } catch (e: any) {
+    console.error('Delete FAQ error:', e);
+    res.status(500).json({ error: 'Failed to delete FAQ' });
+  }
+});
+
+// ========================================
+// MILESTONE CONFIG (per-category bonus points tied to order count)
+// ========================================
+router.get('/milestone-config', authenticate, requireAdmin, async (_req: AuthRequest, res) => {
+  try {
+    const rows = await prisma.milestoneConfig.findMany({ orderBy: [{ category: 'asc' }, { tier: 'asc' }] });
+    res.json({ success: true, data: rows });
+  } catch (e: any) {
+    console.error('List milestone config error:', e);
+    res.status(500).json({ error: 'Failed to load milestone config' });
+  }
+});
+
+router.put('/milestone-config', authenticate, requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const { entries } = req.body || {};
+    if (!Array.isArray(entries)) return res.status(400).json({ error: 'entries[] required' });
+    const updated = await prisma.$transaction(
+      entries.map((e: any) =>
+        prisma.milestoneConfig.upsert({
+          where: { MilestoneConfig_category_tier_unique: { category: e.category, tier: Number(e.tier) } },
+          update: { orderThreshold: Number(e.orderThreshold), bonusPoints: Number(e.bonusPoints) },
+          create: {
+            category: e.category,
+            tier: Number(e.tier),
+            orderThreshold: Number(e.orderThreshold),
+            bonusPoints: Number(e.bonusPoints),
+          },
+        })
+      )
+    );
+    res.json({ success: true, data: updated });
+  } catch (e: any) {
+    console.error('Update milestone config error:', e);
+    res.status(500).json({ error: 'Failed to update milestone config' });
+  }
+});
+
+// ========================================
+// SUBSCRIPTION PLANS (admin CRUD; active plans readable to vendors via /subscription-plans)
+// ========================================
+router.get('/subscription-plans', authenticate, requireAdmin, async (_req: AuthRequest, res) => {
+  try {
+    const plans = await prisma.subscriptionPlan.findMany({ orderBy: { displayOrder: 'asc' } });
+    res.json({ success: true, data: plans });
+  } catch (e: any) {
+    console.error('List plans error:', e);
+    res.status(500).json({ error: 'Failed to load plans' });
+  }
+});
+
+router.put('/subscription-plans/:id', authenticate, requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { name, priceCents, billingPeriod, savingsLabel, features, stripePriceId, isActive, displayOrder } = req.body || {};
+    const plan = await prisma.subscriptionPlan.update({
+      where: { id },
+      data: {
+        ...(name !== undefined && { name }),
+        ...(priceCents !== undefined && { priceCents: Number(priceCents) }),
+        ...(billingPeriod !== undefined && { billingPeriod }),
+        ...(savingsLabel !== undefined && { savingsLabel }),
+        ...(features !== undefined && { features }),
+        ...(stripePriceId !== undefined && { stripePriceId }),
+        ...(isActive !== undefined && { isActive }),
+        ...(displayOrder !== undefined && { displayOrder: Number(displayOrder) }),
+      },
+    });
+    res.json({ success: true, data: plan });
+  } catch (e: any) {
+    console.error('Update plan error:', e);
+    res.status(500).json({ error: 'Failed to update plan' });
+  }
+});
+
+// ========================================
+// REGIONS — extend PUT to accept notes, add bulk activate/deactivate
+// ========================================
+router.patch('/regions/bulk', authenticate, requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const { ids, isActive } = req.body || {};
+    if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'ids[] required' });
+    if (typeof isActive !== 'boolean') return res.status(400).json({ error: 'isActive boolean required' });
+    const result = await prisma.region.updateMany({ where: { id: { in: ids } }, data: { isActive } });
+    res.json({ success: true, data: { updated: result.count } });
+  } catch (e: any) {
+    console.error('Bulk region toggle error:', e);
+    res.status(500).json({ error: 'Failed to bulk toggle regions' });
+  }
+});
+
+// ========================================
+// USERS COUNTS — for push audience picker
+// ========================================
+router.get('/users/counts', authenticate, requireAdmin, async (_req: AuthRequest, res) => {
+  try {
+    const [total, customers, vendors, admins, active] = await Promise.all([
+      prisma.user.count(),
+      prisma.user.count({ where: { role: 'CUSTOMER' } }),
+      prisma.user.count({ where: { role: 'VENDOR' } }),
+      prisma.user.count({ where: { role: 'ADMIN' } }),
+      prisma.user.count({ where: { isActive: true } }),
+    ]);
+    res.json({ success: true, data: { total, customers, vendors, admins, active } });
+  } catch (e: any) {
+    console.error('User counts error:', e);
+    res.status(500).json({ error: 'Failed to load user counts' });
+  }
+});
+
+// ========================================
+// STRIPE TEST CONNECTION — real call against the configured secret key
+// ========================================
+router.post('/payments/test-stripe-connection', authenticate, requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const { secretKey: bodyKey } = req.body || {};
+    const settings = await prisma.platformSettings.findFirst();
+    const secret = bodyKey || settings?.stripeSecretKey;
+    if (!secret) return res.status(400).json({ error: 'No Stripe secret key configured' });
+
+    try {
+      const Stripe = (await import('stripe')).default as any;
+      const stripe = new Stripe(secret, { apiVersion: '2024-06-20' });
+      const balance = await stripe.balance.retrieve();
+      const mode = secret.startsWith('sk_live_') ? 'live' : 'test';
+      res.json({ success: true, data: { mode, available: balance.available, pending: balance.pending } });
+    } catch (sErr: any) {
+      res.status(400).json({ error: sErr?.message || 'Stripe rejected the key' });
+    }
+  } catch (e: any) {
+    console.error('Stripe test error:', e);
+    res.status(500).json({ error: 'Failed to test Stripe connection' });
+  }
+});
+
+// ========================================
+// CUSTOM REPORT BUILDER — aggregate selected dimensions
+// ========================================
+router.post('/reports/custom', authenticate, requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const { dateRange, metrics } = req.body || {};
+    const now = new Date();
+    let startDate = new Date(now);
+    switch (dateRange) {
+      case '7days': startDate.setDate(now.getDate() - 7); break;
+      case '30days': startDate.setDate(now.getDate() - 30); break;
+      case '90days': startDate.setDate(now.getDate() - 90); break;
+      case 'year': startDate.setFullYear(now.getFullYear() - 1); break;
+      default: startDate.setDate(now.getDate() - 30);
+    }
+
+    const want = (k: string) => Array.isArray(metrics) ? metrics.includes(k) : true;
+    const out: any = { dateRange, startDate, endDate: now };
+
+    if (want('revenue')) {
+      const orderRevenue = await prisma.order.aggregate({
+        where: { status: 'COMPLETED', createdAt: { gte: startDate } },
+        _sum: { total: true }, _count: { _all: true },
+      });
+      out.revenue = orderRevenue._sum.total || 0;
+      out.orderCount = orderRevenue._count._all;
+    }
+    if (want('bookings')) {
+      out.bookings = await prisma.booking.count({ where: { createdAt: { gte: startDate } } });
+    }
+    if (want('users')) {
+      out.newUsers = await prisma.user.count({ where: { createdAt: { gte: startDate } } });
+      out.totalUsers = await prisma.user.count();
+    }
+    if (want('vendors')) {
+      out.newVendors = await prisma.vendor.count({ where: { createdAt: { gte: startDate } } });
+      out.totalVendors = await prisma.vendor.count({ where: { status: 'APPROVED' } });
+    }
+    if (want('reviews')) {
+      const reviewAgg = await prisma.review.aggregate({
+        where: { createdAt: { gte: startDate } },
+        _avg: { rating: true }, _count: { _all: true },
+      });
+      out.avgRating = reviewAgg._avg.rating || 0;
+      out.reviewCount = reviewAgg._count._all;
+    }
+
+    res.json({ success: true, data: out });
+  } catch (e: any) {
+    console.error('Custom report error:', e);
+    res.status(500).json({ error: 'Failed to build report' });
+  }
+});
+
+// ========================================
+// SCHEDULED PUSH (admin CRUD + the cron picks them up server-side)
+// ========================================
+router.get('/scheduled-pushes', authenticate, requireAdmin, async (_req: AuthRequest, res) => {
+  try {
+    const rows = await prisma.scheduledPushNotification.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+      include: { createdBy: { select: { id: true, email: true } } },
+    });
+    res.json({ success: true, data: rows });
+  } catch (e: any) {
+    console.error('List scheduled pushes error:', e);
+    res.status(500).json({ error: 'Failed to load scheduled pushes' });
+  }
+});
+
+router.post('/scheduled-pushes', authenticate, requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const { title, body, link, targetType, targetIds, scheduledFor } = req.body || {};
+    if (!title || !body) return res.status(400).json({ error: 'title and body are required' });
+    const allowed = ['ALL', 'CUSTOMERS', 'VENDORS', 'SPECIFIC'];
+    if (targetType && !allowed.includes(targetType)) return res.status(400).json({ error: 'Invalid targetType' });
+    const row = await prisma.scheduledPushNotification.create({
+      data: {
+        title, body,
+        link: link || null,
+        targetType: targetType || 'ALL',
+        targetIds: Array.isArray(targetIds) ? targetIds : [],
+        scheduledFor: scheduledFor ? new Date(scheduledFor) : null,
+        status: 'SCHEDULED',
+        createdById: req.user!.id,
+      },
+    });
+    res.json({ success: true, data: row });
+  } catch (e: any) {
+    console.error('Create scheduled push error:', e);
+    res.status(500).json({ error: 'Failed to schedule push' });
+  }
+});
+
+router.delete('/scheduled-pushes/:id', authenticate, requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const row = await prisma.scheduledPushNotification.findUnique({ where: { id: req.params.id } });
+    if (!row) return res.status(404).json({ error: 'Not found' });
+    if (row.status === 'SENT') return res.status(400).json({ error: 'Cannot cancel a sent push' });
+    await prisma.scheduledPushNotification.update({
+      where: { id: req.params.id },
+      data: { status: 'CANCELLED' },
+    });
+    res.json({ success: true });
+  } catch (e: any) {
+    console.error('Cancel scheduled push error:', e);
+    res.status(500).json({ error: 'Failed to cancel push' });
   }
 });
 

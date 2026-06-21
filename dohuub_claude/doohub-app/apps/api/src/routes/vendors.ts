@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { prisma } from '@doohub/database';
-import { optionalAuth, authenticate, requireRole, AuthRequest } from '../middleware/auth';
+import { optionalAuth, authenticate, requireRole, requireActiveVendor, AuthRequest } from '../middleware/auth';
 import { setAuthUserRole } from '../utils/supabase';
 
 const router = Router();
@@ -211,7 +211,7 @@ router.get('/me/service-areas', authenticate, async (req: AuthRequest, res) => {
   }
 });
 
-router.post('/me/service-areas', authenticate, async (req: AuthRequest, res) => {
+router.post('/me/service-areas', authenticate, requireActiveVendor, async (req: AuthRequest, res) => {
   try {
     const vendorId = await getCurrentVendorId(req.user!.id);
     if (!vendorId) return res.status(403).json({ error: 'Vendor profile not found' });
@@ -238,7 +238,7 @@ router.post('/me/service-areas', authenticate, async (req: AuthRequest, res) => 
   }
 });
 
-router.put('/me/service-areas/:id', authenticate, async (req: AuthRequest, res) => {
+router.put('/me/service-areas/:id', authenticate, requireActiveVendor, async (req: AuthRequest, res) => {
   try {
     const vendorId = await getCurrentVendorId(req.user!.id);
     if (!vendorId) return res.status(403).json({ error: 'Vendor profile not found' });
@@ -266,7 +266,7 @@ router.put('/me/service-areas/:id', authenticate, async (req: AuthRequest, res) 
   }
 });
 
-router.delete('/me/service-areas/:id', authenticate, async (req: AuthRequest, res) => {
+router.delete('/me/service-areas/:id', authenticate, requireActiveVendor, async (req: AuthRequest, res) => {
   try {
     const vendorId = await getCurrentVendorId(req.user!.id);
     if (!vendorId) return res.status(403).json({ error: 'Vendor profile not found' });
@@ -302,7 +302,7 @@ router.get('/me/availability', authenticate, async (req: AuthRequest, res) => {
 
 // Bulk upsert — accepts an array of 7 day-of-week entries. The portal sends
 // the whole week at once when the vendor hits Save.
-router.put('/me/availability', authenticate, async (req: AuthRequest, res) => {
+router.put('/me/availability', authenticate, requireActiveVendor, async (req: AuthRequest, res) => {
   try {
     const vendorId = await getCurrentVendorId(req.user!.id);
     if (!vendorId) return res.status(403).json({ error: 'Vendor profile not found' });
@@ -658,7 +658,7 @@ router.get('/listings', authenticate, async (req: AuthRequest, res) => {
 });
 
 // Create a listing for the current vendor (any of 9 categories)
-router.post('/listings', authenticate, async (req: AuthRequest, res) => {
+router.post('/listings', authenticate, requireActiveVendor, async (req: AuthRequest, res) => {
   try {
     const vendor = await prisma.vendor.findFirst({ where: { userId: req.user!.id } });
     if (!vendor) return res.status(403).json({ error: 'Vendor profile not found' });
@@ -957,7 +957,7 @@ router.get('/listings/:type/:id', authenticate, async (req: AuthRequest, res) =>
 
 // PUT — replace updatable fields on a vendor listing. Same field set as POST
 // minus required-on-create fields. Same category-specific branches.
-router.put('/listings/:type/:id', authenticate, async (req: AuthRequest, res) => {
+router.put('/listings/:type/:id', authenticate, requireActiveVendor, async (req: AuthRequest, res) => {
   try {
     const vendorId = await getOwnVendorId(req.user!.id);
     if (!vendorId) return res.status(403).json({ error: 'Vendor profile not found' });
@@ -1052,7 +1052,7 @@ router.put('/listings/:type/:id', authenticate, async (req: AuthRequest, res) =>
 });
 
 // PATCH status (toggle ACTIVE / PAUSED / DRAFT)
-router.patch('/listings/:type/:id/status', authenticate, async (req: AuthRequest, res) => {
+router.patch('/listings/:type/:id/status', authenticate, requireActiveVendor, async (req: AuthRequest, res) => {
   try {
     const vendorId = await getOwnVendorId(req.user!.id);
     if (!vendorId) return res.status(403).json({ error: 'Vendor profile not found' });
@@ -1081,7 +1081,7 @@ router.patch('/listings/:type/:id/status', authenticate, async (req: AuthRequest
 });
 
 // DELETE a vendor listing
-router.delete('/listings/:type/:id', authenticate, async (req: AuthRequest, res) => {
+router.delete('/listings/:type/:id', authenticate, requireActiveVendor, async (req: AuthRequest, res) => {
   try {
     const vendorId = await getOwnVendorId(req.user!.id);
     if (!vendorId) return res.status(403).json({ error: 'Vendor profile not found' });
@@ -1181,7 +1181,7 @@ router.get('/all-listings', authenticate, requireRole('ADMIN'), async (req: Auth
 });
 
 // Update vendor profile
-router.put('/me', authenticate, async (req: AuthRequest, res) => {
+router.put('/me', authenticate, requireActiveVendor, async (req: AuthRequest, res) => {
   try {
     const vendor = await prisma.vendor.findFirst({
       where: { userId: req.user!.id },
@@ -1237,7 +1237,7 @@ router.get('/me/payment-settings', authenticate, async (req: AuthRequest, res) =
 });
 
 // Update vendor payment settings
-router.put('/me/payment-settings', authenticate, async (req: AuthRequest, res) => {
+router.put('/me/payment-settings', authenticate, requireActiveVendor, async (req: AuthRequest, res) => {
   try {
     const vendor = await prisma.vendor.findFirst({
       where: { userId: req.user!.id },

@@ -42,6 +42,8 @@ import stripeWebhookRoutes from './routes/payments-webhook';
 import chatRoutes from './routes/chat';
 import notificationRoutes from './routes/notifications';
 import reportRoutes from './routes/reports';
+import publicConfigRoutes from './routes/public-config';
+import { startWorkers } from './workers';
 
 const app = express();
 // Railway uses PORT, locally we use API_PORT
@@ -181,6 +183,7 @@ app.use('/api/v1/payments', paymentRoutes);
 app.use('/api/v1/chat', chatRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
 app.use('/api/v1/reports', reportRoutes);
+app.use('/api/v1', publicConfigRoutes);
 
 // Also mount service routes directly (without /services/ prefix) for frontend compatibility
 app.use('/api/v1/cleaning', cleaningRoutes);
@@ -233,6 +236,7 @@ const server = app.listen(PORT, () => {
     },
     'DoHuub API started'
   );
+  startWorkers();
 });
 
 server.on('error', (error) => {
