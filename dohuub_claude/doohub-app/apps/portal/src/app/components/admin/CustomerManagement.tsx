@@ -1,3 +1,4 @@
+import { toast } from "sonner";
 import { useEffect, useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import api from "../../../services/api";
@@ -41,7 +42,7 @@ interface Customer {
   avatar?: string;
   verified: boolean;
   joinedDate: string;
-  status: "active" | "inactive" | "suspended";
+  status: "active" | "inactive" | "suspended" | "banned";
   bookingsCount: number;
   totalSpent: number;
   avgOrderValue: number;
@@ -270,7 +271,7 @@ export function CustomerManagement() {
       });
       setCustomers((prev) => prev.map((c) => (c.id === customerId ? { ...c, status: next } : c)));
     } catch (e: any) {
-      alert(e?.response?.data?.error || e?.message || "Failed to update customer status");
+      toast.error(e?.response?.data?.error || e?.message || "Failed to update customer status");
     }
   };
 
@@ -285,7 +286,10 @@ export function CustomerManagement() {
           avatar: u.profile?.avatar,
           verified: u.isEmailVerified || false,
           joinedDate: u.createdAt,
-          status: u.isActive ? "active" : "suspended",
+          status:
+            u.status === "BANNED" ? "banned"
+            : u.status === "SUSPENDED" ? "suspended"
+            : u.isActive ? "active" : "suspended",
           bookingsCount: u._count?.bookings ?? 0,
           totalSpent: 0,
           avgOrderValue: 0,

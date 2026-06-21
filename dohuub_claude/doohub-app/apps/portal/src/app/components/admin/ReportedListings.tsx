@@ -1,3 +1,4 @@
+import { toast } from "sonner";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -90,7 +91,7 @@ function ReportCard({ report, onResolved }: { report: ListingReport; onResolved:
       });
       onResolved(report.id);
     } catch (e: any) {
-      alert(e?.response?.data?.error || e?.message || "Failed to apply action");
+      toast.error(e?.response?.data?.error || e?.message || "Failed to apply action");
     } finally {
       setBusy(false);
       setShowActionModal(false);

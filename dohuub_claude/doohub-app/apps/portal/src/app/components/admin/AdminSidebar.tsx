@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { supabase } from "../../../lib/supabase";
 import {
   LayoutDashboard,
   User,
@@ -46,8 +47,9 @@ export function AdminSidebar({ activeMenu }: AdminSidebarProps) {
     { id: "settings", icon: Settings, label: "Settings", path: "/admin/settings" },
   ];
 
-  const handleLogout = () => {
-    navigate("/admin");
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate("/admin/login");
   };
 
   return (

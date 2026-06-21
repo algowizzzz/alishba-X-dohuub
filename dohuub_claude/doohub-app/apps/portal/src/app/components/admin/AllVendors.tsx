@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import {
   Eye,
   Pause,
@@ -27,7 +28,7 @@ interface Vendor {
   businessName: string;
   logoUrl?: string;
   category: string;
-  status: "active" | "inactive" | "suspended" | "trial";
+  status: "active" | "inactive" | "suspended" | "trial" | "pending";
   subscriptionPlan: string;
   subscriptionFee: number;
   regions: string[];
@@ -571,8 +572,9 @@ export function AllVendors() {
             : v
         )
       );
+      toast.success(newStatus === "SUSPENDED" ? "Vendor suspended" : "Vendor approved");
     } catch (e: any) {
-      alert(e?.response?.data?.error || e?.message || "Failed to update vendor status");
+      toast.error(e?.response?.data?.error || e?.message || "Failed to update vendor status");
       throw e;
     }
   };
@@ -580,27 +582,49 @@ export function AllVendors() {
   useEffect(() => {
     api.get<{ success: boolean; data: any[] }>("/api/v1/admin/vendors?limit=200")
       .then((r) => {
-        const mapped: Vendor[] = (r.data || []).map((v: any) => ({
-          id: v.id,
-          businessName: v.businessName,
-          logoUrl: v.logo || undefined,
-          category: v.categories?.[0]?.category || "Other",
-          status:
-            v.status === "SUSPENDED" ? "suspended"
-            : v.subscriptionStatus === "TRIAL" ? "trial"
-            : v.isActive ? "active" : "inactive",
-          subscriptionPlan: v.subscriptionStatus === "ACTIVE" ? "Active" : v.subscriptionStatus === "TRIAL" ? "Trial" : "—",
-          subscriptionFee: 49,
-          regions: (v.serviceAreas || []).map((s: any) => `${s.city}, ${s.state}`).filter(Boolean),
-          joinedDate: v.createdAt,
-          listingsCount: v._count?.bookings ?? 0,
-          rating: v.rating ?? 0,
-          reviewCount: v.reviewCount ?? 0,
-          email: v.user?.email || v.contactEmail || "",
-        }));
+        const mapped: Vendor[] = (r.data || []).map((v: any) => {
+          const counts = v._count || {};
+          const listingsTotal = (counts.cleaningListings || 0) + (counts.handymanListings || 0) +
+            (counts.beautyListings || 0) + (counts.groceryListings || 0) +
+            (counts.rentalListings || 0) + (counts.foodListings || 0) +
+            (counts.beautyProductListings || 0) + (counts.rideAssistanceListings || 0) +
+            (counts.companionshipListings || 0);
+          // Region names from stores → regions[].region.name (the canonical
+          // path). Fall back to legacy serviceAreas[] for older vendors.
+          const storeRegions = (v.stores || [])
+            .flatMap((s: any) => (s.regions || []).map((r: any) => r.region?.name))
+            .filter(Boolean);
+          const legacyAreas = (v.serviceAreas || [])
+            .map((s: any) => `${s.city || ""}, ${s.state || ""}`.replace(/^,\s*|,\s*$/g, ""))
+            .filter(Boolean);
+          const regions = Array.from(new Set([...storeRegions, ...legacyAreas]));
+
+          return {
+            id: v.id,
+            businessName: v.businessName,
+            logoUrl: v.logo || undefined,
+            category: v.categories?.[0]?.category || "Other",
+            status:
+              v.status === "SUSPENDED" ? "suspended"
+              : v.status === "PENDING" ? "pending"
+              : v.subscriptionStatus === "TRIAL" ? "trial"
+              : v.isActive ? "active" : "inactive",
+            subscriptionPlan: v.subscription?.planId || (v.subscriptionStatus === "TRIAL" ? "Trial" : "—"),
+            subscriptionFee: 49, // TODO: derive from SubscriptionPlan once plan→price join lands
+            regions,
+            joinedDate: v.createdAt,
+            listingsCount: listingsTotal,
+            rating: v.rating ?? 0,
+            reviewCount: v.reviewCount ?? 0,
+            email: v.user?.email || v.contactEmail || "",
+          };
+        });
         setVendors(mapped);
       })
-      .catch(() => setVendors([]))
+      .catch((e: any) => {
+        toast.error(e?.response?.data?.error || e?.message || "Failed to load vendors");
+        setVendors([]);
+      })
       .finally(() => setVendorsLoading(false));
   }, []);
   const [searchQuery, setSearchQuery] = useState("");

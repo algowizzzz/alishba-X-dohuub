@@ -1,7 +1,6 @@
-import { Menu, User, ChevronDown, AlertTriangle, Settings, LogOut } from "lucide-react";
+import { Menu, User, ChevronDown, Settings, LogOut } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useVendorSuspension } from "../../contexts/VendorSuspensionContext";
 import api from "../../../services/api";
 import { supabase } from "../../../lib/supabase";
 
@@ -13,7 +12,6 @@ interface VendorTopNavProps {
 export function VendorTopNav({ onMenuClick }: VendorTopNavProps) {
   const navigate = useNavigate();
   const [showDropdown, setShowDropdown] = useState(false);
-  const { isSuspended, toggleSuspension } = useVendorSuspension();
   const [displayName, setDisplayName] = useState<string>("Vendor");
 
   const handleSettings = () => {
@@ -117,26 +115,6 @@ export function VendorTopNav({ onMenuClick }: VendorTopNavProps) {
               {/* Menu */}
               <div className="absolute right-0 top-full mt-2 w-64 bg-white border border-[rgba(46,122,217,0.25)] rounded-xl shadow-lg z-50 overflow-hidden">
                 <div className="p-2">
-                  <button
-                    onClick={() => {
-                      toggleSuspension();
-                      setShowDropdown(false);
-                    }}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white transition-colors text-left"
-                  >
-                    <AlertTriangle className={`w-4 h-4 ${isSuspended ? 'text-[#10B981]' : 'text-[#DC2626]'}`} />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-[#1A1A2E]">
-                        {isSuspended ? 'End Suspension' : 'Simulate Suspension'}
-                      </p>
-                      <p className="text-xs text-[#6B7280]">
-                        {isSuspended ? 'Restore account access' : 'Test suspension mode'}
-                      </p>
-                    </div>
-                  </button>
-                </div>
-
-                <div className="border-t border-[rgba(46,122,217,0.25)] p-2">
                   <button
                     onClick={handleSettings}
                     className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white transition-colors text-left"

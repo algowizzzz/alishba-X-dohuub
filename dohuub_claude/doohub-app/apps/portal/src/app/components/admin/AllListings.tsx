@@ -1,3 +1,4 @@
+import { toast } from "sonner";
 import { useEffect, useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import {
@@ -699,7 +700,7 @@ export function AllListings() {
       await api.patch(`/api/v1/admin/listings/${toTypeUrl(category)}/${listingId}/status`, { status: apiStatus });
       setListings((prev) => prev.map((l) => (l.id === listingId ? { ...l, status: next } : l)));
     } catch (e: any) {
-      alert(e?.response?.data?.error || e?.message || "Failed to update listing status");
+      toast.error(e?.response?.data?.error || e?.message || "Failed to update listing status");
     }
   };
 
@@ -730,7 +731,7 @@ export function AllListings() {
     setSelectedListings([]);
     setBulkBusy(false);
     if (failures.length > 0) {
-      alert(`Failed to update ${failures.length} listing(s): ${failures.slice(0, 5).join(", ")}${failures.length > 5 ? "..." : ""}`);
+      toast.error(`Failed to update ${failures.length} listing(s): ${failures.slice(0, 5).join(", ")}${failures.length > 5 ? "..." : ""}`);
     }
   };
 

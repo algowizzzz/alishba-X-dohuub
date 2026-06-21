@@ -1,8 +1,11 @@
-import { ArrowLeft, Gift, TrendingUp, TrendingDown, Clock, Users, Filter, Download, Search } from 'lucide-react';
+import { ArrowLeft, Gift, TrendingUp, TrendingDown, Clock, Users, Filter, Download, Search, Plus, Minus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { toast } from 'sonner';
 import { AdminSidebarRetractable } from './AdminSidebarRetractable';
 import { AdminTopNav } from './AdminTopNav';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
 import api from '../../../services/api';
 
 interface PointsTransaction {
@@ -25,26 +28,14 @@ interface Referral {
   date: string;
 }
 
-// Mock customer data
-const mockCustomer = {
-  id: '1',
-  name: 'John Smith',
-  email: 'john.smith@email.com',
-  phone: '+1 (555) 123-4567',
-  joinDate: '2024-06-15',
-  currentBalance: 2450,
-  lifetimeEarned: 5200,
-  lifetimeRedeemed: 2750,
-  pendingPoints: 150,
-  expiringPoints: 200,
-  expiringDate: '2025-02-15',
-  referralCode: 'JOHN-ABC123',
-  totalReferrals: 8,
-  pendingReferrals: 2,
-};
-
-
 type FilterType = 'all' | 'earned' | 'redeemed' | 'expired' | 'bonus';
+
+const emptyCustomer = {
+  id: '', name: '', email: '', phone: '—', joinDate: '',
+  currentBalance: 0, lifetimeEarned: 0, lifetimeRedeemed: 0,
+  pendingPoints: 0, expiringPoints: 0, expiringDate: null as string | null,
+  referralCode: '—', totalReferrals: 0, pendingReferrals: 0,
+};
 
 export function CustomerRewardsDetail() {
   const navigate = useNavigate();
@@ -52,11 +43,14 @@ export function CustomerRewardsDetail() {
   const [activeTab, setActiveTab] = useState<'transactions' | 'referrals'>('transactions');
   const [filter, setFilter] = useState<FilterType>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [customer, setCustomer] = useState<any>(mockCustomer);
+  const [customer, setCustomer] = useState<any>(emptyCustomer);
   const [transactions, setTransactions] = useState<PointsTransaction[]>([]);
   const [referrals, setReferrals] = useState<Referral[]>([]);
+  const [adjustAmount, setAdjustAmount] = useState('');
+  const [adjustReason, setAdjustReason] = useState('');
+  const [adjusting, setAdjusting] = useState(false);
 
-  useEffect(() => {
+  const loadRewards = () => {
     if (!id) return;
     api.get<{ success: boolean; data: any }>(`/api/v1/admin/customers/${id}/rewards`)
       .then((r) => {
@@ -65,6 +59,12 @@ export function CustomerRewardsDetail() {
         const u = d.user;
         const w = d.wallet || {};
         const refMade = d.referrals || [];
+        const txs = d.transactions || [];
+        // Lifetime totals computed from PointsTransaction history (API doesn't
+        // store them; computing client-side is fine here since the page is
+        // already showing the full tx list).
+        const lifetimeEarned = txs.filter((t: any) => t.amount > 0).reduce((s: number, t: any) => s + t.amount, 0);
+        const lifetimeRedeemed = Math.abs(txs.filter((t: any) => t.amount < 0).reduce((s: number, t: any) => s + t.amount, 0));
         setCustomer({
           id: u.id,
           name: u.profile ? `${u.profile.firstName ?? ''} ${u.profile.lastName ?? ''}`.trim() || u.email : u.email,
@@ -72,8 +72,8 @@ export function CustomerRewardsDetail() {
           phone: u.phone || '—',
           joinDate: u.createdAt,
           currentBalance: w.totalPoints ?? 0,
-          lifetimeEarned: 0,
-          lifetimeRedeemed: 0,
+          lifetimeEarned,
+          lifetimeRedeemed,
           pendingPoints: w.pendingPoints ?? 0,
           expiringPoints: w.expiringPoints ?? 0,
           expiringDate: w.expiringDate,
@@ -81,34 +81,89 @@ export function CustomerRewardsDetail() {
           totalReferrals: refMade.length,
           pendingReferrals: refMade.filter((r: any) => r.status === 'pending').length,
         });
-        const txMap = (d.transactions || []).map((t: any) => ({
-          id: t.id,
-          type: String(t.type || '').toLowerCase().includes('redeem') ? 'redeemed'
-            : String(t.type || '').toLowerCase().includes('expire') ? 'expired'
-            : String(t.type || '').toLowerCase().includes('refer') ? 'referral_bonus'
-            : String(t.type || '').toLowerCase().includes('milestone') ? 'milestone_bonus'
-            : String(t.type || '').toLowerCase().includes('signup') ? 'signup_bonus'
-            : 'earned',
-          amount: Math.abs(t.amount),
-          description: t.description || '—',
-          date: t.createdAt,
-          orderId: t.orderId || t.bookingId || undefined,
-          vendorName: t.vendorName || undefined,
-        }));
-        setTransactions(txMap);
-        setReferrals(
-          refMade.map((r: any) => ({
-            id: r.id,
-            name: r.refereeUserId || r.referralCode,
-            email: '—',
-            status: (r.status === 'completed' ? 'completed' : 'pending'),
-            pointsEarned: r.pointsEarned || 0,
-            date: r.createdAt,
+        setTransactions(
+          txs.map((t: any) => ({
+            id: t.id,
+            type: String(t.type || '').toLowerCase().includes('redeem') ? 'redeemed'
+              : String(t.type || '').toLowerCase().includes('expire') ? 'expired'
+              : String(t.type || '').toLowerCase().includes('refer') ? 'referral_bonus'
+              : String(t.type || '').toLowerCase().includes('milestone') ? 'milestone_bonus'
+              : String(t.type || '').toLowerCase().includes('signup') ? 'signup_bonus'
+              : 'earned',
+            amount: Math.abs(t.amount),
+            description: t.description || '—',
+            date: t.createdAt,
+            orderId: t.orderId || t.bookingId || undefined,
+            vendorName: t.vendorName || undefined,
           }))
         );
+        setReferrals(
+          refMade.map((r: any) => {
+            const refUser = r.referee;
+            const name = refUser?.profile
+              ? `${refUser.profile.firstName ?? ''} ${refUser.profile.lastName ?? ''}`.trim() || refUser.email
+              : refUser?.email || r.referralCode;
+            return {
+              id: r.id,
+              name,
+              email: refUser?.email || '—',
+              status: (r.status === 'completed' ? 'completed' : 'pending'),
+              pointsEarned: r.pointsEarned || 0,
+              date: r.createdAt,
+            };
+          })
+        );
       })
-      .catch(() => {});
-  }, [id]);
+      .catch((e: any) => {
+        toast.error(e?.response?.data?.error || e?.message || 'Failed to load rewards');
+      });
+  };
+
+  useEffect(() => { loadRewards(); }, [id]);
+
+  const handleAdjust = async (delta: number) => {
+    const n = parseInt(adjustAmount, 10);
+    if (!n || Number.isNaN(n) || n <= 0) {
+      toast.error('Enter a positive number of points');
+      return;
+    }
+    if (!adjustReason.trim()) {
+      toast.error('Provide a reason for the adjustment');
+      return;
+    }
+    setAdjusting(true);
+    try {
+      await api.post(`/api/v1/admin/customers/${id}/rewards/adjust`, {
+        amount: delta * n,
+        reason: adjustReason.trim(),
+      });
+      toast.success(`${delta > 0 ? 'Credited' : 'Debited'} ${n} points`);
+      setAdjustAmount('');
+      setAdjustReason('');
+      loadRewards();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error || e?.message || 'Failed to adjust points');
+    } finally {
+      setAdjusting(false);
+    }
+  };
+
+  const handleExport = () => {
+    const header = ['date', 'type', 'amount', 'description', 'orderId'];
+    const rows = transactions.map((t) =>
+      [t.date, t.type, t.amount, t.description, t.orderId || '']
+        .map((v) => `"${String(v).replace(/"/g, '""')}"`)
+        .join(',')
+    );
+    const csv = [header.join(','), ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${customer.name || 'customer'}-rewards.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   // Sidebar state
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -222,7 +277,7 @@ export function CustomerRewardsDetail() {
               <h1 className="text-xl font-bold text-foreground">Customer Rewards</h1>
               <p className="text-sm text-muted-foreground">{customer.name} - {customer.email}</p>
             </div>
-            <button className="flex items-center gap-2 px-4 py-2 border border-border rounded-lg hover:bg-secondary transition-colors">
+            <button onClick={handleExport} className="flex items-center gap-2 px-4 py-2 border border-border rounded-lg hover:bg-secondary transition-colors">
               <Download className="w-4 h-4" />
               Export History
             </button>
@@ -280,9 +335,37 @@ export function CustomerRewardsDetail() {
               </div>
             </div>
             <div className="text-right">
-              <p className="text-lg font-bold text-blue-800">+{customer.totalReferrals * 60} pts</p>
+              <p className="text-lg font-bold text-blue-800">+{referrals.reduce((s, r) => s + r.pointsEarned, 0)} pts</p>
               <p className="text-xs text-blue-600">from referrals</p>
             </div>
+          </div>
+        </div>
+
+        {/* Adjust Points (admin manual credit/debit) */}
+        <div className="bg-white rounded-xl border border-border p-5 mb-6 shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
+          <h3 className="text-lg font-semibold text-foreground mb-3">Adjust Points</h3>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Input
+              type="number"
+              min="1"
+              placeholder="Points"
+              value={adjustAmount}
+              onChange={(e) => setAdjustAmount(e.target.value)}
+              className="sm:w-32"
+            />
+            <Input
+              type="text"
+              placeholder="Reason (e.g. refund for failed booking)"
+              value={adjustReason}
+              onChange={(e) => setAdjustReason(e.target.value)}
+              className="flex-1"
+            />
+            <Button onClick={() => handleAdjust(1)} disabled={adjusting} className="bg-[#10B981] hover:bg-[#059669]">
+              <Plus className="w-4 h-4 mr-2" />Credit
+            </Button>
+            <Button onClick={() => handleAdjust(-1)} disabled={adjusting} variant="outline" className="text-[#DC2626] border-[#FECACA]">
+              <Minus className="w-4 h-4 mr-2" />Debit
+            </Button>
           </div>
         </div>
 

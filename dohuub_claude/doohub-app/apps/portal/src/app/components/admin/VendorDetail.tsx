@@ -1,3 +1,4 @@
+import { toast } from "sonner";
 import { useEffect, useState } from "react";
 import { Link, useParams, useLocation } from "react-router-dom";
 import api from "../../../services/api";
@@ -2810,7 +2811,7 @@ export function VendorDetail() {
       await api.patch(`/api/v1/admin/vendors/${id}/status`, { status: apiStatus });
       setVendor((prev) => ({ ...prev, status: next }));
     } catch (e: any) {
-      alert(e?.response?.data?.error || e?.message || "Failed to update vendor status");
+      toast.error(e?.response?.data?.error || e?.message || "Failed to update vendor status");
     } finally {
       setStatusBusy(false);
     }

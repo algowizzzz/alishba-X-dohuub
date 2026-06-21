@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   User,
@@ -14,6 +14,7 @@ import {
   Lock,
 } from "lucide-react";
 import { Button } from "../ui/button";
+import { supabase } from "../../../lib/supabase";
 
 interface AdminSidebarRetractableProps {
   isOpen: boolean;
@@ -36,6 +37,11 @@ export function AdminSidebarRetractable({
   onClose,
   activeMenu = "dashboard",
 }: AdminSidebarRetractableProps) {
+  const navigate = useNavigate();
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate("/admin/login");
+  };
   const menuItems: MenuItem[] = [
     { icon: <LayoutDashboard className="w-5 h-5" />, label: "Dashboard", href: "/admin/dashboard", key: "dashboard" },
     { icon: <User className="w-5 h-5" />, label: "Michelle's Services", href: "/admin/michelle-profiles", key: "michelle" },
@@ -129,16 +135,14 @@ export function AdminSidebarRetractable({
           <div className="p-3 border-t border-[rgba(46,122,217,0.25)]">
             <Button
               variant="ghost"
+              onClick={handleLogout}
               className={`
                 w-full justify-start gap-3 text-[#6B7280] hover:text-[#DC2626] hover:bg-[#FEE2E2]
                 ${isCollapsed && !isOpen ? 'justify-center' : ''}
               `}
-              asChild
             >
-              <Link to="/admin">
-                <LogOut className="w-5 h-5" />
-                {(!isCollapsed || isOpen) && <span className="text-sm font-medium">Logout</span>}
-              </Link>
+              <LogOut className="w-5 h-5" />
+              {(!isCollapsed || isOpen) && <span className="text-sm font-medium">Logout</span>}
             </Button>
           </div>
         </div>

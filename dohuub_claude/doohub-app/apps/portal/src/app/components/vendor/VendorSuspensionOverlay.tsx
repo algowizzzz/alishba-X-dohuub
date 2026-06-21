@@ -1,11 +1,19 @@
-import { AlertTriangle, Mail, Phone, XCircle } from "lucide-react";
+import { AlertTriangle, Mail, Phone } from "lucide-react";
+import { supabase } from "../../../lib/supabase";
 import { useVendorSuspension } from "../../contexts/VendorSuspensionContext";
 import { Button } from "../ui/button";
+import { useNavigate } from "react-router-dom";
 
 export function VendorSuspensionOverlay() {
-  const { isSuspended, toggleSuspension } = useVendorSuspension();
+  const navigate = useNavigate();
+  const { isSuspended, loading } = useVendorSuspension();
 
-  if (!isSuspended) return null;
+  if (loading || !isSuspended) return null;
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    navigate("/vendor/login");
+  };
 
   return (
     <div className="fixed inset-0 bg-white z-[9999] flex items-center justify-center p-4">
@@ -71,19 +79,10 @@ export function VendorSuspensionOverlay() {
           Support Hours: Monday - Friday, 9:00 AM - 6:00 PM EST
         </p>
 
-        {/* Simulation Toggle (for testing only) */}
         <div className="pt-6 border-t border-[rgba(46,122,217,0.25)]">
-          <Button
-            onClick={toggleSuspension}
-            variant="outline"
-            className="text-sm text-[#6B7280] hover:text-[#1A1A2E]"
-          >
-            <XCircle className="w-4 h-4 mr-2" />
-            End Simulation
+          <Button onClick={handleSignOut} variant="outline" className="text-sm text-[#6B7280] hover:text-[#1A1A2E]">
+            Sign Out
           </Button>
-          <p className="text-xs text-[#9CA3AF] mt-2">
-            (This button is for testing purposes only)
-          </p>
         </div>
       </div>
     </div>

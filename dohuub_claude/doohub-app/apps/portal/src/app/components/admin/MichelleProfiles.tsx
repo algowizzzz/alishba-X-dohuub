@@ -1,42 +1,17 @@
 import { useEffect, useState } from "react";
 import api from "../../../services/api";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import {
-  LayoutDashboard,
-  User,
-  Building2,
-  ClipboardList,
-  Flag,
-  Users,
-  Package,
-  BarChart3,
-  Settings,
-  LogOut,
-  Search,
-  Bell,
-  ChevronDown,
-  Plus,
-  Edit,
-  List,
-  TrendingUp,
-  Star,
-  Eye,
+  Building2, Plus, Edit, List, Star, Eye, Trash2,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "../ui/button";
-import { Input } from "../ui/input";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "../ui/dropdown-menu";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "../ui/select";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from "../ui/dialog";
 import { Switch } from "../ui/switch";
 import { AdminSidebarRetractable } from "./AdminSidebarRetractable";
 import { AdminTopNav } from "./AdminTopNav";
@@ -48,429 +23,29 @@ interface VendorProfile {
   status: "active" | "inactive";
   regions: number;
   bookings: number;
-  bookingTrend: number;
   rating: number;
   reviews: number;
-  revenue: number;
-  revenueTrend: number;
   logoUrl?: string;
 }
 
-const mockProfiles: VendorProfile[] = [
-  // CLEANING SERVICES
-  {
-    id: "1",
-    businessName: "Sparkle Clean by Michelle",
-    category: "Cleaning Services",
-    status: "active",
-    regions: 3,
-    bookings: 156,
-    bookingTrend: 12,
-    rating: 4.8,
-    reviews: 245,
-    revenue: 12450,
-    revenueTrend: 18,
-  },
-  {
-    id: "2",
-    businessName: "Michelle's Deep Clean Express",
-    category: "Cleaning Services",
-    status: "active",
-    regions: 2,
-    bookings: 98,
-    bookingTrend: 15,
-    rating: 4.9,
-    reviews: 156,
-    revenue: 9800,
-    revenueTrend: 22,
-  },
-  {
-    id: "3",
-    businessName: "Green & Clean by Michelle",
-    category: "Cleaning Services",
-    status: "active",
-    regions: 4,
-    bookings: 203,
-    bookingTrend: 8,
-    rating: 4.7,
-    reviews: 312,
-    revenue: 15680,
-    revenueTrend: 10,
-  },
 
-  // HANDYMAN SERVICES
-  {
-    id: "4",
-    businessName: "Fix-It Pro by Michelle",
-    category: "Handyman Services",
-    status: "active",
-    regions: 2,
-    bookings: 89,
-    bookingTrend: 8,
-    rating: 4.9,
-    reviews: 187,
-    revenue: 8920,
-    revenueTrend: 15,
-  },
-  {
-    id: "5",
-    businessName: "Michelle's Home Repair Hub",
-    category: "Handyman Services",
-    status: "active",
-    regions: 3,
-    bookings: 124,
-    bookingTrend: 18,
-    rating: 4.8,
-    reviews: 201,
-    revenue: 11450,
-    revenueTrend: 20,
-  },
-  {
-    id: "6",
-    businessName: "Handyman Express Solutions",
-    category: "Handyman Services",
-    status: "active",
-    regions: 1,
-    bookings: 56,
-    bookingTrend: 5,
-    rating: 4.6,
-    reviews: 98,
-    revenue: 5670,
-    revenueTrend: 8,
-  },
-
-  // GROCERY
-  {
-    id: "7",
-    businessName: "Fresh Harvest by Michelle",
-    category: "Grocery",
-    status: "active",
-    regions: 2,
-    bookings: 178,
-    bookingTrend: 25,
-    rating: 4.7,
-    reviews: 289,
-    revenue: 18920,
-    revenueTrend: 30,
-  },
-  {
-    id: "8",
-    businessName: "Organic Essentials Delivery",
-    category: "Grocery",
-    status: "active",
-    regions: 3,
-    bookings: 245,
-    bookingTrend: 32,
-    rating: 4.9,
-    reviews: 412,
-    revenue: 24560,
-    revenueTrend: 35,
-  },
-  {
-    id: "9",
-    businessName: "Michelle's Meal Prep & Groceries",
-    category: "Grocery",
-    status: "active",
-    regions: 1,
-    bookings: 67,
-    bookingTrend: 12,
-    rating: 4.5,
-    reviews: 134,
-    revenue: 6780,
-    revenueTrend: 15,
-  },
-
-  // BEAUTY SERVICES
-  {
-    id: "10",
-    businessName: "Beauty by Michelle",
-    category: "Beauty Services",
-    status: "active",
-    regions: 1,
-    bookings: 67,
-    bookingTrend: -5,
-    rating: 4.7,
-    reviews: 142,
-    revenue: 5680,
-    revenueTrend: -3,
-  },
-  {
-    id: "11",
-    businessName: "Glam Studio Mobile",
-    category: "Beauty Services",
-    status: "active",
-    regions: 2,
-    bookings: 134,
-    bookingTrend: 20,
-    rating: 4.9,
-    reviews: 267,
-    revenue: 13450,
-    revenueTrend: 25,
-  },
-  {
-    id: "12",
-    businessName: "Michelle's Spa On-The-Go",
-    category: "Beauty Services",
-    status: "active",
-    regions: 3,
-    bookings: 189,
-    bookingTrend: 28,
-    rating: 4.8,
-    reviews: 356,
-    revenue: 18920,
-    revenueTrend: 30,
-  },
-
-  // BEAUTY PRODUCTS
-  {
-    id: "13",
-    businessName: "Glam Cosmetics Shop",
-    category: "Beauty Products",
-    status: "active",
-    regions: 2,
-    bookings: 234,
-    bookingTrend: 35,
-    rating: 4.8,
-    reviews: 412,
-    revenue: 23450,
-    revenueTrend: 40,
-  },
-  {
-    id: "14",
-    businessName: "Pure Skincare Boutique",
-    category: "Beauty Products",
-    status: "active",
-    regions: 3,
-    bookings: 189,
-    bookingTrend: 28,
-    rating: 4.9,
-    reviews: 356,
-    revenue: 18920,
-    revenueTrend: 32,
-  },
-  {
-    id: "15",
-    businessName: "Beauty Essentials by Michelle",
-    category: "Beauty Products",
-    status: "active",
-    regions: 1,
-    bookings: 145,
-    bookingTrend: 22,
-    rating: 4.7,
-    reviews: 267,
-    revenue: 14500,
-    revenueTrend: 25,
-  },
-
-  // CAREGIVING SERVICES
-  {
-    id: "16",
-    businessName: "Michelle's Caring Companions",
-    category: "Caregiving Services",
-    status: "active",
-    regions: 2,
-    bookings: 89,
-    bookingTrend: 12,
-    rating: 4.9,
-    reviews: 156,
-    revenue: 12340,
-    revenueTrend: 15,
-  },
-  {
-    id: "17",
-    businessName: "Senior Care Plus",
-    category: "Caregiving Services",
-    status: "active",
-    regions: 3,
-    bookings: 134,
-    bookingTrend: 18,
-    rating: 4.8,
-    reviews: 223,
-    revenue: 18920,
-    revenueTrend: 22,
-  },
-  {
-    id: "18",
-    businessName: "Home Health Helpers",
-    category: "Caregiving Services",
-    status: "active",
-    regions: 1,
-    bookings: 56,
-    bookingTrend: 8,
-    rating: 4.7,
-    reviews: 98,
-    revenue: 8900,
-    revenueTrend: 10,
-  },
-
-  // FOOD
-  {
-    id: "19",
-    businessName: "Mama's Kitchen",
-    category: "Food",
-    status: "active",
-    regions: 2,
-    bookings: 312,
-    bookingTrend: 42,
-    rating: 4.9,
-    reviews: 567,
-    revenue: 31200,
-    revenueTrend: 48,
-  },
-  {
-    id: "20",
-    businessName: "Chef's Table by Michelle",
-    category: "Food",
-    status: "active",
-    regions: 3,
-    bookings: 289,
-    bookingTrend: 38,
-    rating: 4.8,
-    reviews: 478,
-    revenue: 28900,
-    revenueTrend: 42,
-  },
-  {
-    id: "21",
-    businessName: "Homestyle Meals",
-    category: "Food",
-    status: "active",
-    regions: 1,
-    bookings: 198,
-    bookingTrend: 29,
-    rating: 4.7,
-    reviews: 334,
-    revenue: 19800,
-    revenueTrend: 32,
-  },
-
-  // RENTAL PROPERTIES
-  {
-    id: "22",
-    businessName: "Michelle's Properties",
-    category: "Rental Properties",
-    status: "active",
-    regions: 3,
-    bookings: 87,
-    bookingTrend: 24,
-    rating: 4.9,
-    reviews: 123,
-    revenue: 21750,
-    revenueTrend: 28,
-  },
-  {
-    id: "23",
-    businessName: "Urban Stays by Michelle",
-    category: "Rental Properties",
-    status: "active",
-    regions: 2,
-    bookings: 64,
-    bookingTrend: 18,
-    rating: 4.8,
-    reviews: 89,
-    revenue: 16000,
-    revenueTrend: 22,
-  },
-  {
-    id: "24",
-    businessName: "Cozy Rentals",
-    category: "Rental Properties",
-    status: "active",
-    regions: 1,
-    bookings: 45,
-    bookingTrend: 12,
-    rating: 4.7,
-    reviews: 67,
-    revenue: 11250,
-    revenueTrend: 15,
-  },
-
-  // RIDE ASSISTANCE
-  {
-    id: "25",
-    businessName: "CareWheels Transportation",
-    category: "Ride Assistance",
-    status: "active",
-    regions: 2,
-    bookings: 92,
-    bookingTrend: 20,
-    rating: 4.9,
-    reviews: 156,
-    revenue: 14720,
-    revenueTrend: 25,
-  },
-  {
-    id: "26",
-    businessName: "Senior Care Rides",
-    category: "Ride Assistance",
-    status: "active",
-    regions: 3,
-    bookings: 134,
-    bookingTrend: 28,
-    rating: 4.8,
-    reviews: 223,
-    revenue: 20100,
-    revenueTrend: 32,
-  },
-  {
-    id: "27",
-    businessName: "SafeTransit Solutions",
-    category: "Ride Assistance",
-    status: "active",
-    regions: 1,
-    bookings: 67,
-    bookingTrend: 15,
-    rating: 4.7,
-    reviews: 98,
-    revenue: 10050,
-    revenueTrend: 18,
-  },
-
-  // COMPANIONSHIP SUPPORT
-  {
-    id: "32",
-    businessName: "Caring Companions by Michelle",
-    category: "Companionship Support",
-    status: "active",
-    regions: 2,
-    bookings: 156,
-    bookingTrend: 24,
-    rating: 4.9,
-    reviews: 87,
-    revenue: 12800,
-    revenueTrend: 28,
-  },
-  {
-    id: "33",
-    businessName: "Michelle's Senior Care Network",
-    category: "Companionship Support",
-    status: "active",
-    regions: 2,
-    bookings: 234,
-    bookingTrend: 35,
-    rating: 4.8,
-    reviews: 145,
-    revenue: 18600,
-    revenueTrend: 42,
-  },
-  {
-    id: "34",
-    businessName: "Compassionate Care Services",
-    category: "Companionship Support",
-    status: "active",
-    regions: 2,
-    bookings: 178,
-    bookingTrend: 30,
-    rating: 4.9,
-    reviews: 112,
-    revenue: 14200,
-    revenueTrend: 35,
-  },
-];
-
-function VendorProfileCard({ profile }: { profile: VendorProfile }) {
+function VendorProfileCard({
+  profile,
+  onToggleActive,
+  onDelete,
+  busy,
+}: {
+  profile: VendorProfile;
+  onToggleActive: (id: string, next: boolean) => Promise<void>;
+  onDelete: (profile: VendorProfile) => void;
+  busy: boolean;
+}) {
   const navigate = useNavigate();
-  const [isActive, setIsActive] = useState(profile.status === "active");
+  const isActive = profile.status === "active";
+  const handleToggle = async (next: boolean) => {
+    if (busy) return;
+    await onToggleActive(profile.id, next);
+  };
 
   const getCategoryIcon = (category: string) => {
     const icons: Record<string, string> = {
@@ -524,7 +99,7 @@ function VendorProfileCard({ profile }: { profile: VendorProfile }) {
               <span className="text-[13px] text-[#6B7280] hidden sm:inline">
                 {isActive ? "Active" : "Inactive"}
               </span>
-              <Switch checked={isActive} onCheckedChange={setIsActive} />
+              <Switch checked={isActive} disabled={busy} onCheckedChange={handleToggle} />
             </div>
           </div>
 
@@ -543,44 +118,30 @@ function VendorProfileCard({ profile }: { profile: VendorProfile }) {
               <p className="text-base font-semibold flex items-center gap-2">
                 <span className={`w-2 h-2 rounded-full ${isActive ? 'bg-[#10B981]' : 'bg-[#9CA3AF]'}`} />
                 <span className={isActive ? 'text-[#10B981]' : 'text-[#9CA3AF]'}>
-                  {isActive ? `Active in ${profile.regions} regions` : "Inactive"}
+                  {isActive ? `Active in ${profile.regions} ${profile.regions === 1 ? 'region' : 'regions'}` : "Inactive"}
                 </span>
               </p>
             </div>
 
             <div>
-              <p className="text-[13px] text-[#6B7280] mb-1">Bookings This Month</p>
-              <div className="flex items-center gap-2">
-                <p className="text-base text-[#1A1A2E] font-semibold">{profile.bookings}</p>
-                <div className={`flex items-center gap-1 text-[13px] ${profile.bookingTrend >= 0 ? 'text-[#10B981]' : 'text-[#DC2626]'}`}>
-                  <TrendingUp className={`w-3.5 h-3.5 ${profile.bookingTrend < 0 ? 'rotate-180' : ''}`} />
-                  {profile.bookingTrend >= 0 ? '+' : ''}{profile.bookingTrend}%
-                </div>
-              </div>
+              <p className="text-[13px] text-[#6B7280] mb-1">Total Bookings</p>
+              <p className="text-base text-[#1A1A2E] font-semibold">{profile.bookings}</p>
             </div>
 
             <div>
               <p className="text-[13px] text-[#6B7280] mb-1">Average Rating</p>
               <p className="text-base text-[#1A1A2E] font-semibold flex items-center gap-1">
-                ⭐ {profile.rating} <span className="text-[#6B7280] font-normal">({profile.reviews} reviews)</span>
+                ⭐ {profile.rating.toFixed(1)} <span className="text-[#6B7280] font-normal">({profile.reviews} reviews)</span>
               </p>
             </div>
 
             <div>
-              <p className="text-[13px] text-[#6B7280] mb-1">Revenue This Month</p>
-              <div className="flex items-center gap-2">
-                <p className="text-base text-[#1A1A2E] font-semibold">${profile.revenue.toLocaleString()}</p>
-                <div className={`flex items-center gap-1 text-[13px] ${profile.revenueTrend >= 0 ? 'text-[#10B981]' : 'text-[#DC2626]'}`}>
-                  <TrendingUp className={`w-3.5 h-3.5 ${profile.revenueTrend < 0 ? 'rotate-180' : ''}`} />
-                  {profile.revenueTrend >= 0 ? '+' : ''}{profile.revenueTrend}%
-                </div>
-              </div>
-            </div>
-
-            <div>
               <p className="text-[13px] text-[#6B7280] mb-1">Active Regions</p>
-              <button className="text-base text-[#2E7AD9] font-semibold hover:underline">
-                {profile.regions} regions
+              <button
+                onClick={() => navigate(`/admin/michelle-profiles/regions`)}
+                className="text-base text-[#2E7AD9] font-semibold hover:underline"
+              >
+                {profile.regions} {profile.regions === 1 ? 'region' : 'regions'}
               </button>
             </div>
           </div>
@@ -613,6 +174,16 @@ function VendorProfileCard({ profile }: { profile: VendorProfile }) {
               <List className="w-4 h-4" />
               <span className="hidden sm:inline">Manage Listings</span>
               <span className="sm:hidden">Listings</span>
+            </Button>
+            <Button
+              variant="outline"
+              disabled={busy}
+              className="h-10 px-5 flex items-center justify-center gap-2 text-sm w-full sm:w-auto text-[#DC2626] border-[#FCA5A5] hover:bg-[#FEF2F2]"
+              onClick={() => onDelete(profile)}
+            >
+              <Trash2 className="w-4 h-4" />
+              <span className="hidden sm:inline">Delete</span>
+              <span className="sm:hidden">Delete</span>
             </Button>
           </div>
         </div>
@@ -672,13 +243,10 @@ export function MichelleProfiles() {
             businessName: v.businessName || "Unnamed Store",
             category: rawCategory ? (ENUM_TO_CATEGORY[rawCategory] || rawCategory) : "Other",
             status: v.isActive ? "active" : "inactive",
-            regions: v._count?.serviceAreas ?? v.serviceAreas?.length ?? 0,
+            regions: v._count?.serviceAreas ?? v.serviceAreas?.length ?? v._count?.stores ?? 0,
             bookings: v._count?.bookings ?? 0,
-            bookingTrend: 0,
             rating: v.rating ?? 0,
             reviews: v.reviewCount ?? 0,
-            revenue: 0,
-            revenueTrend: 0,
             logoUrl: v.logo || undefined,
           };
         });
@@ -707,6 +275,46 @@ export function MichelleProfiles() {
     if (filter === "inactive") return profile.status === "inactive";
     return profile.category === filter;
   });
+
+  const [pending, setPending] = useState<Record<string, boolean>>({});
+  const [deleteTarget, setDeleteTarget] = useState<VendorProfile | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleToggleActive = async (profileId: string, nextActive: boolean) => {
+    setPending((p) => ({ ...p, [profileId]: true }));
+    const prev = profiles.find((p) => p.id === profileId)?.status;
+    setProfiles((arr) =>
+      arr.map((p) => (p.id === profileId ? { ...p, status: nextActive ? "active" : "inactive" } : p))
+    );
+    try {
+      await api.put(`/api/v1/admin/michelle-profiles/${profileId}`, {
+        status: nextActive ? "APPROVED" : "SUSPENDED",
+      });
+      toast.success(nextActive ? "Profile activated" : "Profile paused");
+    } catch (e: any) {
+      setProfiles((arr) =>
+        arr.map((p) => (p.id === profileId ? { ...p, status: prev || p.status } : p))
+      );
+      toast.error(e?.response?.data?.error || e?.message || "Failed to update status");
+    } finally {
+      setPending((p) => ({ ...p, [profileId]: false }));
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await api.delete(`/api/v1/admin/michelle-profiles/${deleteTarget.id}`);
+      setProfiles((arr) => arr.filter((p) => p.id !== deleteTarget.id));
+      toast.success("Profile deleted (suspended)");
+      setDeleteTarget(null);
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error || e?.message || "Failed to delete profile");
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#F0F7FF]">
@@ -770,12 +378,41 @@ export function MichelleProfiles() {
           ) : (
             <div>
               {filteredProfiles.map((profile) => (
-                <VendorProfileCard key={profile.id} profile={profile} />
+                <VendorProfileCard
+                  key={profile.id}
+                  profile={profile}
+                  onToggleActive={handleToggleActive}
+                  onDelete={(p) => setDeleteTarget(p)}
+                  busy={!!pending[profile.id]}
+                />
               ))}
             </div>
           )}
         </div>
       </main>
+
+      <Dialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Michelle Profile</DialogTitle>
+            <DialogDescription>
+              Suspend "{deleteTarget?.businessName}"? All its listings will be paused and
+              hidden from customers. You can restore the profile by re-activating it later.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={deleting}>Cancel</Button>
+            <Button variant="destructive" onClick={handleConfirmDelete} disabled={deleting} className="bg-[#DC2626] hover:bg-[#B91C1C]">
+              {deleting ? "Deleting..." : "Delete Profile"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
