@@ -82,8 +82,12 @@ app.use(
         if (/^exp:\/\/.+/.test(origin)) return callback(null, true);
       }
 
+      // Reject cleanly: `callback(null, false)` returns the preflight without
+      // Access-Control-Allow-Origin, which the browser blocks. Previously we
+      // called `callback(new Error(...))`, which propagated as a 500 — making
+      // a misconfigured allowlist look like an API crash.
       logger.warn({ origin }, 'CORS: rejected origin');
-      return callback(new Error(`CORS: origin ${origin} not allowed`));
+      return callback(null, false);
     },
     credentials: true,
   })
