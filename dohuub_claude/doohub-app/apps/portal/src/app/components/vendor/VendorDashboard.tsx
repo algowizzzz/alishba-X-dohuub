@@ -31,6 +31,7 @@ export function VendorDashboard() {
   };
 
   const [stats, setStats] = useState({ earnings: 0, orders: 0, listings: 0 });
+  const [vendorName, setVendorName] = useState<string>("");
   const [recentOrders, setRecentOrders] = useState<Array<{
     id: string;
     orderNumber: string;
@@ -47,7 +48,18 @@ export function VendorDashboard() {
       api.get<{ success: boolean; data: any }>("/api/v1/vendors/me/analytics").catch(() => null),
       api.get<{ success: boolean; data: any[] }>("/api/v1/vendors/listings").catch(() => null),
       api.get<{ success: boolean; data: any[] }>("/api/v1/vendors/me/bookings?limit=5").catch(() => null),
-    ]).then(([analyticsRes, listingsRes, bookingsRes]) => {
+      api.get<{ success: boolean; data: any }>("/api/v1/vendors/me").catch(() => null),
+    ]).then(([analyticsRes, listingsRes, bookingsRes, vendorRes]) => {
+      // Pick the most personable display name we have, prefer business name
+      // then owner's first name then email local-part.
+      const v = (vendorRes as any)?.data;
+      const owner = v?.user?.profile;
+      setVendorName(
+        v?.businessName ||
+        (owner?.firstName ? `${owner.firstName}${owner.lastName ? ' ' + owner.lastName : ''}` : '') ||
+        (v?.user?.email ? String(v.user.email).split('@')[0] : '') ||
+        'there'
+      );
       const analytics = (analyticsRes as any)?.data;
       const listings = (listingsRes as any)?.data;
       const bookings = (bookingsRes as any)?.data;
@@ -130,7 +142,7 @@ export function VendorDashboard() {
           {/* Welcome Section */}
           <div className="mb-8">
             <h1 className="text-2xl sm:text-[28px] lg:text-[32px] font-bold text-[#1A1A2E] mb-2">
-              Welcome back, John! 👋
+              Welcome back, {vendorName || "there"}! 👋
             </h1>
             <p className="text-sm sm:text-[15px] text-[#6B7280]">
               Here's what's happening with your business today

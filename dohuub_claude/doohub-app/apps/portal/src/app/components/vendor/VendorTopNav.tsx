@@ -1,7 +1,9 @@
 import { Menu, User, ChevronDown, AlertTriangle, Settings, LogOut } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useVendorSuspension } from "../../contexts/VendorSuspensionContext";
 import api from "../../../services/api";
+import { supabase } from "../../../lib/supabase";
 
 interface VendorTopNavProps {
   onMenuClick: () => void;
@@ -9,9 +11,25 @@ interface VendorTopNavProps {
 }
 
 export function VendorTopNav({ onMenuClick }: VendorTopNavProps) {
+  const navigate = useNavigate();
   const [showDropdown, setShowDropdown] = useState(false);
   const { isSuspended, toggleSuspension } = useVendorSuspension();
   const [displayName, setDisplayName] = useState<string>("Vendor");
+
+  const handleSettings = () => {
+    setShowDropdown(false);
+    navigate("/vendor/settings");
+  };
+
+  const handleLogOut = async () => {
+    setShowDropdown(false);
+    try {
+      await supabase.auth.signOut();
+    } catch {
+      // swallow — we still want to bounce to login below
+    }
+    navigate("/vendor/login");
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -119,11 +137,17 @@ export function VendorTopNav({ onMenuClick }: VendorTopNavProps) {
                 </div>
 
                 <div className="border-t border-[rgba(46,122,217,0.25)] p-2">
-                  <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white transition-colors text-left">
+                  <button
+                    onClick={handleSettings}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white transition-colors text-left"
+                  >
                     <Settings className="w-4 h-4 text-[#6B7280]" />
                     <span className="text-sm text-[#1A1A2E]">Settings</span>
                   </button>
-                  <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-[#FEE2E2] transition-colors text-left group">
+                  <button
+                    onClick={handleLogOut}
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-[#FEE2E2] transition-colors text-left group"
+                  >
                     <LogOut className="w-4 h-4 text-[#6B7280] group-hover:text-[#DC2626]" />
                     <span className="text-sm text-[#1A1A2E] group-hover:text-[#DC2626]">Log Out</span>
                   </button>

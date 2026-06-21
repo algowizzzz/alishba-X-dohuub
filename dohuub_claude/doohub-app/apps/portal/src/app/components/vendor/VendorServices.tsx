@@ -53,6 +53,7 @@ interface VendorStore {
   reviews: number;
   revenue: number;
   revenueTrend: number;
+  logoUrl?: string | null;
 }
 
 // Mock data - same structure as Michelle's profiles
@@ -224,8 +225,12 @@ function StoreCard({
       <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
         {/* Icon/Logo */}
         <div className="flex-shrink-0">
-          <div className="w-full sm:w-[140px] h-[140px] rounded-xl bg-white border-2 border-dashed border-[rgba(46,122,217,0.25)] flex items-center justify-center">
-            <Building2 className="w-12 h-12 text-[#9CA3AF]" />
+          <div className="w-full sm:w-[140px] h-[140px] rounded-xl bg-white border-2 border-dashed border-[rgba(46,122,217,0.25)] flex items-center justify-center overflow-hidden">
+            {profile.logoUrl ? (
+              <img src={profile.logoUrl} alt={profile.businessName} className="w-full h-full object-cover" />
+            ) : (
+              <Building2 className="w-12 h-12 text-[#9CA3AF]" />
+            )}
           </div>
         </div>
 
@@ -438,13 +443,14 @@ export function VendorServices() {
             businessName: s.name || "Untitled Store",
             category: ENUM_TO_LABEL[s.category] || s.category || "Other",
             status: (s.status === "ACTIVE" ? "active" : "inactive") as "active" | "inactive",
-            regions: Array.isArray(s.regions) ? s.regions.length : 0,
+            regions: Array.isArray(s.regions) ? s.regions.filter((r: any) => r.isActive).length : 0,
             bookings: listingsTotal,
             bookingTrend: 0,
             rating: 0,
             reviews: 0,
             revenue: 0,
             revenueTrend: 0,
+            logoUrl: s.logo || null,
           };
         });
         setStores(mapped);

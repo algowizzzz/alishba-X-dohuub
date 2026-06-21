@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { VendorSidebar } from "./VendorSidebar";
 import { VendorTopNav } from "./VendorTopNav";
 import { 
@@ -48,50 +48,70 @@ export function VendorSubscriptionManagement() {
     }
   };
 
-  // Mock subscription data
-  const subscription = {
-    plan: "Yearly Plan",
-    status: "Active",
-    amount: 470,
-    billing: "yearly",
-    nextBillingDate: "March 15, 2026",
+  // Real subscription data, loaded from /vendors/me.
+  // Stripe billing isn't wired yet, so amount + paymentMethod stay placeholder
+  // until Stripe Connect is configured. Trial status, end date and cancel
+  // come from the real Vendor row.
+  const [subscription, setSubscription] = useState<{
+    plan: string;
+    status: string;
+    amount: number | null;
+    billing: string;
+    nextBillingDate: string | null;
+    trialEndsDate: string | null;
+    paymentMethod: { type: string; last4: string; expiryDate: string } | null;
+  }>({
+    plan: "Trial",
+    status: "Loading…",
+    amount: null,
+    billing: "—",
+    nextBillingDate: null,
     trialEndsDate: null,
-    paymentMethod: {
-      type: "Visa",
-      last4: "4242",
-      expiryDate: "12/28",
-    },
-  };
+    paymentMethod: null,
+  });
+
+  useEffect(() => {
+    api
+      .get<{ success: boolean; data: any }>("/api/v1/vendors/me")
+      .then((r) => {
+        const v = (r as any)?.data;
+        if (!v) return;
+        const trialEnds = v.trialEndsAt ? new Date(v.trialEndsAt) : null;
+        const status = v.subscriptionStatus || "TRIAL";
+        setSubscription({
+          plan:
+            status === "TRIAL"
+              ? "Free Trial"
+              : status === "ACTIVE"
+              ? "Monthly Plan"
+              : status === "CANCELLED"
+              ? "Cancelled"
+              : status === "EXPIRED"
+              ? "Expired"
+              : "—",
+          status: status.charAt(0) + status.slice(1).toLowerCase(),
+          amount: null,
+          billing: status === "TRIAL" ? "trial" : "monthly",
+          nextBillingDate: trialEnds
+            ? trialEnds.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
+            : null,
+          trialEndsDate: trialEnds && status === "TRIAL"
+            ? trialEnds.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
+            : null,
+          paymentMethod: null,
+        });
+      })
+      .catch(() => {});
+  }, []);
 
   const features = [
     "Unlimited service listings",
     "Real-time order management",
-    "Payment processing included",
+    "Multi-region coverage",
   ];
 
-  const invoices: Invoice[] = [
-    {
-      id: "INV-2026-001",
-      date: "Jan 15, 2026",
-      amount: 470,
-      status: "Paid",
-      downloadUrl: "#",
-    },
-    {
-      id: "INV-2025-012",
-      date: "Dec 15, 2025",
-      amount: 470,
-      status: "Paid",
-      downloadUrl: "#",
-    },
-    {
-      id: "INV-2025-011",
-      date: "Nov 15, 2025",
-      amount: 470,
-      status: "Paid",
-      downloadUrl: "#",
-    },
-  ];
+  // Billing history — empty until Stripe webhooks populate BillingHistory.
+  const invoices: Invoice[] = [];
 
   const handleChangePlan = () => {
     // Navigate to change plan page
@@ -228,23 +248,29 @@ export function VendorSubscriptionManagement() {
                   {subscription.plan}
                 </p>
                 <p className="text-sm text-[#6B7280]">
-                  ${subscription.amount}/{subscription.billing === "yearly" ? "year" : "month"}
+                  {subscription.amount != null
+                    ? `$${subscription.amount}/${subscription.billing === "yearly" ? "year" : "month"}`
+                    : subscription.billing === "trial"
+                    ? "No charge during trial"
+                    : "—"}
                 </p>
               </div>
 
               {/* Next Billing */}
               <div className="bg-white border border-[rgba(46,122,217,0.25)] rounded-xl p-6 shadow-[0_2px_8px_rgba(46,122,217,0.10)]">
                 <p className="text-xs font-semibold text-[#6B7280] uppercase tracking-wide mb-2">
-                  Next Billing Date
+                  {subscription.trialEndsDate ? "Trial Ends" : "Next Billing Date"}
                 </p>
                 <div className="flex items-center gap-2">
                   <Calendar className="w-5 h-5 text-[#6B7280]" />
                   <p className="text-base font-semibold text-[#1A1A2E]">
-                    {subscription.nextBillingDate}
+                    {subscription.nextBillingDate || "—"}
                   </p>
                 </div>
                 <p className="text-sm text-[#6B7280] mt-1">
-                  Auto-renews on this date
+                  {subscription.trialEndsDate
+                    ? "Subscription required after this date"
+                    : "Auto-renews on this date"}
                 </p>
               </div>
 
@@ -256,21 +282,26 @@ export function VendorSubscriptionManagement() {
                 <div className="flex items-center gap-2">
                   <CreditCard className="w-5 h-5 text-[#6B7280]" />
                   <p className="text-base font-semibold text-[#1A1A2E]">
-                    {subscription.paymentMethod.type} •••• {subscription.paymentMethod.last4}
+                    {subscription.paymentMethod
+                      ? `${subscription.paymentMethod.type} •••• ${subscription.paymentMethod.last4}`
+                      : "Not added"}
                   </p>
                 </div>
                 <p className="text-sm text-[#6B7280] mt-1">
-                  Expires {subscription.paymentMethod.expiryDate}
+                  {subscription.paymentMethod
+                    ? `Expires ${subscription.paymentMethod.expiryDate}`
+                    : "Add a card before your trial ends"}
                 </p>
               </div>
             </div>
 
-            {/* Action Buttons */}
+            {/* Action Buttons — payments-bound actions are disabled until
+                Stripe Connect is wired. Cancel always works. */}
             <div className="flex flex-wrap gap-3">
-              <Button onClick={handleChangePlan} variant="default">
+              <Button onClick={handleChangePlan} variant="default" disabled title="Stripe billing not yet configured">
                 Change Plan
               </Button>
-              <Button onClick={handleUpdatePayment} variant="outline">
+              <Button onClick={handleUpdatePayment} variant="outline" disabled title="Stripe billing not yet configured">
                 <Edit className="w-4 h-4 mr-2" />
                 Update Payment Method
               </Button>
@@ -282,6 +313,9 @@ export function VendorSubscriptionManagement() {
                 Cancel Subscription
               </Button>
             </div>
+            <p className="text-xs text-[#6B7280] mt-3">
+              Plan changes and payment-method updates will be enabled when Stripe billing is connected.
+            </p>
           </div>
 
           {/* Plan Features */}

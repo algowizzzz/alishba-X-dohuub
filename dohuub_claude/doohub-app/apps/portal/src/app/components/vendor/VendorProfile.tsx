@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Save, User as UserIcon, Building, Mail, Phone, MapPin, FileText, Briefcase, Lock } from "lucide-react";
+import { toast } from "sonner";
 import api from "../../../services/api";
 import { VendorSidebar } from "./VendorSidebar";
 import { VendorTopNav } from "./VendorTopNav";
@@ -69,14 +70,34 @@ export function VendorProfile() {
     setIsSaving(true);
     setSaveError("");
     try {
+      // Vendor fields — businessName, contactPhone, description carry the
+      // business profile. The API also accepts logo + coverImage which we
+      // don't expose on this form yet.
       await api.put("/api/v1/vendors/me", {
         businessName: formData.businessName,
-        contactEmail: formData.email,
         contactPhone: formData.phone,
-        address: formData.businessAddress,
+        // Email is locked on this form — submitting it would no-op because
+        // the API resolves the user's email from Supabase.
       });
+
+      // Owner name lives on the User profile (firstName/lastName), not on
+      // Vendor. Split on the first space.
+      if (formData.ownerName.trim()) {
+        const parts = formData.ownerName.trim().split(/\s+/);
+        const firstName = parts.shift() || "";
+        const lastName = parts.join(" ");
+        await api.put("/api/v1/users/me", {
+          firstName,
+          lastName,
+          phone: formData.phone,
+        });
+      }
+
+      toast.success("Profile saved");
     } catch (e: any) {
-      setSaveError(e?.response?.data?.error || e?.message || "Save failed");
+      const msg = e?.response?.data?.error || e?.message || "Save failed";
+      setSaveError(msg);
+      toast.error(msg);
     } finally {
       setIsSaving(false);
     }

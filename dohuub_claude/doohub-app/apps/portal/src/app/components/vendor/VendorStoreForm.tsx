@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import axios from "axios";
 import { toast } from "sonner";
@@ -79,6 +79,54 @@ export function VendorStoreForm() {
   const [showRegionModal, setShowRegionModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  // In edit mode, load the existing store and pre-fill every field. Without
+  // this the form opens blank and a Save would overwrite the store with the
+  // empty values.
+  useEffect(() => {
+    if (!isEditing || !storeId) return;
+    const ENUM_TO_LABEL: Record<string, string> = {
+      CLEANING: "Cleaning Services",
+      HANDYMAN: "Handyman Services",
+      BEAUTY: "Beauty Services",
+      BEAUTY_PRODUCTS: "Beauty Products",
+      GROCERIES: "Grocery",
+      FOOD: "Food",
+      RENTALS: "Rental Properties",
+      RIDE_ASSISTANCE: "Ride Assistance",
+      COMPANIONSHIP: "Companionship Support",
+    };
+    api
+      .get<{ success: boolean; data: any }>(`/api/v1/stores/${storeId}`)
+      .then((r) => {
+        const s = (r as any)?.data;
+        if (!s) return;
+        setBusinessName(s.name || "");
+        setCategory(ENUM_TO_LABEL[s.category] || s.category || "");
+        setDescription(s.description || "");
+        setPhone(s.phone || "");
+        setEmail(s.email || "");
+        setActivateNow(s.status === "ACTIVE" ? "active" : "inactive");
+        if (s.logo) {
+          setLogoUrl(s.logo);
+          setLogoPreview(s.logo);
+        }
+        if (Array.isArray(s.regions) && s.regions.length > 0) {
+          const mappedRegions = s.regions.map((r: any) => ({
+            id: r.id || r.region?.id || String(Math.random()),
+            name: r.region?.name || r.name || "Region",
+            countryCode: r.region?.countryCode || "",
+            countryName: r.region?.countryName || "",
+            countryFlag: r.region?.flag || "🌐",
+            isActive: r.isActive !== false,
+          }));
+          setRegions(mappedRegions);
+        }
+      })
+      .catch((e: any) => {
+        toast.error(e?.response?.data?.error || e?.message || "Failed to load store");
+      });
+  }, [isEditing, storeId]);
 
   const progress = (currentStep / 4) * 100;
 
@@ -176,7 +224,7 @@ export function VendorStoreForm() {
     setSaveError(null);
     setIsSaving(true);
     try {
-      await api.post("/api/v1/stores", {
+      const payload = {
         name: businessName,
         category: categoryEnum,
         description,
@@ -187,7 +235,14 @@ export function VendorStoreForm() {
         // ("us-1", "us-2", ...) and don't FK to the Region table; manage
         // regions from the dedicated /vendor/services/:storeId/regions page.
         status: activateNow === "active" ? "ACTIVE" : "DRAFT",
-      });
+      };
+      if (isEditing && storeId) {
+        await api.put(`/api/v1/stores/${storeId}`, payload);
+        toast.success("Store updated");
+      } else {
+        await api.post("/api/v1/stores", payload);
+        toast.success("Store created");
+      }
       navigate("/vendor/services");
     } catch (err: any) {
       setSaveError(err?.response?.data?.error || err?.message || "Failed to save store");

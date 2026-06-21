@@ -607,9 +607,15 @@ export function VendorStoreListings() {
 
   const [statusFilter, setStatusFilter] = useState("all");
 
-  // Get store data
-  const storeData = storeDataMap[storeId || "1"] || storeDataMap[" 1"];
-  const [listings, setListings] = useState(storeData.listings);
+  // Get store data — the storeDataMap is a 1..9 demo-only fixture. A real
+  // store id (cuid) won't match, so default to an empty shape instead of
+  // crashing on `undefined.listings`. Live listings load from the API below.
+  const storeData = (storeDataMap[storeId || ""] as { listings: Listing[]; name?: string; category?: string } | undefined) || {
+    listings: [] as Listing[],
+    name: "Your Store",
+    category: "Cleaning Services",
+  };
+  const [listings, setListings] = useState<Listing[]>(storeData.listings);
   const [usingDemoData, setUsingDemoData] = useState(true);
 
   // Load listings from API; fall back to localStorage / mock if empty
