@@ -51,83 +51,61 @@ export function RewardsOverview() {
     redemptionGrowth: 0,
   });
   const [topEarners, setTopEarners] = useState<TopEarner[]>([]);
+  const [recentTransactions, setRecentTransactions] = useState<PointsTransaction[]>([]);
 
   useEffect(() => {
-    api.get<{ success: boolean; data: any }>("/api/v1/admin/rewards/summary")
-      .then((r) => {
-        const d = (r as any)?.data;
-        if (!d) return;
-        setStats({
-          totalPointsIssued: d.transactions?.totalEarned ?? 0,
-          totalPointsRedeemed: d.transactions?.totalRedeemed ?? 0,
-          activeParticipants: d.wallet?.activeWallets ?? 0,
-          expiringPoints: d.wallet?.expiringPoints ?? 0,
-          issueGrowth: 0,
-          redemptionGrowth: 0,
-        });
-        setTopEarners(
-          (d.topEarners || []).map((e: any) => ({
-            id: e.userId,
-            name: e.name || e.email,
-            email: e.email,
-            pointsThisMonth: 0,
-            lifetimePoints: e.totalPoints,
-          }))
+    Promise.all([
+      api.get<{ success: boolean; data: any }>(`/api/v1/admin/rewards/summary?timeRange=${timeRange}`),
+      api.get<{ success: boolean; data: any[] }>(`/api/v1/admin/rewards/transactions?limit=15`),
+    ])
+      .then(([sumRes, txRes]) => {
+        const d = (sumRes as any)?.data;
+        if (d) {
+          setStats({
+            totalPointsIssued: d.transactions?.totalEarned ?? 0,
+            totalPointsRedeemed: d.transactions?.totalRedeemed ?? 0,
+            activeParticipants: d.wallet?.activeWallets ?? 0,
+            expiringPoints: d.wallet?.expiringPoints ?? 0,
+            issueGrowth: d.period?.earnGrowthPct ?? 0,
+            redemptionGrowth: d.period?.redeemGrowthPct ?? 0,
+          });
+          setTopEarners(
+            (d.topEarners || []).map((e: any) => ({
+              id: e.userId,
+              name: e.name || e.email || "—",
+              email: e.email || "—",
+              pointsThisMonth: 0,
+              lifetimePoints: e.totalPoints,
+            }))
+          );
+        }
+        const txData = (txRes as any)?.data || [];
+        setRecentTransactions(
+          txData.map((t: any) => {
+            const customerName = t.user?.profile
+              ? `${t.user.profile.firstName ?? ""} ${t.user.profile.lastName ?? ""}`.trim() || t.user.email
+              : t.user?.email || "Customer";
+            const typeLower = String(t.type || "").toLowerCase();
+            const type: PointsTransaction["type"] =
+              typeLower.includes("redeem") || t.amount < 0 ? "redeemed"
+              : typeLower.includes("expire") ? "expired"
+              : typeLower.includes("refer") ? "referral_bonus"
+              : "earned";
+            return {
+              id: t.id,
+              customerName,
+              customerId: t.userId,
+              type,
+              amount: Math.abs(t.amount),
+              description: t.description || "—",
+              date: t.createdAt,
+              orderId: t.orderId || t.bookingId || undefined,
+            };
+          })
         );
       })
       .catch(() => {});
-  }, []);
-
-  const recentTransactions: PointsTransaction[] = [
-    {
-      id: 'pt-001',
-      customerName: 'John Smith',
-      customerId: 'cust-001',
-      type: 'earned',
-      amount: 125,
-      description: 'Deep House Cleaning',
-      date: '2024-12-05',
-      orderId: 'ORD-1001'
-    },
-    {
-      id: 'pt-002',
-      customerName: 'Sarah Jones',
-      customerId: 'cust-002',
-      type: 'redeemed',
-      amount: 500,
-      description: 'Discount on Food Order',
-      date: '2024-12-05',
-      orderId: 'ORD-1002'
-    },
-    {
-      id: 'pt-003',
-      customerName: 'Mike Brown',
-      customerId: 'cust-003',
-      type: 'referral_bonus',
-      amount: 60,
-      description: 'Referral bonus - Anna K. completed first order',
-      date: '2024-12-04'
-    },
-    {
-      id: 'pt-004',
-      customerName: 'Emily Davis',
-      customerId: 'cust-004',
-      type: 'earned',
-      amount: 89,
-      description: 'Food Order',
-      date: '2024-12-04',
-      orderId: 'ORD-1003'
-    },
-    {
-      id: 'pt-005',
-      customerName: 'Chris Wilson',
-      customerId: 'cust-005',
-      type: 'expired',
-      amount: 150,
-      description: 'Points expired (12-month limit)',
-      date: '2024-12-03'
-    }
-  ];
+  }, [timeRange]);
 
 
   const getTransactionIcon = (type: string) => {
@@ -211,9 +189,9 @@ export function RewardsOverview() {
             <div className="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center">
               <Gift className="w-6 h-6 text-amber-600" />
             </div>
-            <div className="flex items-center gap-1 text-green-600 text-sm">
-              <ArrowUpRight className="w-4 h-4" />
-              <span>{stats.issueGrowth}%</span>
+            <div className={`flex items-center gap-1 text-sm ${stats.issueGrowth >= 0 ? "text-green-600" : "text-red-600"}`}>
+              {stats.issueGrowth >= 0 ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
+              <span>{stats.issueGrowth >= 0 ? "+" : ""}{stats.issueGrowth}%</span>
             </div>
           </div>
           <p className="text-muted-foreground text-sm mb-1">Total Points Issued</p>
@@ -225,9 +203,9 @@ export function RewardsOverview() {
             <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
               <TrendingUp className="w-6 h-6 text-blue-600" />
             </div>
-            <div className="flex items-center gap-1 text-green-600 text-sm">
-              <ArrowUpRight className="w-4 h-4" />
-              <span>{stats.redemptionGrowth}%</span>
+            <div className={`flex items-center gap-1 text-sm ${stats.redemptionGrowth >= 0 ? "text-green-600" : "text-red-600"}`}>
+              {stats.redemptionGrowth >= 0 ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
+              <span>{stats.redemptionGrowth >= 0 ? "+" : ""}{stats.redemptionGrowth}%</span>
             </div>
           </div>
           <p className="text-muted-foreground text-sm mb-1">Points Redeemed</p>
@@ -256,31 +234,6 @@ export function RewardsOverview() {
         </div>
       </div>
 
-      {/* Program Info Banner */}
-      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-8">
-        <div className="flex items-center gap-2 mb-2">
-          <Gift className="w-5 h-5 text-amber-600" />
-          <h3 className="font-semibold text-amber-800">Program Settings (Hardcoded)</h3>
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-          <div>
-            <span className="text-amber-600">Earn Rate:</span>
-            <span className="ml-2 font-medium text-amber-900">1 point per $1</span>
-          </div>
-          <div>
-            <span className="text-amber-600">Redemption:</span>
-            <span className="ml-2 font-medium text-amber-900">100 pts = $1</span>
-          </div>
-          <div>
-            <span className="text-amber-600">Referrer Bonus:</span>
-            <span className="ml-2 font-medium text-amber-900">60 pts</span>
-          </div>
-          <div>
-            <span className="text-amber-600">New User Bonus:</span>
-            <span className="ml-2 font-medium text-amber-900">35 pts</span>
-          </div>
-        </div>
-      </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Activity */}
@@ -289,6 +242,9 @@ export function RewardsOverview() {
             <h2 className="text-lg font-semibold text-foreground">Recent Points Activity</h2>
           </div>
           <div className="divide-y divide-gray-100">
+            {recentTransactions.length === 0 && (
+              <div className="px-6 py-8 text-center text-sm text-muted-foreground">No recent activity yet.</div>
+            )}
             {recentTransactions.map((transaction) => (
               <div key={transaction.id} className="px-6 py-4 flex items-center gap-4">
                 <div className="w-10 h-10 bg-secondary rounded-full flex items-center justify-center">
@@ -313,24 +269,25 @@ export function RewardsOverview() {
         {/* Top Earners */}
         <div className="bg-white rounded-xl border border-border shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
           <div className="px-6 py-4 border-b border-border">
-            <h2 className="text-lg font-semibold text-foreground">Top Earners This Month</h2>
+            <h2 className="text-lg font-semibold text-foreground">Top Earners (Lifetime)</h2>
           </div>
           <div className="divide-y divide-gray-100">
-            {topEarners.map((earner, index) => (
+            {topEarners.length === 0 ? (
+              <div className="px-6 py-8 text-center text-sm text-muted-foreground">No participants yet.</div>
+            ) : topEarners.map((earner, index) => (
               <div key={earner.id} className="px-6 py-4 flex items-center gap-4">
                 <div className="w-8 h-8 bg-amber-100 rounded-full flex items-center justify-center text-amber-700 font-bold">
                   {index + 1}
                 </div>
                 <div className="w-10 h-10 bg-secondary rounded-full flex items-center justify-center">
-                  <span className="text-muted-foreground font-medium">{earner.name.charAt(0)}</span>
+                  <span className="text-muted-foreground font-medium">{(earner.name || earner.email || "?").charAt(0).toUpperCase()}</span>
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-foreground">{earner.name}</p>
                   <p className="text-sm text-muted-foreground truncate">{earner.email}</p>
                 </div>
                 <div className="text-right">
-                  <p className="font-semibold text-amber-600">{earner.pointsThisMonth.toLocaleString()} pts</p>
-                  <p className="text-xs text-muted-foreground">Lifetime: {earner.lifetimePoints.toLocaleString()}</p>
+                  <p className="font-semibold text-amber-600">{earner.lifetimePoints.toLocaleString()} pts</p>
                 </div>
               </div>
             ))}
