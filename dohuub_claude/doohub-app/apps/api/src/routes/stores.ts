@@ -4,6 +4,44 @@ import { authenticate, AuthRequest } from '../middleware/auth';
 
 const router = Router();
 
+type RegionInput = {
+  name: string;
+  countryName?: string;
+  countryCode?: string;
+};
+
+// Resolve incoming region inputs to real Region IDs. Vendor portal sends region
+// names (from CountryRegionModal) since the modal IDs aren't FKs. We
+// find-or-create by (name, country) — the @@unique constraint guarantees the
+// upsert is safe even if two stores race the same region.
+async function resolveRegionIds(
+  inputs: Array<RegionInput | string> | undefined
+): Promise<string[]> {
+  if (!Array.isArray(inputs) || inputs.length === 0) return [];
+  const out: string[] = [];
+  for (const raw of inputs) {
+    const input: RegionInput =
+      typeof raw === 'string' ? { name: raw } : raw;
+    if (!input.name) continue;
+    const country = input.countryName || 'USA';
+    const countryCode = input.countryCode || 'US';
+    const city = input.name.split(',')[0]?.trim() || input.name;
+    const region = await prisma.region.upsert({
+      where: { name_country: { name: input.name, country } },
+      update: {},
+      create: {
+        name: input.name,
+        city,
+        country,
+        countryCode,
+        isActive: true,
+      },
+    });
+    out.push(region.id);
+  }
+  return out;
+}
+
 // Get all stores for current vendor
 router.get('/', authenticate, async (req: AuthRequest, res) => {
   try {
@@ -80,13 +118,17 @@ router.post('/', authenticate, async (req: AuthRequest, res) => {
       return res.status(403).json({ error: 'Vendor profile not found' });
     }
 
-    const { name, category, description, logo, phone, email, regionIds, status } = req.body;
+    const { name, category, description, logo, phone, email, regionIds, regions: regionInputs, status } = req.body;
 
     if (!name || !category) {
       return res.status(400).json({ error: 'name and category are required' });
     }
 
-    // Create store with regions in a transaction
+    const resolvedFromNames = await resolveRegionIds(regionInputs);
+    const finalRegionIds = Array.isArray(regionIds) && regionIds.length > 0
+      ? regionIds
+      : resolvedFromNames;
+
     const store = await prisma.$transaction(async (tx) => {
       const newStore = await tx.vendorStore.create({
         data: {
@@ -101,10 +143,9 @@ router.post('/', authenticate, async (req: AuthRequest, res) => {
         },
       });
 
-      // Assign regions if provided
-      if (regionIds && Array.isArray(regionIds) && regionIds.length > 0) {
+      if (finalRegionIds.length > 0) {
         await tx.vendorStoreRegion.createMany({
-          data: regionIds.map((regionId: string) => ({
+          data: finalRegionIds.map((regionId: string) => ({
             storeId: newStore.id,
             regionId,
             isActive: true,
@@ -195,11 +236,18 @@ router.put('/:id', authenticate, async (req: AuthRequest, res) => {
       return res.status(404).json({ error: 'Store not found' });
     }
 
-    const { name, category, description, logo, phone, email, regionIds, status } = req.body;
+    const { name, category, description, logo, phone, email, regionIds, regions: regionInputs, status } = req.body;
 
-    // Update store with regions in a transaction
+    const useNames = regionInputs !== undefined;
+    const resolvedFromNames = useNames ? await resolveRegionIds(regionInputs) : [];
+    const finalRegionIds = Array.isArray(regionIds)
+      ? regionIds
+      : useNames
+        ? resolvedFromNames
+        : undefined;
+
     const store = await prisma.$transaction(async (tx) => {
-      const updatedStore = await tx.vendorStore.update({
+      await tx.vendorStore.update({
         where: { id },
         data: {
           ...(name && { name }),
@@ -212,17 +260,14 @@ router.put('/:id', authenticate, async (req: AuthRequest, res) => {
         },
       });
 
-      // Update regions if provided
-      if (regionIds !== undefined && Array.isArray(regionIds)) {
-        // Delete existing regions
+      if (finalRegionIds !== undefined) {
         await tx.vendorStoreRegion.deleteMany({
           where: { storeId: id },
         });
 
-        // Create new regions
-        if (regionIds.length > 0) {
+        if (finalRegionIds.length > 0) {
           await tx.vendorStoreRegion.createMany({
-            data: regionIds.map((regionId: string) => ({
+            data: finalRegionIds.map((regionId: string) => ({
               storeId: id,
               regionId,
               isActive: true,

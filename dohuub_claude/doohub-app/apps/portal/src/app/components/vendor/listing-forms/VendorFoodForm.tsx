@@ -120,7 +120,7 @@ export function VendorFoodForm({
       quantityAmount: formData.quantityAmount ? parseFloat(formData.quantityAmount) : null,
       quantityUnit: formData.quantityUnit,
       status: isDraft ? "inactive" : "active",
-      productThumbnail: formData.productThumbnail,
+      images: [formData.productThumbnail].filter(Boolean),
     };
 
     try {

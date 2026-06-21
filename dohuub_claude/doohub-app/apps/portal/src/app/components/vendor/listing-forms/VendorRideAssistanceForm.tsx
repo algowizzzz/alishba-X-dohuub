@@ -118,8 +118,7 @@ export function VendorRideAssistanceForm({
       totalSeats: parseInt(formData.totalSeats) || 0,
       status: isDraft ? "inactive" : "active",
       serviceRegions: [formData.coverageArea],
-      serviceThumbnail: formData.serviceThumbnail,
-      vehicleImages: formData.vehicleImages,
+      images: [formData.serviceThumbnail, ...formData.vehicleImages].filter(Boolean),
     };
 
     try {

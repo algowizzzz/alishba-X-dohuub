@@ -157,8 +157,7 @@ export function VendorCleaningServiceForm({
       price: parseFloat(formData.price) || 0,
       status: isDraft ? "inactive" : "active",
       whatsIncluded: allIncludedItems,
-      thumbnailImage: formData.thumbnailImage,
-      images: formData.imageGallery,
+      images: [formData.thumbnailImage, ...formData.imageGallery].filter(Boolean),
     };
 
     try {

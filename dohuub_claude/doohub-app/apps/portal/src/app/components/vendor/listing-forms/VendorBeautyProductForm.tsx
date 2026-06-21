@@ -100,7 +100,7 @@ export function VendorBeautyProductForm({
       quantityAmount: parseFloat(formData.quantityAmount) || 0,
       quantityUnit: formData.quantityUnit,
       status: isDraft ? "inactive" : "active",
-      productThumbnail: formData.productThumbnail,
+      images: [formData.productThumbnail].filter(Boolean),
     };
 
     try {

@@ -117,17 +117,34 @@ export function VendorListingFormRouter() {
         if (cancelled) return;
         const d = (r as any)?.data;
         if (!d) return;
-        // Normalize back into the field shape the child forms expect.
-        // Product-style tables use `name`; service-style use `title`.
+        // Schema stores images as `image` (single, for product tables) or
+        // `images` (array, for service tables). UI forms separate them into
+        // `thumbnailImage` + `imageGallery` (or category-specific names).
+        // Reconstruct that split so edit-mode forms render with the saved
+        // image still present.
+        const imageList: string[] = Array.isArray(d.images)
+          ? d.images
+          : d.image
+            ? [d.image]
+            : [];
+        const thumb = imageList[0] || null;
+        const gallery = imageList.slice(1);
         setInitialData({
           id: d.id,
           title: d.title || d.name || "",
           description: d.description || "",
           fullDescription: d.longDescription || d.description || "",
           price: d.basePrice ?? d.price ?? d.hourlyRate ?? 0,
-          images: Array.isArray(d.images) ? d.images : d.image ? [d.image] : [],
+          images: imageList,
+          thumbnailImage: thumb,
+          imageGallery: gallery,
+          productThumbnail: thumb,
+          companionPhoto: thumb,
+          serviceThumbnail: thumb,
+          propertyThumbnail: thumb,
+          propertyImages: imageList,
+          vehicleImages: gallery,
           whatsIncluded: Array.isArray(d.whatsIncluded) ? d.whatsIncluded : [],
-          // category-specific raw pass-through so each form can read what it needs
           ...d,
         });
       })

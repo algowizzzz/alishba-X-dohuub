@@ -177,8 +177,7 @@ export function VendorRentalPropertyForm({
       unavailableDates: formData.unavailableDates,
       status: isDraft ? "inactive" : "active",
       serviceRegions: [formData.region],
-      propertyThumbnail: formData.propertyThumbnail,
-      propertyImages: formData.propertyImages,
+      images: [formData.propertyThumbnail, ...formData.propertyImages].filter(Boolean),
     };
 
     try {

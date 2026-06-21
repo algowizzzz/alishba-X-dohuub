@@ -81,13 +81,10 @@ function normalizeListing(raw: any): Listing {
         ? raw.amenities
         : [];
   const thumbnail =
-    raw.thumbnailImage ||
-    raw.productThumbnail ||
-    raw.companionPhoto ||
-    (Array.isArray(raw.imageGallery) && raw.imageGallery[0]) ||
-    (Array.isArray(raw.propertyImages) && raw.propertyImages[0]) ||
-    (Array.isArray(raw.vehicleImages) && raw.vehicleImages[0]) ||
     raw.image ||
+    (Array.isArray(raw.images) && raw.images[0]) ||
+    (Array.isArray(raw.portfolio) && raw.portfolio[0]) ||
+    (Array.isArray(raw.credentialImages) && raw.credentialImages[0]) ||
     null;
   return {
     id: raw.id,

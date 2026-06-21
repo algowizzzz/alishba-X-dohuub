@@ -176,8 +176,7 @@ export function VendorHandymanServiceForm({
       pricingType: formData.pricingType,
       status: isDraft ? "inactive" : "active",
       whatsIncluded: allIncludedItems,
-      thumbnailImage: formData.thumbnailImage,
-      images: formData.imageGallery,
+      images: [formData.thumbnailImage, ...formData.imageGallery].filter(Boolean),
     };
 
     try {

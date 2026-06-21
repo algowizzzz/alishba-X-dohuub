@@ -166,7 +166,7 @@ export function VendorCompanionshipSupportForm({
       supportTypes: allSupportTypes,
       languages: formData.languages,
       status: isDraft ? "inactive" : "active",
-      companionPhoto: formData.companionPhoto,
+      images: [formData.companionPhoto].filter(Boolean),
       credentialImages: formData.credentialImages,
     };
 

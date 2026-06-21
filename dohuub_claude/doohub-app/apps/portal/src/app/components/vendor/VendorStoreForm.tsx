@@ -227,9 +227,13 @@ export function VendorStoreForm() {
         logo: logoUrl || null,
         phone,
         email,
-        // Region IDs from CountryRegionModal are hardcoded sample strings
-        // ("us-1", "us-2", ...) and don't FK to the Region table; manage
-        // regions from the dedicated /vendor/services/:storeId/regions page.
+        regions: regions
+          .filter((r) => r.isActive)
+          .map((r) => ({
+            name: r.name,
+            countryName: r.countryName,
+            countryCode: r.countryCode,
+          })),
         status: activateNow === "active" ? "ACTIVE" : "DRAFT",
       };
       if (isEditing && storeId) {
