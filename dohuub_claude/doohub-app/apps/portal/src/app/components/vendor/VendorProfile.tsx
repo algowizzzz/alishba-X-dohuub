@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Save, User as UserIcon, Building, Mail, Phone, MapPin, FileText, Briefcase, Lock } from "lucide-react";
 import { toast } from "sonner";
 import api from "../../../services/api";
+import { supabase } from "../../../lib/supabase";
 import { VendorSidebar } from "./VendorSidebar";
 import { VendorTopNav } from "./VendorTopNav";
 import { Button } from "../ui/button";
@@ -44,6 +45,56 @@ export function VendorProfile() {
 
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
+
+  // Password change form
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+
+  const handleChangePassword = async () => {
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      toast.error("Fill in all three password fields");
+      return;
+    }
+    if (newPassword.length < 8) {
+      toast.error("New password must be at least 8 characters");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error("New password and confirmation don't match");
+      return;
+    }
+    if (newPassword === currentPassword) {
+      toast.error("New password must be different from the current password");
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      // Re-authenticate with current password before changing — protects against
+      // someone walking into an already-signed-in tab.
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.email) throw new Error("Not signed in");
+      const { error: reAuthErr } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: currentPassword,
+      });
+      if (reAuthErr) throw new Error("Current password is incorrect");
+
+      const { error: updateErr } = await supabase.auth.updateUser({ password: newPassword });
+      if (updateErr) throw updateErr;
+
+      toast.success("Password updated");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to update password");
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
 
   useEffect(() => {
     api.get<{ success: boolean; data: any }>("/api/v1/vendors/me")
@@ -301,6 +352,8 @@ export function VendorProfile() {
                   id="currentPassword"
                   type="password"
                   placeholder="Enter current password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
                 />
               </div>
 
@@ -311,7 +364,10 @@ export function VendorProfile() {
                 <Input
                   id="newPassword"
                   type="password"
-                  placeholder="Enter new password"
+                  placeholder="Enter new password (min 8 characters)"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  minLength={8}
                 />
               </div>
 
@@ -323,11 +379,18 @@ export function VendorProfile() {
                   id="confirmPassword"
                   type="password"
                   placeholder="Confirm new password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
                 />
               </div>
 
-              <Button variant="outline" size="sm">
-                Change Password
+              <Button
+                onClick={handleChangePassword}
+                disabled={isChangingPassword || !currentPassword || !newPassword || !confirmPassword}
+                variant="outline"
+                size="sm"
+              >
+                {isChangingPassword ? "Updating…" : "Change Password"}
               </Button>
             </div>
           </div>
