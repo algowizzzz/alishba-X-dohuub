@@ -2093,12 +2093,13 @@ router.patch('/bookings/:id/status', authenticate, requireAdmin, async (req: Aut
       where: { id },
       data: {
         status,
-        ...(status === 'ACCEPTED' && { acceptedAt: new Date() }),
+        // Booking schema has completedAt + cancelledAt but no acceptedAt
+        // column — earlier handler wrote acceptedAt and 500'd. Drop it.
         ...(status === 'COMPLETED' && { completedAt: new Date() }),
         ...(status === 'CANCELLED' && { cancelledAt: new Date() }),
-        // Same audit trail the vendor endpoint writes — the customer's
-        // mobile tracking screen reads from BookingStatusHistory, so without
-        // this the timeline only shows the initial PENDING entry.
+        // Mirror what the vendor endpoint writes so the customer's mobile
+        // tracking screen sees the timeline. Without this, only the initial
+        // PENDING entry shows.
         statusHistory: {
           create: { status, note: 'Updated by admin' },
         },
