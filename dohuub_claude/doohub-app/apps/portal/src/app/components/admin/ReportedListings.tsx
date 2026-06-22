@@ -30,42 +30,6 @@ interface ListingReport {
   reportedAt: string;
 }
 
-// Mock data - Only listing reports
-const mockReports: ListingReport[] = [
-  {
-    id: "1",
-    listingName: "Deep Cleaning Service",
-    vendorId: "V001",
-    vendorName: "CleanCo Services",
-    customerName: "John D.",
-    reportReason: "Service Not As Described",
-    reportExplanation:
-      "Service advertised as 3-hour deep clean. Vendor left after 90 minutes, many areas not cleaned as promised. When questioned, claimed 3 hours is 'maximum' not standard. Very disappointed.",
-    reportedAt: "2026-01-03",
-  },
-  {
-    id: "2",
-    listingName: "Professional Plumbing Repair",
-    vendorId: "V002",
-    vendorName: "QuickFix Pro",
-    customerName: "Maria S.",
-    reportReason: "Safety Concerns",
-    reportExplanation:
-      "The vendor did not follow proper safety protocols. No protective equipment was used and water was left running after the job, causing minor flooding in my basement.",
-    reportedAt: "2026-01-02",
-  },
-  {
-    id: "3",
-    listingName: "Home Beauty Services",
-    vendorId: "V003",
-    vendorName: "Glam Squad Mobile",
-    customerName: "Sarah K.",
-    reportReason: "Misleading Pricing",
-    reportExplanation:
-      "Listing showed $50 for haircut but was charged $120 at completion. Hidden fees were not disclosed upfront. This is deceptive pricing.",
-    reportedAt: "2025-12-28",
-  },
-];
 
 function ReportCard({ report, onResolved }: { report: ListingReport; onResolved: (id: string) => void }) {
   const navigate = useNavigate();

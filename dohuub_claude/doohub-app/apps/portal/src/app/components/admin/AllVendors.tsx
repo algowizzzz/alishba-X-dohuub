@@ -41,320 +41,6 @@ interface Vendor {
 }
 
 // Mock data
-const mockVendors: Vendor[] = [
-  {
-    id: "1",
-    businessName: "Sarah's Cleaning Co.",
-    category: "Cleaning Services",
-    status: "active",
-    subscriptionPlan: "Pro Plan",
-    subscriptionFee: 49,
-    regions: ["New York, NY", "Brooklyn, NY"],
-    joinedDate: "2024-10-15",
-    listingsCount: 8,
-    rating: 4.7,
-    reviewCount: 45,
-    email: "sarah@cleaningco.com",
-  },
-  {
-    id: "2",
-    businessName: "QuickFix Handyman",
-    category: "Handyman Services",
-    status: "active",
-    subscriptionPlan: "Basic Plan",
-    subscriptionFee: 29,
-    regions: ["Los Angeles, CA"],
-    joinedDate: "2024-09-20",
-    listingsCount: 12,
-    rating: 4.9,
-    reviewCount: 78,
-    email: "contact@quickfix.com",
-  },
-  {
-    id: "3",
-    businessName: "Green Valley Grocers",
-    category: "Grocery",
-    status: "active",
-    subscriptionPlan: "Pro Plan",
-    subscriptionFee: 49,
-    regions: ["Seattle, WA"],
-    joinedDate: "2024-07-15",
-    listingsCount: 15,
-    rating: 4.8,
-    reviewCount: 187,
-    email: "info@greenvalley.com",
-  },
-  {
-    id: "4",
-    businessName: "Beauty Bliss Salon",
-    category: "Beauty Services",
-    status: "trial",
-    subscriptionPlan: "Trial",
-    subscriptionFee: 0,
-    regions: ["New York, NY"],
-    joinedDate: "2025-01-01",
-    listingsCount: 5,
-    rating: 4.8,
-    reviewCount: 12,
-    email: "hello@beautybliss.com",
-    trialDaysLeft: 3,
-  },
-  {
-    id: "5",
-    businessName: "Tech Repair Pro",
-    category: "Handyman Services",
-    status: "suspended",
-    subscriptionPlan: "Basic Plan",
-    subscriptionFee: 29,
-    regions: ["New York, NY", "Jersey City, NJ"],
-    joinedDate: "2024-08-10",
-    listingsCount: 6,
-    rating: 3.2,
-    reviewCount: 23,
-    email: "support@techrepair.com",
-  },
-  {
-    id: "6",
-    businessName: "Cozy Home Rentals",
-    category: "Rental Properties",
-    status: "active",
-    subscriptionPlan: "Premium Plan",
-    subscriptionFee: 99,
-    regions: ["New York, NY", "Brooklyn, NY", "Queens, NY"],
-    joinedDate: "2024-07-05",
-    listingsCount: 15,
-    rating: 4.6,
-    reviewCount: 89,
-    email: "rentals@cozyhome.com",
-  },
-  {
-    id: "7",
-    businessName: "Farm Fresh Direct",
-    category: "Grocery",
-    status: "active",
-    subscriptionPlan: "Basic Plan",
-    subscriptionFee: 29,
-    regions: ["Portland, OR"],
-    joinedDate: "2024-09-01",
-    listingsCount: 10,
-    rating: 4.7,
-    reviewCount: 98,
-    email: "contact@farmfreshdirect.com",
-  },
-  {
-    id: "8",
-    businessName: "Elite Caregiving Services",
-    category: "Caregiving Services",
-    status: "active",
-    subscriptionPlan: "Pro Plan",
-    subscriptionFee: 49,
-    regions: ["Chicago, IL"],
-    joinedDate: "2024-10-01",
-    listingsCount: 7,
-    rating: 4.9,
-    reviewCount: 34,
-    email: "care@elitecare.com",
-  },
-  {
-    id: "9",
-    businessName: "Sparkle Wash",
-    category: "Cleaning Services",
-    status: "inactive",
-    subscriptionPlan: "Basic Plan",
-    subscriptionFee: 29,
-    regions: ["San Francisco, CA"],
-    joinedDate: "2024-12-30",
-    listingsCount: 0,
-    rating: 0,
-    reviewCount: 0,
-    email: "contact@sparklewash.com",
-  },
-  {
-    id: "10",
-    businessName: "Urban Beauty Products",
-    category: "Beauty Services",
-    status: "active",
-    subscriptionPlan: "Pro Plan",
-    subscriptionFee: 49,
-    regions: ["New York, NY"],
-    joinedDate: "2024-09-15",
-    listingsCount: 25,
-    rating: 4.4,
-    reviewCount: 67,
-    email: "shop@urbanbeauty.com",
-  },
-  {
-    id: "16",
-    businessName: "Luxe Beauty Boutique",
-    category: "Beauty Products",
-    status: "active",
-    subscriptionPlan: "Pro Plan",
-    subscriptionFee: 49,
-    regions: ["Los Angeles, CA"],
-    joinedDate: "2024-08-22",
-    listingsCount: 42,
-    rating: 4.9,
-    reviewCount: 156,
-    email: "info@luxebeauty.com",
-  },
-  {
-    id: "17",
-    businessName: "Natural Glow Cosmetics",
-    category: "Beauty Products",
-    status: "trial",
-    subscriptionPlan: "Trial",
-    subscriptionFee: 0,
-    regions: ["Chicago, IL"],
-    joinedDate: "2025-01-02",
-    listingsCount: 8,
-    rating: 4.6,
-    reviewCount: 23,
-    email: "contact@naturalglow.com",
-    trialDaysLeft: 5,
-  },
-  {
-    id: "11",
-    businessName: "Golden Spoon Restaurant",
-    category: "Food",
-    status: "active",
-    subscriptionPlan: "Pro Plan",
-    subscriptionFee: 49,
-    regions: ["New York, NY", "Brooklyn, NY"],
-    joinedDate: "2024-09-20",
-    listingsCount: 15,
-    rating: 4.9,
-    reviewCount: 342,
-    email: "info@goldenspoon.com",
-  },
-  {
-    id: "12",
-    businessName: "Taste of India Kitchen",
-    category: "Food",
-    status: "active",
-    subscriptionPlan: "Basic Plan",
-    subscriptionFee: 29,
-    regions: ["Los Angeles, CA", "Santa Monica, CA"],
-    joinedDate: "2024-11-05",
-    listingsCount: 12,
-    rating: 4.8,
-    reviewCount: 267,
-    email: "orders@tasteofindia.com",
-  },
-  {
-    id: "13",
-    businessName: "Vegan Delights Cafe",
-    category: "Food",
-    status: "active",
-    subscriptionPlan: "Pro Plan",
-    subscriptionFee: 49,
-    regions: ["San Francisco, CA"],
-    joinedDate: "2024-10-12",
-    listingsCount: 10,
-    rating: 4.7,
-    reviewCount: 198,
-    email: "hello@vegandelights.com",
-  },
-  {
-    id: "28",
-    businessName: "CareWheels Transportation",
-    category: "Ride Assistance",
-    status: "active",
-    subscriptionPlan: "Pro Plan",
-    subscriptionFee: 49,
-    regions: ["New York, NY", "Brooklyn, NY"],
-    joinedDate: "2024-09-15",
-    listingsCount: 1,
-    rating: 4.9,
-    reviewCount: 187,
-    email: "info@carewheels.com",
-  },
-  {
-    id: "29",
-    businessName: "Senior Care Rides",
-    category: "Ride Assistance",
-    status: "active",
-    subscriptionPlan: "Basic Plan",
-    subscriptionFee: 29,
-    regions: ["Queens, NY", "Manhattan, NY"],
-    joinedDate: "2024-10-20",
-    listingsCount: 1,
-    rating: 4.8,
-    reviewCount: 142,
-    email: "rides@seniorcare.com",
-  },
-  {
-    id: "30",
-    businessName: "SafeTransit Solutions",
-    category: "Ride Assistance",
-    status: "trial",
-    subscriptionPlan: "Trial",
-    subscriptionFee: 0,
-    regions: ["Manhattan, NY"],
-    joinedDate: "2025-01-03",
-    listingsCount: 1,
-    rating: 4.9,
-    reviewCount: 103,
-    email: "contact@safetransit.com",
-    trialDaysLeft: 7,
-  },
-  {
-    id: "31",
-    businessName: "Urban Beauty Products",
-    category: "Beauty Services",
-    status: "active",
-    subscriptionPlan: "Pro Plan",
-    subscriptionFee: 49,
-    regions: ["New York, NY"],
-    joinedDate: "2024-09-15",
-    listingsCount: 25,
-    rating: 4.4,
-    reviewCount: 67,
-    email: "shop@urbanbeauty.com",
-  },
-  {
-    id: "35",
-    businessName: "Caring Hearts Companions",
-    category: "Companionship Support",
-    status: "active",
-    subscriptionPlan: "Pro Plan",
-    subscriptionFee: 49,
-    regions: ["New York, NY", "Brooklyn, NY"],
-    joinedDate: "2024-08-10",
-    listingsCount: 1,
-    rating: 4.9,
-    reviewCount: 143,
-    email: "info@caringhearts.com",
-  },
-  {
-    id: "36",
-    businessName: "Golden Years Companionship",
-    category: "Companionship Support",
-    status: "active",
-    subscriptionPlan: "Basic Plan",
-    subscriptionFee: 29,
-    regions: ["Queens, NY", "Manhattan, NY"],
-    joinedDate: "2024-09-20",
-    listingsCount: 1,
-    rating: 4.8,
-    reviewCount: 98,
-    email: "hello@goldenyears.com",
-  },
-  {
-    id: "37",
-    businessName: "Friendship & Care Services",
-    category: "Companionship Support",
-    status: "trial",
-    subscriptionPlan: "Trial",
-    subscriptionFee: 0,
-    regions: ["Manhattan, NY"],
-    joinedDate: "2025-01-04",
-    listingsCount: 1,
-    rating: 4.9,
-    reviewCount: 34,
-    email: "contact@friendshipcare.com",
-    trialDaysLeft: 6,
-  },
-];
 
 const getCategoryIcon = (category: string) => {
   const icons: Record<string, string> = {
@@ -640,62 +326,36 @@ export function AllVendors() {
   const activeVendors = vendors.filter((v) => v.status === "active" || v.status === "trial").length;
   const suspendedVendors = vendors.filter((v) => v.status === "suspended").length;
 
-  // Get available regions based on selected country
+  // Real region data from /api/v1/regions — was previously a hardcoded
+  // list of 16 cities which never matched real vendor region strings.
+  const [regionRows, setRegionRows] = useState<{ id: string; name: string; countryCode: string }[]>([]);
+  const [countryOptions, setCountryOptions] = useState<{ code: string; name: string }[]>([]);
+
+  useEffect(() => {
+    api
+      .get<{ success: boolean; data: any[]; countries: any[] }>(
+        "/api/v1/regions?isActive=true&limit=500"
+      )
+      .then((r) => {
+        const rs = ((r as any)?.data || []).map((row: any) => ({
+          id: row.id,
+          name: row.name,
+          countryCode: row.countryCode,
+        }));
+        setRegionRows(rs);
+        setCountryOptions(((r as any)?.countries || []).map((c: any) => ({ code: c.code, name: c.name })));
+      })
+      .catch(() => {});
+  }, []);
+
   const getRegionsByCountry = () => {
-    if (countryFilter === "all") {
-      return [
-        "New York, NY",
-        "Los Angeles, CA",
-        "Chicago, IL",
-        "Brooklyn, NY",
-        "San Francisco, CA",
-        "Queens, NY",
-        "Santa Monica, CA",
-        "Jersey City, NJ",
-        "Toronto, ON",
-        "Vancouver, BC",
-        "Montreal, QC",
-        "Calgary, AB",
-        "Ottawa, ON",
-        "Edmonton, AB",
-        "Mississauga, ON",
-        "Winnipeg, MB",
-      ];
-    }
-    
-    if (countryFilter === "usa") {
-      return [
-        "New York, NY",
-        "Los Angeles, CA",
-        "Chicago, IL",
-        "Brooklyn, NY",
-        "San Francisco, CA",
-        "Queens, NY",
-        "Santa Monica, CA",
-        "Jersey City, NJ",
-      ];
-    }
-    
-    if (countryFilter === "canada") {
-      return [
-        "Toronto, ON",
-        "Vancouver, BC",
-        "Montreal, QC",
-        "Calgary, AB",
-        "Ottawa, ON",
-        "Edmonton, AB",
-        "Mississauga, ON",
-        "Winnipeg, MB",
-      ];
-    }
-    
-    return [];
+    if (countryFilter === "all") return Array.from(new Set(regionRows.map((r) => r.name))).sort();
+    return Array.from(new Set(regionRows.filter((r) => r.countryCode === countryFilter).map((r) => r.name))).sort();
   };
 
-  // Reset region filter when country changes
   const handleCountryChange = (value: string) => {
     setCountryFilter(value);
-    setRegionFilter("all"); // Reset region when country changes
+    setRegionFilter("all");
   };
 
   // Filter vendors
@@ -845,8 +505,9 @@ export function AllVendors() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Countries</SelectItem>
-                  <SelectItem value="usa">USA</SelectItem>
-                  <SelectItem value="canada">Canada</SelectItem>
+                  {countryOptions.map((c) => (
+                    <SelectItem key={c.code} value={c.code}>{c.name}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
 

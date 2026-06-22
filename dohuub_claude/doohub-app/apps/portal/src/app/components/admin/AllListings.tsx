@@ -73,203 +73,6 @@ interface Listing {
   flaggedAt?: string;
 }
 
-// Mock data
-const mockListings: Listing[] = [
-  {
-    id: "1",
-    name: "Deep Cleaning Service",
-    vendorId: "1",
-    vendorName: "Sarah's Cleaning Co.",
-    category: "Cleaning Services",
-    status: "active",
-    price: "$120 flat rate",
-    regions: ["New York, NY", "Brooklyn, NY"],
-    bookings: 89,
-    rating: 4.8,
-    reviewCount: 34,
-    createdAt: "2024-10-15",
-    updatedAt: "2026-01-03",
-    views: 1234,
-  },
-  {
-    id: "2",
-    name: "Plumbing Repair Services",
-    vendorId: "2",
-    vendorName: "QuickFix Handyman",
-    category: "Handyman Services",
-    status: "active",
-    price: "$85/hour",
-    regions: ["Los Angeles, CA"],
-    bookings: 156,
-    rating: 4.9,
-    reviewCount: 67,
-    createdAt: "2024-09-20",
-    updatedAt: "2026-01-05",
-    views: 2341,
-  },
-  {
-    id: "3",
-    name: "Fresh Organic Groceries",
-    vendorId: "3",
-    vendorName: "Green Valley Grocers",
-    category: "Grocery",
-    status: "inactive",
-    price: "$50-$200",
-    regions: ["Seattle, WA"],
-    bookings: 23,
-    rating: 4.2,
-    reviewCount: 12,
-    createdAt: "2024-12-28",
-    updatedAt: "2025-12-30",
-    views: 456,
-  },
-  {
-    id: "4",
-    name: "Premium Hair Styling",
-    vendorId: "4",
-    vendorName: "Beauty Bliss Salon",
-    category: "Beauty Services",
-    status: "flagged",
-    price: "$45-$150",
-    regions: ["New York, NY"],
-    bookings: 67,
-    rating: 3.9,
-    reviewCount: 28,
-    createdAt: "2025-01-01",
-    updatedAt: "2026-01-04",
-    views: 789,
-    flagReason: "Customer complaint - misleading description",
-    flaggedAt: "2026-01-04",
-  },
-  {
-    id: "5",
-    name: "Smartphone Repair",
-    vendorId: "5",
-    vendorName: "Tech Repair Pro",
-    category: "Handyman Services",
-    status: "active",
-    price: "$50-$150",
-    regions: ["New York, NY", "Jersey City, NJ"],
-    bookings: 234,
-    rating: 4.6,
-    reviewCount: 89,
-    createdAt: "2024-08-10",
-    updatedAt: "2026-01-02",
-    views: 3456,
-  },
-  {
-    id: "6",
-    name: "Fresh Organic Produce Box",
-    vendorId: "7",
-    vendorName: "Farm Fresh Direct",
-    category: "Grocery",
-    status: "active",
-    price: "$50-$200",
-    regions: ["Portland, OR"],
-    bookings: 45,
-    rating: 4.7,
-    reviewCount: 31,
-    createdAt: "2024-09-01",
-    updatedAt: "2026-01-06",
-    views: 678,
-  },
-  {
-    id: "7",
-    name: "Chicken Tikka Masala",
-    vendorId: "11",
-    vendorName: "Golden Spoon Restaurant",
-    category: "Food",
-    status: "active",
-    price: "$15.99",
-    regions: ["New York, NY", "Brooklyn, NY"],
-    bookings: 267,
-    rating: 5.0,
-    reviewCount: 189,
-    createdAt: "2024-09-20",
-    updatedAt: "2026-01-05",
-    views: 2876,
-  },
-  {
-    id: "8",
-    name: "Spicy Thai Basil Chicken",
-    vendorId: "12",
-    vendorName: "Taste of India Kitchen",
-    category: "Food",
-    status: "active",
-    price: "$13.99",
-    regions: ["Los Angeles, CA"],
-    bookings: 198,
-    rating: 4.9,
-    reviewCount: 145,
-    createdAt: "2024-11-05",
-    updatedAt: "2026-01-04",
-    views: 1987,
-  },
-  {
-    id: "9",
-    name: "Vegan Buddha Bowl",
-    vendorId: "13",
-    vendorName: "Vegan Delights Cafe",
-    category: "Food",
-    status: "active",
-    price: "$12.99",
-    regions: ["San Francisco, CA"],
-    bookings: 145,
-    rating: 4.7,
-    reviewCount: 98,
-    createdAt: "2024-10-12",
-    updatedAt: "2026-01-03",
-    views: 1234,
-  },
-  {
-    id: "10",
-    name: "Luxury Downtown Apartment",
-    vendorId: "6",
-    vendorName: "Cozy Home Rentals",
-    category: "Rental Properties",
-    status: "active",
-    price: "$250/night",
-    regions: ["Manhattan, New York, NY"],
-    bookings: 45,
-    rating: 4.9,
-    reviewCount: 67,
-    createdAt: "2024-06-15",
-    updatedAt: "2026-01-07",
-    views: 3456,
-  },
-  {
-    id: "11",
-    name: "Cozy Brooklyn Brownstone",
-    vendorId: "6",
-    vendorName: "Cozy Home Rentals",
-    category: "Rental Properties",
-    status: "active",
-    price: "$320/night",
-    regions: ["Brooklyn, New York, NY"],
-    bookings: 38,
-    rating: 4.8,
-    reviewCount: 52,
-    createdAt: "2024-06-20",
-    updatedAt: "2026-01-06",
-    views: 2987,
-  },
-  {
-    id: "12",
-    name: "Modern Studio with River View",
-    vendorId: "6",
-    vendorName: "Cozy Home Rentals",
-    category: "Rental Properties",
-    status: "active",
-    price: "$180/night",
-    regions: ["Queens, New York, NY"],
-    bookings: 62,
-    rating: 4.7,
-    reviewCount: 89,
-    createdAt: "2024-07-01",
-    updatedAt: "2026-01-05",
-    views: 4321,
-  },
-];
 
 const getCategoryIcon = (category: string) => {
   const icons: Record<string, string> = {
@@ -429,7 +232,7 @@ function ListingCard({
             {/* Header */}
             <div className="flex items-start justify-between gap-3 mb-2">
               <button
-                onClick={() => navigate(`/admin/listings/${listing.id}`)}
+                onClick={() => navigate(`/admin/vendors/${listing.vendorId}`)}
                 className="text-lg lg:text-xl font-bold text-[#1A1A2E] hover:text-[#2E7AD9] hover:underline text-left"
               >
                 {listing.name}
@@ -499,7 +302,7 @@ function ListingCard({
                 variant="outline"
                 size="sm"
                 className="flex-1 sm:flex-none"
-                onClick={() => navigate(`/admin/listings/${listing.id}`)}
+                onClick={() => navigate(`/admin/vendors/${listing.vendorId}`)}
               >
                 <Eye className="w-4 h-4 mr-2" />
                 View
@@ -508,7 +311,7 @@ function ListingCard({
                 variant="outline"
                 size="sm"
                 className="flex-1 sm:flex-none"
-                onClick={() => navigate(`/admin/listings/${listing.id}/edit`)}
+                onClick={() => navigate(`/admin/michelle-profiles/${listing.vendorId}/listings/edit/${listing.id}?type=${listing.category}`)}
               >
                 <Edit className="w-4 h-4 mr-2" />
                 Edit
@@ -553,7 +356,7 @@ function ListingCard({
               variant="outline"
               size="sm"
               className="w-full justify-start"
-              onClick={() => navigate(`/admin/listings/${listing.id}`)}
+              onClick={() => navigate(`/admin/vendors/${listing.vendorId}`)}
             >
               <Eye className="w-4 h-4 mr-2" />
               View Details
@@ -562,7 +365,7 @@ function ListingCard({
               variant="outline"
               size="sm"
               className="w-full justify-start"
-              onClick={() => navigate(`/admin/listings/${listing.id}/edit`)}
+              onClick={() => navigate(`/admin/michelle-profiles/${listing.vendorId}/listings/edit/${listing.id}?type=${listing.category}`)}
             >
               <Edit className="w-4 h-4 mr-2" />
               Edit

@@ -192,29 +192,50 @@ export function PlatformSettings() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
-  // Load settings from API on mount
+  // Load settings + FAQs from API on mount
   useEffect(() => {
     api
       .get<{ success: boolean; data: any }>("/api/v1/admin/settings")
       .then((r) => {
         const settings = (r as any)?.data;
-        if (settings) {
-          if (settings.supportEmail) setSupportEmail(settings.supportEmail);
-          if (settings.supportEmail) {
-            setContactInfo((c) => ({ ...c, email: settings.supportEmail }));
-          }
-          if (settings.supportPhone) {
-            setContactInfo((c) => ({ ...c, phone: settings.supportPhone }));
-          }
-          if (settings.termsContent) setTermsContent(settings.termsContent);
-          if (settings.privacyContent) setPrivacyContent(settings.privacyContent);
-          if (settings.stripePublishableKey) setStripePublishableKey(settings.stripePublishableKey);
-          if (settings.stripeSecretKey) setStripeSecretKey(settings.stripeSecretKey);
+        if (!settings) return;
+        if (settings.supportEmail) setSupportEmail(settings.supportEmail);
+        if (settings.supportEmail) setContactInfo((c) => ({ ...c, email: settings.supportEmail }));
+        if (settings.supportPhone) setContactInfo((c) => ({ ...c, phone: settings.supportPhone }));
+        if (settings.termsContent) setTermsContent(settings.termsContent);
+        if (settings.privacyContent) setPrivacyContent(settings.privacyContent);
+        if (settings.stripePublishableKey) setStripePublishableKey(settings.stripePublishableKey);
+        if (settings.stripeSecretKey) setStripeSecretKey(settings.stripeSecretKey);
+        // Hydrate About + Social + extended Contact fields
+        if (settings.mission !== undefined && settings.mission !== null) setMission(settings.mission);
+        if (Array.isArray(settings.serviceOffers) && settings.serviceOffers.length > 0) setServiceOffers(settings.serviceOffers);
+        if (Array.isArray(settings.benefitPoints) && settings.benefitPoints.length > 0) setBenefitPoints(settings.benefitPoints);
+        setContactInfo((c) => ({
+          ...c,
+          phoneNumeric: settings.phoneNumeric ?? c.phoneNumeric,
+          addressLine1: settings.addressLine1 ?? c.addressLine1,
+          addressLine2: settings.addressLine2 ?? c.addressLine2,
+          website: settings.website ?? c.website,
+        }));
+        setSocialLinks((s) => ({
+          instagram: settings.socialInstagram ?? s.instagram,
+          facebook: settings.socialFacebook ?? s.facebook,
+          twitter: settings.socialTwitter ?? s.twitter,
+          linkedin: settings.socialLinkedin ?? s.linkedin,
+        }));
+      })
+      .catch(() => {});
+
+    // FAQs come from a dedicated endpoint backed by the new FAQ table
+    api
+      .get<{ success: boolean; data: any[] }>("/api/v1/admin/faqs")
+      .then((r) => {
+        const rows = (r as any)?.data || [];
+        if (rows.length > 0) {
+          setFaqs(rows.map((f: any) => ({ id: f.id, question: f.question, answer: f.answer })));
         }
       })
-      .catch(() => {
-        // ignore — keep defaults
-      });
+      .catch(() => {});
   }, []);
 
   const persistSettings = async (payload: Record<string, any>, successMessage: string) => {
@@ -240,6 +261,17 @@ export function PlatformSettings() {
       {
         supportEmail: supportEmail || contactInfo.email,
         supportPhone: contactInfo.phone,
+        mission,
+        serviceOffers,
+        benefitPoints,
+        phoneNumeric: contactInfo.phoneNumeric,
+        addressLine1: contactInfo.addressLine1,
+        addressLine2: contactInfo.addressLine2,
+        website: contactInfo.website,
+        socialInstagram: socialLinks.instagram,
+        socialFacebook: socialLinks.facebook,
+        socialTwitter: socialLinks.twitter,
+        socialLinkedin: socialLinks.linkedin,
       },
       "Settings saved"
     );
@@ -256,24 +288,58 @@ export function PlatformSettings() {
       "Payment settings saved"
     );
 
-  // FAQ Functions
+  // FAQ Functions — local edits stay local until "Save Help" persists them.
+  // A new FAQ gets a temp id; on save we diff against the server: create
+  // missing rows (temp ids), update existing rows whose text changed, delete
+  // rows that disappeared.
+  const [serverFaqs, setServerFaqs] = useState<FAQ[]>([]);
+  useEffect(() => { setServerFaqs(faqs); /* synced after each load/save */ // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const addFAQ = () => {
-    const newFAQ: FAQ = {
-      id: Date.now().toString(),
-      question: "",
-      answer: "",
-    };
+    const newFAQ: FAQ = { id: `temp-${Date.now()}`, question: "", answer: "" };
     setFaqs([...faqs, newFAQ]);
   };
 
   const updateFAQ = (id: string, field: "question" | "answer", value: string) => {
-    setFaqs(
-      faqs.map((faq) => (faq.id === id ? { ...faq, [field]: value } : faq))
-    );
+    setFaqs(faqs.map((faq) => (faq.id === id ? { ...faq, [field]: value } : faq)));
   };
 
   const deleteFAQ = (id: string) => {
     setFaqs(faqs.filter((faq) => faq.id !== id));
+  };
+
+  const saveFAQs = async () => {
+    const serverById = new Map(serverFaqs.map((f) => [f.id, f]));
+    const localIds = new Set(faqs.map((f) => f.id));
+    const ops: Promise<any>[] = [];
+    for (const f of faqs) {
+      if (f.id.startsWith("temp-")) {
+        if (f.question.trim() || f.answer.trim()) {
+          ops.push(api.post("/api/v1/admin/faqs", { question: f.question, answer: f.answer }));
+        }
+      } else {
+        const s = serverById.get(f.id);
+        if (s && (s.question !== f.question || s.answer !== f.answer)) {
+          ops.push(api.put(`/api/v1/admin/faqs/${f.id}`, { question: f.question, answer: f.answer }));
+        }
+      }
+    }
+    for (const s of serverFaqs) {
+      if (!localIds.has(s.id)) {
+        ops.push(api.delete(`/api/v1/admin/faqs/${s.id}`));
+      }
+    }
+    try {
+      await Promise.all(ops);
+      const refreshed = await api.get<{ success: boolean; data: any[] }>("/api/v1/admin/faqs");
+      const rows = ((refreshed as any)?.data || []).map((f: any) => ({ id: f.id, question: f.question, answer: f.answer }));
+      setFaqs(rows);
+      setServerFaqs(rows);
+      toast.success("FAQs saved");
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error || e?.message || "Failed to save FAQs");
+    }
   };
 
   // Benefit Point Functions
@@ -478,7 +544,10 @@ export function PlatformSettings() {
                   )}
                   <Button
                     className="w-full sm:w-auto"
-                    onClick={handleSaveSettings}
+                    onClick={async () => {
+                      await saveFAQs();
+                      await handleSaveSettings();
+                    }}
                     disabled={isSaving}
                   >
                     <Save className="w-4 h-4 mr-2" />
