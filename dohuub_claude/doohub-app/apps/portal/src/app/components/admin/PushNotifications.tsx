@@ -361,7 +361,7 @@ export function PushNotifications() {
             <TabsContent value="history" className="m-0">
               <div className="bg-white border border-[rgba(46,122,217,0.25)] border-t-0 rounded-b-2xl">
                 {/* Notifications List */}
-                <div className="divide-y divide-[rgba(46, 122, 217, 0.12)]">
+                <div className="divide-y divide-[rgba(46,122,217, 0.12)]">
                   {notifications.map((notif) => (
                     <div key={notif.id} className="p-6 hover:bg-white transition-colors">
                       <div className="flex items-start gap-3">
@@ -392,7 +392,7 @@ export function PushNotifications() {
 
                   {notifications.length === 0 && (
                     <div className="p-12 text-center">
-                      <Bell className="w-12 h-12 text-[rgba(46, 122, 217, 0.18)] mx-auto mb-3" />
+                      <Bell className="w-12 h-12 text-[rgba(46,122,217, 0.18)] mx-auto mb-3" />
                       <p className="text-sm text-[#6B7280]">No notifications found</p>
                     </div>
                   )}

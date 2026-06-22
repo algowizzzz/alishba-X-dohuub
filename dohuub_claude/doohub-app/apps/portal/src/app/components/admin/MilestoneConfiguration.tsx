@@ -1,29 +1,27 @@
-import { ArrowLeft, Gift, Save, Info, ChevronDown, ChevronRight, Copy, Check } from 'lucide-react';
-import { useState } from 'react';
+import { ArrowLeft, Gift, Save, Info, ChevronDown, ChevronRight, Copy, Check, Loader2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import { AdminSidebarRetractable } from './AdminSidebarRetractable';
 import { AdminTopNav } from './AdminTopNav';
+import api from '../../../services/api';
 
-// Fixed milestone thresholds (same for all categories)
-const MILESTONE_THRESHOLDS = [5, 10, 25, 50];
-
-const categories = [
-  'Cleaning Services',
-  'Handyman Services',
-  'Food Delivery',
-  'Grocery Delivery',
-  'Beauty Services',
-  'Beauty Products',
-  'Rental Properties',
-  'Ride Services',
-  'Companionship Services'
-];
-
-// Default bonus points for each milestone tier
-const DEFAULT_BONUS_POINTS = [25, 50, 100, 200];
+const ENUM_TO_LABEL: Record<string, string> = {
+  CLEANING: 'Cleaning Services',
+  HANDYMAN: 'Handyman Services',
+  FOOD: 'Food Delivery',
+  GROCERIES: 'Grocery Delivery',
+  BEAUTY: 'Beauty Services',
+  BEAUTY_PRODUCTS: 'Beauty Products',
+  RENTALS: 'Rental Properties',
+  RIDE_ASSISTANCE: 'Ride Services',
+  COMPANIONSHIP: 'Companionship Services',
+};
+const CATEGORY_ENUMS = Object.keys(ENUM_TO_LABEL);
 
 export function MilestoneConfiguration() {
   const navigate = useNavigate();
+  const [thresholds, setThresholds] = useState<number[]>([5, 10, 25, 50]);
 
   // Sidebar state
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -39,20 +37,46 @@ export function MilestoneConfiguration() {
     }
   };
 
-  // Initialize all categories with default bonus points
-  const initializeCategoryPoints = () => {
-    const initial: Record<string, number[]> = {};
-    categories.forEach(category => {
-      initial[category] = [...DEFAULT_BONUS_POINTS];
-    });
-    return initial;
-  };
-
-  const [categoryBonusPoints, setCategoryBonusPoints] = useState<Record<string, number[]>>(initializeCategoryPoints);
+  const [categoryBonusPoints, setCategoryBonusPoints] = useState<Record<string, number[]>>({});
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [showSaveSuccess, setShowSaveSuccess] = useState(false);
   const [showApplyAllModal, setShowApplyAllModal] = useState(false);
-  const [applyAllValues, setApplyAllValues] = useState<number[]>([...DEFAULT_BONUS_POINTS]);
+  const [applyAllValues, setApplyAllValues] = useState<number[]>([25, 50, 100, 200]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  // Fetch existing config; group rows by category, sort by tier so we get
+  // [tier1, tier2, tier3, tier4] consistently.
+  useEffect(() => {
+    setLoading(true);
+    api
+      .get<{ success: boolean; data: any[] }>('/api/v1/admin/milestone-config')
+      .then((r) => {
+        const rows = (r as any)?.data || [];
+        const grouped: Record<string, number[]> = {};
+        const thresholdMap: Record<number, number> = {};
+        for (const row of rows) {
+          const cat = ENUM_TO_LABEL[row.category] || row.category;
+          if (!grouped[cat]) grouped[cat] = [];
+          grouped[cat][row.tier - 1] = row.bonusPoints;
+          thresholdMap[row.tier] = row.orderThreshold;
+        }
+        // Ensure every category has 4 tiers filled out (default if missing)
+        for (const cat of Object.values(ENUM_TO_LABEL)) {
+          if (!grouped[cat]) grouped[cat] = [25, 50, 100, 200];
+          for (let i = 0; i < 4; i++) if (grouped[cat][i] === undefined) grouped[cat][i] = [25, 50, 100, 200][i];
+        }
+        setCategoryBonusPoints(grouped);
+        const orderedThresholds = [1, 2, 3, 4].map((t) => thresholdMap[t] || [5, 10, 25, 50][t - 1]);
+        setThresholds(orderedThresholds);
+      })
+      .catch((e: any) => toast.error(e?.response?.data?.error || e?.message || 'Failed to load milestones'))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const categories = Object.values(ENUM_TO_LABEL);
+  const MILESTONE_THRESHOLDS = thresholds;
+  const LABEL_TO_ENUM = Object.fromEntries(Object.entries(ENUM_TO_LABEL).map(([k, v]) => [v, k]));
 
   const toggleCategory = (category: string) => {
     setExpandedCategories(prev => {
@@ -74,10 +98,31 @@ export function MilestoneConfiguration() {
     }));
   };
 
-  const handleSave = () => {
-    // In a real app, this would save to backend
-    setShowSaveSuccess(true);
-    setTimeout(() => setShowSaveSuccess(false), 3000);
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const entries: any[] = [];
+      for (const [catLabel, bonuses] of Object.entries(categoryBonusPoints)) {
+        const enumKey = LABEL_TO_ENUM[catLabel];
+        if (!enumKey) continue;
+        for (let i = 0; i < bonuses.length; i++) {
+          entries.push({
+            category: enumKey,
+            tier: i + 1,
+            orderThreshold: MILESTONE_THRESHOLDS[i] || (i + 1) * 10,
+            bonusPoints: bonuses[i],
+          });
+        }
+      }
+      await api.put('/api/v1/admin/milestone-config', { entries });
+      setShowSaveSuccess(true);
+      setTimeout(() => setShowSaveSuccess(false), 3000);
+      toast.success('Milestones saved');
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error || e?.message || 'Failed to save milestones');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleApplyToAll = () => {
@@ -140,10 +185,11 @@ export function MilestoneConfiguration() {
               </button>
               <button
                 onClick={handleSave}
-                className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors"
+                disabled={saving || loading}
+                className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors disabled:opacity-50"
               >
                 <Save className="w-4 h-4" />
-                Save Changes
+                {saving ? "Saving..." : "Save Changes"}
               </button>
             </div>
           </div>
@@ -246,28 +292,6 @@ export function MilestoneConfiguration() {
             })}
           </div>
 
-          {/* System-Wide Info */}
-          <div className="mt-8 bg-secondary rounded-xl p-4">
-            <h3 className="font-semibold text-foreground mb-3">System-Wide Settings (Not Editable)</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-              <div className="bg-white rounded-lg p-3">
-                <p className="text-muted-foreground">Points Rate</p>
-                <p className="font-semibold text-foreground">1 pt / $1 spent</p>
-              </div>
-              <div className="bg-white rounded-lg p-3">
-                <p className="text-muted-foreground">Redemption Value</p>
-                <p className="font-semibold text-foreground">100 pts = $1</p>
-              </div>
-              <div className="bg-white rounded-lg p-3">
-                <p className="text-muted-foreground">Referrer Bonus</p>
-                <p className="font-semibold text-foreground">60 points</p>
-              </div>
-              <div className="bg-white rounded-lg p-3">
-                <p className="text-muted-foreground">New User Bonus</p>
-                <p className="font-semibold text-foreground">35 points</p>
-              </div>
-            </div>
-          </div>
         </div>
       </main>
 

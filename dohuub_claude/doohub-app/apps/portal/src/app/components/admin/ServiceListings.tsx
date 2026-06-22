@@ -1222,7 +1222,7 @@ function EmptyState() {
   return (
     <div className="flex flex-col items-center justify-center py-20">
       <div className="w-[120px] h-[120px] rounded-full bg-white flex items-center justify-center mb-6">
-        <Building2 className="w-16 h-16 text-[rgba(46, 122, 217, 0.18)]" />
+        <Building2 className="w-16 h-16 text-[rgba(46,122,217, 0.18)]" />
       </div>
       <h3 className="text-2xl font-bold text-[#1A1A2E] mb-2">
         {isRentalPropertiesProfile ? "No Properties Added Yet" : isProductProfile ? "No Products Added Yet" : "No Services Added Yet"}

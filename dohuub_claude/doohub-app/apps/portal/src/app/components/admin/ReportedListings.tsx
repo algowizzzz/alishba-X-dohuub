@@ -280,7 +280,7 @@ export function ReportedListings() {
           {/* Report Cards */}
           {reports.length === 0 ? (
             <div className="text-center py-12">
-              <AlertTriangle className="w-12 h-12 text-[rgba(46, 122, 217, 0.18)] mx-auto mb-3" />
+              <AlertTriangle className="w-12 h-12 text-[rgba(46,122,217, 0.18)] mx-auto mb-3" />
               <p className="text-[#6B7280]">No reports to review</p>
             </div>
           ) : (

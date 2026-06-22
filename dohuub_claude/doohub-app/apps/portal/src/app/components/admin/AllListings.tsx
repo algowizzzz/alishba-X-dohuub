@@ -322,7 +322,7 @@ const getStatusConfig = (status: string) => {
       bg: "bg-[#F0F7FF]",
       border: "border-[rgba(46,122,217,0.25)]",
       text: "text-[#9CA3AF]",
-      borderLeft: "border-l-[rgba(46, 122, 217, 0.18)]",
+      borderLeft: "border-l-[rgba(46,122,217, 0.18)]",
     },
     rejected: {
       label: "Rejected",

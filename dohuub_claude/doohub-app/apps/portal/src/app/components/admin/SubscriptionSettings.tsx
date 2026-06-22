@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowLeft, Trophy, Check } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
@@ -15,6 +16,7 @@ import {
 } from "../ui/select";
 import { AdminSidebarRetractable } from "./AdminSidebarRetractable";
 import { AdminTopNav } from "./AdminTopNav";
+import api from "../../../services/api";
 
 interface TrialSettings {
   enabled: boolean;
@@ -73,14 +75,62 @@ export function SubscriptionSettings() {
 
   const [trialSettings, setTrialSettings] = useState<TrialSettings>(defaultTrialSettings);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
+  const [plans, setPlans] = useState<any[]>([]);
 
-  const handleSaveSettings = () => {
+  useEffect(() => {
+    Promise.all([
+      api.get<{ success: boolean; data: any }>("/api/v1/admin/settings"),
+      api.get<{ success: boolean; data: any[] }>("/api/v1/admin/subscription-plans"),
+    ])
+      .then(([sRes, pRes]) => {
+        const s: any = (sRes as any)?.data;
+        if (s) {
+          setTrialSettings({
+            enabled: true,
+            duration: s.trialDurationDays ?? 30,
+            durationUnit: "days",
+            afterTrialAction: s.trialAfterExpiry === "AUTO_CONVERT" ? "auto-convert" : "manual-upgrade",
+            notifications: {
+              reminderBeforeEnd: s.trialOnExpirySendNotification ?? true,
+              requirePaymentMethod: s.trialRequirePaymentMethod ?? false,
+              sendWelcomeEmail: s.trialSendWelcomeEmail ?? true,
+            },
+            onExpiration: {
+              deactivateListings: s.trialOnExpiryDeactivateListings ?? true,
+              blockNewListings: s.trialOnExpiryBlockNewListings ?? true,
+              sendNotification: s.trialOnExpirySendNotification ?? true,
+              suspendAccount: s.trialOnExpirySuspendAccount ?? false,
+            },
+            gracePeriodDays: s.trialGracePeriodDays ?? 7,
+          });
+        }
+        setPlans((pRes as any)?.data || []);
+      })
+      .catch(() => {});
+  }, []);
+
+  const handleSaveSettings = async () => {
     setSaveStatus("saving");
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      await api.put("/api/v1/admin/settings", {
+        trialDurationDays: trialSettings.duration,
+        trialGracePeriodDays: trialSettings.gracePeriodDays,
+        trialReminderDaysBefore: 3,
+        trialRequirePaymentMethod: trialSettings.notifications.requirePaymentMethod,
+        trialSendWelcomeEmail: trialSettings.notifications.sendWelcomeEmail,
+        trialAfterExpiry: trialSettings.afterTrialAction === "auto-convert" ? "AUTO_CONVERT" : "PAUSE",
+        trialOnExpiryDeactivateListings: trialSettings.onExpiration.deactivateListings,
+        trialOnExpiryBlockNewListings: trialSettings.onExpiration.blockNewListings,
+        trialOnExpirySendNotification: trialSettings.onExpiration.sendNotification,
+        trialOnExpirySuspendAccount: trialSettings.onExpiration.suspendAccount,
+      });
       setSaveStatus("saved");
+      toast.success("Subscription settings saved");
       setTimeout(() => setSaveStatus("idle"), 2000);
-    }, 500);
+    } catch (e: any) {
+      setSaveStatus("idle");
+      toast.error(e?.response?.data?.error || e?.message || "Failed to save settings");
+    }
   };
 
   return (
@@ -122,56 +172,47 @@ export function SubscriptionSettings() {
             </p>
           </div>
 
-          {/* Available Plans (Read-Only) */}
+          {/* Available Plans — from SubscriptionPlan table */}
           <div className="bg-white border border-[rgba(46,122,217,0.25)] rounded-2xl p-6 sm:p-8 mb-6 shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
-            <h2 className="text-xl font-bold text-[#1A1A2E] mb-6">
-              Available Plans (Read-Only)
-            </h2>
-            <p className="text-sm text-[#6B7280] mb-6">
-              Platform Subscription Plans
-            </p>
+            <h2 className="text-xl font-bold text-[#1A1A2E] mb-6">Available Plans</h2>
+            <p className="text-sm text-[#6B7280] mb-6">Edit these via the database — vendor portal reads them from the same table.</p>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 mb-8">
-              {/* Trial Plan */}
               <div className="bg-white border border-[rgba(46,122,217,0.25)] rounded-xl p-5 shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
                 <h3 className="text-lg font-bold text-[#1A1A2E] mb-3">Trial (Free)</h3>
                 <ul className="space-y-2 text-sm text-[#4B5563]">
-                  <li>• Duration: Configurable (see settings below)</li>
+                  <li>• Duration: {trialSettings.duration} {trialSettings.durationUnit}</li>
                   <li>• Price: $0</li>
                   <li>• Full access to all features</li>
-                  <li>• Payment method required</li>
+                  <li>• {trialSettings.notifications.requirePaymentMethod ? "Payment method required" : "No payment method needed"}</li>
                 </ul>
               </div>
 
-              {/* Monthly Plan */}
-              <div className="bg-white border border-[rgba(46,122,217,0.25)] rounded-xl p-5 shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
-                <h3 className="text-lg font-bold text-[#1A1A2E] mb-3">
-                  Monthly Subscription
-                </h3>
-                <ul className="space-y-2 text-sm text-[#4B5563]">
-                  <li>• Price: $49.00/month</li>
-                  <li>• Billed monthly</li>
-                  <li>• All features included</li>
-                  <li>• Cancel anytime</li>
-                </ul>
-              </div>
-
-              {/* Yearly Plan */}
-              <div className="bg-[#F0FDF4] border-2 border-[#10B981] rounded-xl p-5 relative">
-                <div className="absolute -top-3 right-4 bg-[#10B981] text-white px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
-                  <Trophy className="w-3 h-3" />
-                  RECOMMENDED
+              {plans.length === 0 ? (
+                <div className="col-span-2 bg-[#F0F7FF] border border-[rgba(46,122,217,0.25)] rounded-xl p-5 text-sm text-[#6B7280]">
+                  No subscription plans configured yet. Seed via /admin/subscription-plans API.
                 </div>
-                <h3 className="text-lg font-bold text-[#1A1A2E] mb-3">
-                  Yearly Subscription
-                </h3>
-                <ul className="space-y-2 text-sm text-[#4B5563]">
-                  <li>• Price: $39.00/month</li>
-                  <li>• Billed $468 annually</li>
-                  <li>• Save $120 (20%) compared to monthly</li>
-                  <li>• All features included</li>
-                </ul>
-              </div>
+              ) : plans.map((plan: any) => {
+                const isYearly = plan.billingPeriod === "YEARLY";
+                const monthly = isYearly ? plan.priceCents / 12 / 100 : plan.priceCents / 100;
+                return (
+                  <div key={plan.id} className={`rounded-xl p-5 relative ${isYearly ? "bg-[#F0FDF4] border-2 border-[#10B981]" : "bg-white border border-[rgba(46,122,217,0.25)] shadow-[0_4px_16px_rgba(46,122,217,0.18)]"}`}>
+                    {isYearly && (
+                      <div className="absolute -top-3 right-4 bg-[#10B981] text-white px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
+                        <Trophy className="w-3 h-3" /> {plan.savingsLabel || "BEST VALUE"}
+                      </div>
+                    )}
+                    <h3 className="text-lg font-bold text-[#1A1A2E] mb-3">{plan.name}</h3>
+                    <ul className="space-y-2 text-sm text-[#4B5563]">
+                      <li>• Price: ${monthly.toFixed(2)}/month</li>
+                      <li>• Billed {isYearly ? `$${(plan.priceCents / 100).toFixed(0)} annually` : "monthly"}</li>
+                      {Array.isArray(plan.features) && plan.features.slice(0, 2).map((f: string, i: number) => (
+                        <li key={i}>• {f}</li>
+                      ))}
+                    </ul>
+                  </div>
+                );
+              })}
             </div>
 
             {/* All Plans Include */}
@@ -225,7 +266,7 @@ export function SubscriptionSettings() {
                     setTrialSettings({ ...trialSettings, enabled: !trialSettings.enabled })
                   }
                   className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    trialSettings.enabled ? "bg-[#10B981]" : "bg-[rgba(46, 122, 217, 0.12)]"
+                    trialSettings.enabled ? "bg-[#10B981]" : "bg-[rgba(46,122,217, 0.12)]"
                   }`}
                 >
                   <span

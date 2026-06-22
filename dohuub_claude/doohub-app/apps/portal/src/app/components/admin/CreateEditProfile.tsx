@@ -351,7 +351,7 @@ export function CreateEditProfile() {
           </p>
 
           {/* Progress Bar */}
-          <div className="w-full h-1.5 bg-[rgba(46, 122, 217, 0.12)] rounded-full mb-8">
+          <div className="w-full h-1.5 bg-[rgba(46,122,217, 0.12)] rounded-full mb-8">
             <div
               className="h-full bg-[#2E7AD9] rounded-full transition-all duration-300"
               style={{ width: `${progress}%` }}
@@ -615,7 +615,7 @@ export function CreateEditProfile() {
 
                   <div className="bg-white p-4 rounded-lg">
                     <p className="text-sm text-[#6B7280] mb-3">Badge Preview:</p>
-                    <div className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full ${showBadge ? 'bg-gradient-to-r from-[#F59E0B] to-[#F97316]' : 'bg-[rgba(46, 122, 217, 0.18)]'}`}>
+                    <div className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-full ${showBadge ? 'bg-gradient-to-r from-[#F59E0B] to-[#F97316]' : 'bg-[rgba(46,122,217, 0.18)]'}`}>
                       <Star className={`w-3.5 h-3.5 ${showBadge ? 'fill-white text-white' : 'fill-[#6B7280] text-[#6B7280]'}`} />
                       <span className={`text-xs font-bold ${showBadge ? 'text-white' : 'text-[#6B7280]'}`}>
                         Powered by DoHuub

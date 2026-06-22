@@ -234,7 +234,7 @@ export function CreateEditServiceListing() {
                 <span className="text-sm text-[#6B7280]">Profile: </span>
                 <span className="text-sm font-bold text-[#1A1A2E]">{profileName}</span>
               </div>
-              <div className="h-4 w-px bg-[rgba(46, 122, 217, 0.12)]" />
+              <div className="h-4 w-px bg-[rgba(46,122,217, 0.12)]" />
               <div>
                 <span className="text-sm text-[#6B7280]">Category: </span>
                 <span className="text-sm font-bold text-[#1A1A2E]">🧹 {profileCategory}</span>
@@ -454,7 +454,7 @@ export function CreateEditServiceListing() {
                   >
                     Select All
                   </button>
-                  <span className="text-[rgba(46, 122, 217, 0.12)]">|</span>
+                  <span className="text-[rgba(46,122,217, 0.12)]">|</span>
                   <button
                     onClick={() => setRegions(regions.map(r => ({ ...r, isEnabled: false })))}
                     className="text-[#2E7AD9] hover:underline"

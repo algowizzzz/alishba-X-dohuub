@@ -488,7 +488,7 @@ export function MichelleOrders() {
                       </div>
 
                       {/* Orders List */}
-                      <div className="divide-y divide-[rgba(46, 122, 217, 0.12)]">
+                      <div className="divide-y divide-[rgba(46,122,217, 0.12)]">
                         {storeOrders.map((order) => (
                           <div
                             key={order.id}

@@ -162,7 +162,7 @@ export function AdminLogin() {
             <Button
               type="submit"
               disabled={isLoading || !email || !password}
-              className="w-full h-[52px] bg-[#2E7AD9] hover:bg-[#1E5DB0] text-white text-base font-semibold rounded-[10px] disabled:bg-[rgba(46, 122, 217, 0.18)] disabled:cursor-not-allowed transition-colors mt-7"
+              className="w-full h-[52px] bg-[#2E7AD9] hover:bg-[#1E5DB0] text-white text-base font-semibold rounded-[10px] disabled:bg-[rgba(46,122,217, 0.18)] disabled:cursor-not-allowed transition-colors mt-7"
             >
               {isLoading ? "Logging in..." : "Login to Admin Panel"}
             </Button>
