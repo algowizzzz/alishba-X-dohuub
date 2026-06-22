@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import api from "../../../services/api";
+import { Input } from "../ui/input";
 import {
   ArrowLeft,
   Plus,
@@ -243,10 +245,26 @@ export function GeographicRegions() {
     });
   }
 
-  const handleToggleRegion = (regionId: string) => {
-    setRegions(regions.map(r => 
-      r.id === regionId ? { ...r, isActive: !r.isActive } : r
-    ));
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [addForm, setAddForm] = useState<{ name: string; city: string; state: string; province: string; country: string; countryCode: string; isActive: boolean }>({
+    name: "", city: "", state: "", province: "", country: "USA", countryCode: "US", isActive: true,
+  });
+  const [addBusy, setAddBusy] = useState(false);
+  const [savingNotes, setSavingNotes] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const handleToggleRegion = async (regionId: string) => {
+    const region = regions.find((r) => r.id === regionId);
+    if (!region) return;
+    const next = !region.isActive;
+    setRegions(regions.map(r => r.id === regionId ? { ...r, isActive: next } : r));
+    try {
+      await api.put(`/api/v1/admin/regions/${regionId}`, { isActive: next });
+      toast.success(next ? "Region activated" : "Region paused");
+    } catch (e: any) {
+      setRegions(regions.map(r => r.id === regionId ? { ...r, isActive: !next } : r));
+      toast.error(e?.response?.data?.error || e?.message || "Failed to toggle region");
+    }
   };
 
   const handleViewDetails = (region: Region) => {
@@ -260,12 +278,18 @@ export function GeographicRegions() {
     setShowEditModal(true);
   };
 
-  const handleSaveNotes = () => {
-    if (selectedRegion) {
-      setRegions(regions.map(r =>
-        r.id === selectedRegion.id ? { ...r, notes: editedNotes } : r
-      ));
+  const handleSaveNotes = async () => {
+    if (!selectedRegion) return;
+    setSavingNotes(true);
+    try {
+      await api.put(`/api/v1/admin/regions/${selectedRegion.id}`, { notes: editedNotes });
+      setRegions(regions.map(r => r.id === selectedRegion.id ? { ...r, notes: editedNotes } : r));
+      toast.success("Notes saved");
       setShowDetailModal(false);
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error || e?.message || "Failed to save notes");
+    } finally {
+      setSavingNotes(false);
     }
   };
 
@@ -278,12 +302,84 @@ export function GeographicRegions() {
     }
   };
 
-  const handleSaveRegionEdit = () => {
-    if (selectedRegion) {
-      setRegions(regions.map(r =>
-        r.id === selectedRegion.id ? selectedRegion : r
-      ));
+  const handleSaveRegionEdit = async () => {
+    if (!selectedRegion) return;
+    setSavingEdit(true);
+    try {
+      await api.put(`/api/v1/admin/regions/${selectedRegion.id}`, {
+        name: selectedRegion.name,
+        isActive: selectedRegion.isActive,
+      });
+      setRegions(regions.map(r => r.id === selectedRegion.id ? selectedRegion : r));
+      toast.success("Region updated");
       setShowEditModal(false);
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error || e?.message || "Failed to update region");
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const handleAddRegion = async () => {
+    if (!addForm.name.trim() || !addForm.city.trim() || !addForm.country.trim()) {
+      toast.error("name, city, and country are required");
+      return;
+    }
+    setAddBusy(true);
+    try {
+      const res: any = await api.post("/api/v1/admin/regions", addForm);
+      const created = res?.data;
+      if (created) {
+        const profilesList: any[] = [];
+        const profilesCount = 0;
+        const activeProfiles = 0;
+        const totalProfiles = 0;
+        setRegions((arr) => [
+          ...arr,
+          {
+            id: created.id,
+            name: created.name,
+            city: created.city,
+            state: created.state,
+            province: created.province,
+            country: created.country,
+            countryCode: created.countryCode,
+            countryFlag: created.countryCode === "US" ? "🇺🇸" : created.countryCode === "CA" ? "🇨🇦" : "🌐",
+            isActive: created.isActive,
+            notes: created.notes || "",
+            profiles: profilesList,
+            profilesCount,
+            activeProfiles,
+            totalProfiles,
+            bookings: 0,
+            revenue: 0,
+            customers: 0,
+            avgBookingValue: 0,
+            avgRating: 0,
+            totalReviews: 0,
+            growth: 0,
+          } as any,
+        ]);
+      }
+      toast.success("Region added");
+      setShowAddModal(false);
+      setAddForm({ name: "", city: "", state: "", province: "", country: "USA", countryCode: "US", isActive: true });
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error || e?.message || "Failed to add region");
+    } finally {
+      setAddBusy(false);
+    }
+  };
+
+  const handleBulkActivate = async (countryCode: string, isActive: boolean) => {
+    const ids = regions.filter((r) => r.countryCode === countryCode).map((r) => r.id);
+    if (ids.length === 0) return;
+    try {
+      await api.patch("/api/v1/admin/regions/bulk", { ids, isActive });
+      setRegions(regions.map((r) => (r.countryCode === countryCode ? { ...r, isActive } : r)));
+      toast.success(isActive ? `Activated ${ids.length} regions` : `Deactivated ${ids.length} regions`);
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error || e?.message || "Failed to bulk update");
     }
   };
 
@@ -331,7 +427,7 @@ export function GeographicRegions() {
           <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between mb-6 sm:mb-8">
             <Button
               className="h-12 bg-[#2E7AD9] hover:bg-[#1E5DB0] text-white font-semibold"
-              onClick={() => {/* Open add region modal */}}
+              onClick={() => setShowAddModal(true)}
             >
               <Plus className="w-[18px] h-[18px] mr-2" />
               <Globe className="w-[18px] h-[18px] mr-2" />
@@ -392,10 +488,8 @@ export function GeographicRegions() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem>Activate All Regions</DropdownMenuItem>
-                      <DropdownMenuItem>Deactivate All Regions</DropdownMenuItem>
-                      <DropdownMenuItem>Export Region Data</DropdownMenuItem>
-                      <DropdownMenuItem>View Country Analytics</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleBulkActivate(country.code, true)}>Activate All Regions</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleBulkActivate(country.code, false)}>Deactivate All Regions</DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
@@ -774,6 +868,63 @@ export function GeographicRegions() {
             </div>
           </div>
         </>
+      )}
+
+      {/* Add Region Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-[500px] p-6 max-h-[90vh] overflow-y-auto">
+            <h2 className="text-xl font-bold text-[#1A1A2E] mb-4">Add New Region</h2>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-[#1A1A2E] mb-1">
+                  Region Name <span className="text-[#DC2626]">*</span>
+                </label>
+                <Input value={addForm.name} onChange={(e) => setAddForm({ ...addForm, name: e.target.value })} placeholder='e.g. "New York, NY"' className="h-11" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-[#1A1A2E] mb-1">
+                  City <span className="text-[#DC2626]">*</span>
+                </label>
+                <Input value={addForm.city} onChange={(e) => setAddForm({ ...addForm, city: e.target.value })} placeholder="New York" className="h-11" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-[#1A1A2E] mb-1">State (US)</label>
+                  <Input value={addForm.state} onChange={(e) => setAddForm({ ...addForm, state: e.target.value })} placeholder="NY" className="h-11" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[#1A1A2E] mb-1">Province (CA)</label>
+                  <Input value={addForm.province} onChange={(e) => setAddForm({ ...addForm, province: e.target.value })} placeholder="ON" className="h-11" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-[#1A1A2E] mb-1">
+                    Country <span className="text-[#DC2626]">*</span>
+                  </label>
+                  <Input value={addForm.country} onChange={(e) => setAddForm({ ...addForm, country: e.target.value })} placeholder="USA" className="h-11" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[#1A1A2E] mb-1">
+                    Country Code <span className="text-[#DC2626]">*</span>
+                  </label>
+                  <Input value={addForm.countryCode} onChange={(e) => setAddForm({ ...addForm, countryCode: e.target.value.toUpperCase() })} placeholder="US" maxLength={2} className="h-11" />
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <input type="checkbox" id="active" checked={addForm.isActive} onChange={(e) => setAddForm({ ...addForm, isActive: e.target.checked })} />
+                <label htmlFor="active" className="text-sm text-[#1A1A2E]">Active</label>
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
+              <Button variant="outline" onClick={() => setShowAddModal(false)} disabled={addBusy}>Cancel</Button>
+              <Button onClick={handleAddRegion} disabled={addBusy} className="bg-[#2E7AD9] hover:bg-[#1E5DB0]">
+                {addBusy ? "Adding..." : "Add Region"}
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

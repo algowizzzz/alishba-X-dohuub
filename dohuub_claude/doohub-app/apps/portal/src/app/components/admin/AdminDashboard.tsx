@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { TrendingUp, TrendingDown, Users, Store, DollarSign, ShoppingBag, UserPlus, type LucideIcon } from "lucide-react";
+import { TrendingUp, TrendingDown, Users, Store, DollarSign, ShoppingBag, Loader2, type LucideIcon } from "lucide-react";
+import { toast } from "sonner";
 import { AdminSidebarRetractable } from "./AdminSidebarRetractable";
 import { AdminTopNav } from "./AdminTopNav";
 import api from "../../../services/api";
@@ -60,11 +61,21 @@ export function AdminDashboard() {
     typeof window !== "undefined" && window.innerWidth >= 1024 ? false : true
   );
   const [report, setReport] = useState<PlatformReport | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    setLoading(true);
+    setError(null);
     api.get<{ success: boolean; data: PlatformReport }>("/api/v1/admin/reports/platform?dateRange=30days")
-      .then((r) => setReport(r.data))
-      .catch(() => setReport(null));
+      .then((r) => setReport((r as any)?.data || null))
+      .catch((e: any) => {
+        const msg = e?.response?.data?.error || e?.message || "Failed to load dashboard";
+        setError(msg);
+        toast.error(msg);
+        setReport(null);
+      })
+      .finally(() => setLoading(false));
   }, []);
 
   const handleSidebarToggle = () => {
@@ -105,44 +116,47 @@ export function AdminDashboard() {
             Dashboard Overview
           </h1>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
-            <MetricCard
-              label="New Users"
-              value={report ? fmt(report.kpis.newUsers.value) : "—"}
-              change={report ? formatChange(report.kpis.newUsers.change) : undefined}
-              isPositive={!report || report.kpis.newUsers.change >= 0}
-              icon={Users}
-            />
-            <MetricCard
-              label="Active Vendors"
-              value={report ? fmt(report.kpis.activeVendors.value) : "—"}
-              change={report ? formatChange(report.kpis.activeVendors.change) : undefined}
-              isPositive={!report || report.kpis.activeVendors.change >= 0}
-              icon={Store}
-            />
-            <MetricCard
-              label="Revenue (This Month)"
-              value={report ? fmtMoney(report.kpis.revenue.value) : "—"}
-              change={report ? formatChange(report.kpis.revenue.change) : undefined}
-              isPositive={!report || report.kpis.revenue.change >= 0}
-              icon={DollarSign}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <MetricCard
-              label="Total Bookings"
-              value={report ? fmt(report.kpis.bookings.value) : "—"}
-              change={report ? formatChange(report.kpis.bookings.change) : undefined}
-              isPositive={!report || report.kpis.bookings.change >= 0}
-              icon={ShoppingBag}
-            />
-            <MetricCard
-              label="New Vendors"
-              value={report ? fmt(report.kpis.activeVendors.value) : "—"}
-              icon={UserPlus}
-            />
-          </div>
+          {loading ? (
+            <div className="flex items-center justify-center py-20">
+              <Loader2 className="w-8 h-8 text-[#2E7AD9] animate-spin" />
+            </div>
+          ) : error ? (
+            <div className="bg-[#FEE2E2] border border-[#FECACA] text-[#991B1B] rounded-xl p-6">
+              <p className="font-semibold mb-1">Could not load dashboard</p>
+              <p className="text-sm">{error}</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <MetricCard
+                label="New Users"
+                value={report ? fmt(report.kpis.newUsers.value) : "—"}
+                change={report ? formatChange(report.kpis.newUsers.change) : undefined}
+                isPositive={!report || report.kpis.newUsers.change >= 0}
+                icon={Users}
+              />
+              <MetricCard
+                label="Active Vendors"
+                value={report ? fmt(report.kpis.activeVendors.value) : "—"}
+                change={report ? formatChange(report.kpis.activeVendors.change) : undefined}
+                isPositive={!report || report.kpis.activeVendors.change >= 0}
+                icon={Store}
+              />
+              <MetricCard
+                label="Revenue (last 30 days)"
+                value={report ? fmtMoney(report.kpis.revenue.value) : "—"}
+                change={report ? formatChange(report.kpis.revenue.change) : undefined}
+                isPositive={!report || report.kpis.revenue.change >= 0}
+                icon={DollarSign}
+              />
+              <MetricCard
+                label="Bookings (last 30 days)"
+                value={report ? fmt(report.kpis.bookings.value) : "—"}
+                change={report ? formatChange(report.kpis.bookings.change) : undefined}
+                isPositive={!report || report.kpis.bookings.change >= 0}
+                icon={ShoppingBag}
+              />
+            </div>
+          )}
         </div>
       </main>
     </div>
