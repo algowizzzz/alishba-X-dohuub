@@ -70,10 +70,14 @@ const mockReports: ListingReport[] = [
 function ReportCard({ report, onResolved }: { report: ListingReport; onResolved: (id: string) => void }) {
   const navigate = useNavigate();
   const [showActionModal, setShowActionModal] = useState(false);
-  const [actionType, setActionType] = useState<"ignore" | "suspend" | null>(null);
+  const [actionType, setActionType] = useState<"ignore" | "suspend" | "restore" | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const handleAction = (action: "ignore" | "suspend") => {
+  const handleAction = (action: "ignore" | "suspend" | "restore") => {
+    if (action === "suspend" && !report.vendorId) {
+      toast.error("Vendor could not be resolved from this report; can't suspend.");
+      return;
+    }
     setActionType(action);
     setShowActionModal(true);
   };
@@ -81,15 +85,23 @@ function ReportCard({ report, onResolved }: { report: ListingReport; onResolved:
   const confirmAction = async () => {
     setBusy(true);
     try {
+      if (actionType === "restore") {
+        // Calls the new /admin/reports/:id/restore-listing endpoint which
+        // un-PAUSEs the listing AND marks the report DISMISSED.
+        await api.post(`/api/v1/admin/reports/${report.id}/restore-listing`, {});
+        onResolved(report.id);
+        toast.success("Listing restored and report dismissed");
+        return;
+      }
       if (actionType === "suspend" && report.vendorId) {
         await api.patch(`/api/v1/admin/vendors/${report.vendorId}/status`, { status: "SUSPENDED" });
       }
-      // Mark the report as reviewed/dismissed in either case
       await api.patch(`/api/v1/admin/reports/${report.id}/status`, {
-        status: "REVIEWED",
+        status: actionType === "ignore" ? "DISMISSED" : "REVIEWED",
         resolution: actionType === "suspend" ? `Vendor suspended` : `Report dismissed`,
       });
       onResolved(report.id);
+      toast.success(actionType === "suspend" ? "Vendor suspended" : "Report dismissed");
     } catch (e: any) {
       toast.error(e?.response?.data?.error || e?.message || "Failed to apply action");
     } finally {
@@ -145,17 +157,26 @@ function ReportCard({ report, onResolved }: { report: ListingReport; onResolved:
 
         {/* Actions */}
         <div className="flex flex-wrap gap-2 pt-4 border-t border-[rgba(46,122,217,0.25)]">
-          <Button 
-            size="sm" 
+          <Button
+            size="sm"
             variant="outline"
-            onClick={() => handleAction("ignore")}
+            onClick={() => handleAction("restore")}
+            className="text-[#10B981] border-[#A7F3D0]"
           >
-            <X className="w-4 h-4 mr-2" />
-            Ignore
+            Dismiss + Restore Listing
           </Button>
           <Button
             size="sm"
             variant="outline"
+            onClick={() => handleAction("ignore")}
+          >
+            <X className="w-4 h-4 mr-2" />
+            Ignore (leave paused)
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={!report.vendorId}
             className="text-[#DC2626] border-[#FECACA]"
             onClick={() => handleAction("suspend")}
           >
@@ -230,7 +251,7 @@ export function ReportedListings() {
               ? `${rep.user.profile.firstName} ${rep.user.profile.lastName?.[0] || ""}.`
               : rep.user?.email?.split("@")[0] || "Customer",
           reportReason: rep.reason || rep.type || "Report",
-          reportExplanation: rep.description || rep.details || "No additional details provided.",
+          reportExplanation: rep.comment || rep.description || rep.details || "No additional details provided.",
           reportedAt: rep.createdAt || new Date().toISOString(),
         }));
         setReports(mapped.length > 0 ? mapped : []);

@@ -1,32 +1,23 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
-  Bell,
-  Send,
-  Clock,
-  CheckCircle,
-  Users,
-  Smartphone,
-  Plus,
+  Bell, Send, Clock, CheckCircle, Users, Plus, Smartphone,
 } from "lucide-react";
+import { toast } from "sonner";
 import { AdminSidebarRetractable } from "./AdminSidebarRetractable";
 import { AdminTopNav } from "./AdminTopNav";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Textarea } from "../ui/textarea";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "../ui/select";
 import api from "../../../services/api";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from "../ui/dialog";
 import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
+  Tabs, TabsContent, TabsList, TabsTrigger,
 } from "../ui/tabs";
 
 interface Notification {
@@ -55,8 +46,13 @@ export function PushNotifications() {
   // Form state
   const [title, setTitle] = useState("");
   const [message, setMessage] = useState("");
+  const [link, setLink] = useState("");
+  const [targetType, setTargetType] = useState<"ALL" | "CUSTOMERS" | "VENDORS">("ALL");
+  const [scheduledFor, setScheduledFor] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  const [audienceCounts, setAudienceCounts] = useState<{ total: number; customers: number; vendors: number; active: number }>({ total: 0, customers: 0, vendors: 0, active: 0 });
+  const [historyLoading, setHistoryLoading] = useState(true);
 
   const handleSidebarToggle = () => {
     if (typeof window !== "undefined" && window.innerWidth >= 1024) {
@@ -66,109 +62,97 @@ export function PushNotifications() {
     }
   };
 
-  // Mock notification history
-  const [notifications] = useState<Notification[]>([
-    {
-      id: "1",
-      title: "New Year Special Offers! 🎉",
-      message: "Celebrate 2026 with exclusive deals on all services. Up to 50% off!",
-      audience: "All Customers",
-      audienceCount: 12450,
-      status: "sent",
-      sentAt: "2026-01-07T10:00:00",
-      delivered: 11980,
-      opened: 8456,
-      clicked: 3245,
-      link: "/offers",
-    },
-    {
-      id: "2",
-      title: "Your order is on the way",
-      message: "Your order #CLN-12345 will arrive in 30 minutes",
-      audience: "All Customers",
-      audienceCount: 12450,
-      status: "sent",
-      sentAt: "2026-01-07T09:30:00",
-      delivered: 234,
-      opened: 198,
-      clicked: 156,
-    },
-    {
-      id: "3",
-      title: "Rate your recent experience",
-      message: "How was your service with CleanCo? Leave a review and help others!",
-      audience: "All Customers",
-      audienceCount: 12450,
-      status: "sent",
-      sentAt: "2026-01-06T18:00:00",
-      delivered: 550,
-      opened: 412,
-      clicked: 189,
-      link: "/reviews",
-    },
-    {
-      id: "4",
-      title: "Weekend Flash Sale!",
-      message: "Limited time offer on beauty services. Book now!",
-      audience: "All Customers",
-      audienceCount: 12450,
-      status: "sent",
-      sentAt: "2026-01-06T08:00:00",
-      delivered: 3398,
-      opened: 2145,
-      clicked: 876,
-      link: "/beauty",
-    },
-    {
-      id: "5",
-      title: "New vendors in your area",
-      message: "Discover 5 new service providers near you",
-      audience: "All Customers",
-      audienceCount: 12450,
-      status: "sent",
-      sentAt: "2026-01-05T14:00:00",
-      delivered: 8765,
-      opened: 5234,
-      clicked: 2134,
-    },
-  ]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+
+  const loadHistory = () => {
+    setHistoryLoading(true);
+    api
+      .get<{ success: boolean; data: any[] }>("/api/v1/admin/scheduled-pushes")
+      .then((r) => {
+        const arr = (r as any)?.data || [];
+        const mapped: Notification[] = arr.map((n: any) => ({
+          id: n.id,
+          title: n.title,
+          message: n.body,
+          audience:
+            n.targetType === "CUSTOMERS" ? "Customers"
+            : n.targetType === "VENDORS" ? "Vendors"
+            : n.targetType === "SPECIFIC" ? `${(n.targetIds || []).length} users`
+            : "All users",
+          audienceCount: n.recipientCount || 0,
+          status: n.status === "SENT" ? "sent" : n.status === "CANCELLED" ? "draft" : n.status === "FAILED" ? "draft" : "scheduled",
+          sentAt: n.sentAt || (n.status === "SCHEDULED" ? undefined : n.createdAt),
+          scheduledFor: n.scheduledFor || undefined,
+          delivered: n.recipientCount || 0,
+          opened: 0,
+          clicked: 0,
+          link: n.link || undefined,
+        }));
+        setNotifications(mapped);
+      })
+      .catch(() => setNotifications([]))
+      .finally(() => setHistoryLoading(false));
+  };
+
+  useEffect(() => {
+    loadHistory();
+    api
+      .get<{ success: boolean; data: any }>("/api/v1/admin/users/counts")
+      .then((r) => {
+        const d = (r as any)?.data;
+        if (d) setAudienceCounts({ total: d.total || 0, customers: d.customers || 0, vendors: d.vendors || 0, active: d.active || 0 });
+      })
+      .catch(() => {});
+  }, []);
 
   const handleSend = async () => {
     setSendError(null);
     setIsSending(true);
     try {
-      await api.post("/api/v1/admin/push-notifications", {
+      // Use the scheduled-push endpoint for both immediate (scheduledFor=null)
+      // AND scheduled sends; the cron picks both up on the next 60s tick.
+      await api.post("/api/v1/admin/scheduled-pushes", {
         title,
         body: message,
-        targetType: "ALL",
+        link: link || undefined,
+        targetType,
+        scheduledFor: scheduledFor ? new Date(scheduledFor).toISOString() : null,
       });
       setShowSuccessModal(true);
+      toast.success(scheduledFor ? "Push scheduled" : "Push queued — will dispatch within 1 minute");
       setTimeout(() => {
         setTitle("");
         setMessage("");
+        setLink("");
+        setScheduledFor("");
         setShowSuccessModal(false);
         setActiveTab("history");
-      }, 2000);
+        loadHistory();
+      }, 1500);
     } catch (err: any) {
-      setSendError(
-        err?.response?.data?.error || err?.message || "Failed to send notification"
-      );
+      const msg = err?.response?.data?.error || err?.message || "Failed to send notification";
+      setSendError(msg);
+      toast.error(msg);
     } finally {
       setIsSending(false);
     }
   };
 
+  const handleCancelScheduled = async (id: string) => {
+    if (!window.confirm("Cancel this scheduled push?")) return;
+    try {
+      await api.delete(`/api/v1/admin/scheduled-pushes/${id}`);
+      toast.success("Scheduled push cancelled");
+      loadHistory();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error || e?.message || "Failed to cancel");
+    }
+  };
+
   const getAudienceCount = (audienceType: string) => {
-    const counts: Record<string, number> = {
-      all: 12450,
-      active: 234,
-      recent: 567,
-      beauty: 3420,
-      grocery: 2890,
-      service: 5670,
-      rental: 1230,
-    };
-    return counts[audienceType] || 0;
+    if (audienceType === "CUSTOMERS") return audienceCounts.customers;
+    if (audienceType === "VENDORS") return audienceCounts.vendors;
+    return audienceCounts.total;
   };
 
   const formatDate = (dateString: string) => {
@@ -283,10 +267,46 @@ export function PushNotifications() {
                       <Label htmlFor="audience" className="text-sm font-medium text-[#1A1A2E] mb-2">
                         Target Audience
                       </Label>
-                      <div className="h-11 px-4 rounded-lg border border-[rgba(46,122,217,0.25)] bg-white flex items-center text-[#6B7280] shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
-                        <Users className="w-4 h-4 mr-2" />
-                        <span>All Customers ({getAudienceCount("all").toLocaleString()})</span>
-                      </div>
+                      <Select value={targetType} onValueChange={(v) => setTargetType(v as any)}>
+                        <SelectTrigger className="h-11"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ALL">All users ({audienceCounts.total.toLocaleString()})</SelectItem>
+                          <SelectItem value="CUSTOMERS">Customers only ({audienceCounts.customers.toLocaleString()})</SelectItem>
+                          <SelectItem value="VENDORS">Vendors only ({audienceCounts.vendors.toLocaleString()})</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="link" className="text-sm font-medium text-[#1A1A2E] mb-2">
+                        Deep Link (optional)
+                      </Label>
+                      <Input
+                        id="link"
+                        placeholder="/offers or https://..."
+                        value={link}
+                        onChange={(e) => setLink(e.target.value)}
+                        className="h-11"
+                      />
+                      <p className="text-xs text-[#6B7280] mt-1">
+                        Tapping the notification opens this URL or in-app route.
+                      </p>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="scheduledFor" className="text-sm font-medium text-[#1A1A2E] mb-2">
+                        Schedule for later (optional)
+                      </Label>
+                      <Input
+                        id="scheduledFor"
+                        type="datetime-local"
+                        value={scheduledFor}
+                        onChange={(e) => setScheduledFor(e.target.value)}
+                        className="h-11"
+                      />
+                      <p className="text-xs text-[#6B7280] mt-1">
+                        Leave empty to send within 1 minute.
+                      </p>
                     </div>
 
                     <div className="flex flex-col gap-2 pt-4">
@@ -314,9 +334,11 @@ export function PushNotifications() {
                             Estimated Reach
                           </h3>
                           <p className="text-2xl font-bold text-[#1A1A2E]">
-                            {getAudienceCount("all").toLocaleString()}
+                            {getAudienceCount(targetType).toLocaleString()}
                           </p>
-                          <p className="text-xs text-[#6B7280] mt-1">customers</p>
+                          <p className="text-xs text-[#6B7280] mt-1">
+                            {targetType === "VENDORS" ? "vendors" : targetType === "CUSTOMERS" ? "customers" : "users"}
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -414,7 +436,7 @@ export function PushNotifications() {
               Notification Sent!
             </h3>
             <p className="text-sm text-[#6B7280]">
-              Your notification has been successfully sent to {getAudienceCount("all").toLocaleString()} customers
+              {scheduledFor ? "Your notification has been scheduled and will dispatch at the specified time." : `Your notification has been queued. It will reach up to ${getAudienceCount(targetType).toLocaleString()} ${targetType === "VENDORS" ? "vendors" : targetType === "CUSTOMERS" ? "customers" : "users"} within 1 minute.`}
             </p>
           </div>
         </DialogContent>
