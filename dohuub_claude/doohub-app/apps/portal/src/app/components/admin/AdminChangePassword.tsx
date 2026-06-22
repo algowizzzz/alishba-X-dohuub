@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Lock, Eye, EyeOff, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "../ui/button";
@@ -9,17 +9,37 @@ import { supabase } from "../../../lib/supabase";
 
 export function AdminChangePassword() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  // When admin lands here via the password-reset email link, the URL contains
+  // ?recovery=1 (set in PasswordReset's redirectTo) AND Supabase has placed a
+  // recovery access_token in the URL hash that detectSessionInUrl swaps for
+  // a session. In that mode the user doesn't know their current password,
+  // so we skip the re-auth gate.
+  const [isRecovery, setIsRecovery] = useState(searchParams.get("recovery") === "1");
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
   const [confirm, setConfirm] = useState("");
   const [show, setShow] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  useEffect(() => {
+    // Listen for PASSWORD_RECOVERY event in case the page mounts before
+    // Supabase has processed the URL hash.
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY") setIsRecovery(true);
+    });
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
   const validate = () => {
-    if (!current || !next || !confirm) return "All fields are required";
+    if (isRecovery) {
+      if (!next || !confirm) return "Enter and confirm your new password";
+    } else {
+      if (!current || !next || !confirm) return "All fields are required";
+      if (next === current) return "New password must be different";
+    }
     if (next.length < 8) return "New password must be at least 8 characters";
     if (next !== confirm) return "New passwords don't match";
-    if (next === current) return "New password must be different";
     return null;
   };
 
@@ -33,23 +53,30 @@ export function AdminChangePassword() {
 
     setSaving(true);
     try {
-      // Re-authenticate with the current password before changing — this
-      // protects against session hijack scenarios where someone reaches an
-      // already-signed-in admin tab.
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user?.email) throw new Error("Not signed in");
+      if (!isRecovery) {
+        // Re-authenticate with the current password before changing — this
+        // protects against session hijack scenarios where someone reaches an
+        // already-signed-in admin tab.
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user?.email) throw new Error("Not signed in");
 
-      const { error: reAuthErr } = await supabase.auth.signInWithPassword({
-        email: user.email,
-        password: current,
-      });
-      if (reAuthErr) throw new Error("Current password is incorrect");
+        const { error: reAuthErr } = await supabase.auth.signInWithPassword({
+          email: user.email,
+          password: current,
+        });
+        if (reAuthErr) throw new Error("Current password is incorrect");
+      }
 
       const { error: updateErr } = await supabase.auth.updateUser({ password: next });
       if (updateErr) throw updateErr;
 
-      toast.success("Password updated");
-      navigate(-1);
+      toast.success(isRecovery ? "Password set. Please sign in." : "Password updated");
+      if (isRecovery) {
+        await supabase.auth.signOut();
+        navigate("/admin/login");
+      } else {
+        navigate(-1);
+      }
     } catch (e: any) {
       toast.error(e?.message || "Failed to update password");
     } finally {

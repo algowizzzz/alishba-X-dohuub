@@ -15,7 +15,10 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
-    detectSessionInUrl: false,
+    // Enable so password-reset recovery links land users into a real session
+    // and our AdminChangePassword recovery-token flow can call updateUser.
+    detectSessionInUrl: true,
+    flowType: 'pkce',
     storage: typeof window !== 'undefined' ? window.localStorage : undefined,
   },
 });

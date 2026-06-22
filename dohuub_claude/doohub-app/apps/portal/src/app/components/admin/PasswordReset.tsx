@@ -4,6 +4,7 @@ import { ArrowLeft, Check } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
+import { supabase } from "../../../lib/supabase";
 
 export function PasswordReset() {
   const [email, setEmail] = useState("");
@@ -40,18 +41,24 @@ export function PasswordReset() {
     }
 
     setIsLoading(true);
-    
-    // Simulate API call
-    setTimeout(() => {
-      // Mock - check if email is in admin system
-      if (email.endsWith("@dohuub.com")) {
-        setSuccess(true);
-        setIsLoading(false);
+
+    try {
+      const { error: sError } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/admin/account/password?recovery=1`,
+      });
+      if (sError) {
+        setError(sError.message);
       } else {
-        setError("This email is not registered as an admin.");
-        setIsLoading(false);
+        // Always show success even if email doesn't exist — don't leak which
+        // emails are registered admins. The email will arrive only if the
+        // address belongs to a real user.
+        setSuccess(true);
       }
-    }, 1000);
+    } catch (e: any) {
+      setError(e?.message || "Failed to send reset link");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -137,7 +144,7 @@ export function PasswordReset() {
               className={`w-full h-[52px] text-base font-semibold rounded-[10px] disabled:cursor-not-allowed transition-all ${
                 success 
                   ? 'bg-[#10B981] hover:bg-[#10B981] text-white' 
-                  : 'bg-[#2E7AD9] hover:bg-[#1E5DB0] text-white disabled:bg-[rgba(46, 122, 217, 0.18)]'
+                  : 'bg-[#2E7AD9] hover:bg-[#1E5DB0] text-white disabled:bg-[rgba(46,122,217,0.18)]'
               }`}
             >
               {isLoading ? "Sending..." : success ? "Link Sent! ✓" : "Send Reset Link"}

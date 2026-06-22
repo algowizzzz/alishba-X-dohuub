@@ -1,15 +1,12 @@
-import { useState } from "react";
-import { ArrowLeft, X, Search, Globe } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ArrowLeft, X, Search, Globe, Loader2 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Checkbox } from "../ui/checkbox";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from "../ui/dialog";
+import api from "../../../services/api";
 
 interface Country {
   code: string;
@@ -17,10 +14,14 @@ interface Country {
   flag: string;
 }
 
-interface Region {
+interface RegionRow {
   id: string;
   name: string;
-  subRegion: string;
+  city: string;
+  state?: string | null;
+  province?: string | null;
+  country: string;
+  countryCode: string;
 }
 
 interface CountryRegionModalProps {
@@ -29,100 +30,13 @@ interface CountryRegionModalProps {
   onAddRegions: (regions: { countryCode: string; countryName: string; countryFlag: string; regionId: string; regionName: string }[]) => void;
 }
 
-const COUNTRIES: Country[] = [
-  { code: "US", name: "United States", flag: "🇺🇸" },
-  { code: "CA", name: "Canada", flag: "🇨🇦" },
-  { code: "AU", name: "Australia", flag: "🇦🇺" },
-  { code: "BR", name: "Brazil", flag: "🇧🇷" },
-  { code: "FR", name: "France", flag: "🇫🇷" },
-  { code: "DE", name: "Germany", flag: "🇩🇪" },
-  { code: "IN", name: "India", flag: "🇮🇳" },
-  { code: "IT", name: "Italy", flag: "🇮🇹" },
-  { code: "JP", name: "Japan", flag: "🇯🇵" },
-  { code: "MX", name: "Mexico", flag: "🇲🇽" },
-  { code: "NL", name: "Netherlands", flag: "🇳🇱" },
-  { code: "ES", name: "Spain", flag: "🇪🇸" },
-  { code: "GB", name: "United Kingdom", flag: "🇬🇧" },
-];
-
-const REGIONS_BY_COUNTRY: Record<string, { major: Region[]; all: Region[] }> = {
-  US: {
-    major: [
-      { id: "us-1", name: "New York, NY", subRegion: "Northeast" },
-      { id: "us-2", name: "Los Angeles, CA", subRegion: "West Coast" },
-      { id: "us-3", name: "Chicago, IL", subRegion: "Midwest" },
-      { id: "us-4", name: "Houston, TX", subRegion: "South" },
-    ],
-    all: [
-      { id: "us-1", name: "New York, NY", subRegion: "Northeast" },
-      { id: "us-2", name: "Los Angeles, CA", subRegion: "West Coast" },
-      { id: "us-3", name: "Chicago, IL", subRegion: "Midwest" },
-      { id: "us-4", name: "Houston, TX", subRegion: "South" },
-      { id: "us-5", name: "Atlanta, GA", subRegion: "South" },
-      { id: "us-6", name: "Austin, TX", subRegion: "South" },
-      { id: "us-7", name: "Boston, MA", subRegion: "Northeast" },
-      { id: "us-8", name: "Dallas, TX", subRegion: "South" },
-      { id: "us-9", name: "Denver, CO", subRegion: "West" },
-      { id: "us-10", name: "Miami, FL", subRegion: "South" },
-      { id: "us-11", name: "Phoenix, AZ", subRegion: "Southwest" },
-      { id: "us-12", name: "San Diego, CA", subRegion: "West Coast" },
-      { id: "us-13", name: "San Francisco, CA", subRegion: "West Coast" },
-      { id: "us-14", name: "Seattle, WA", subRegion: "Northwest" },
-    ],
-  },
-  CA: {
-    major: [
-      { id: "ca-1", name: "Toronto, ON", subRegion: "Ontario" },
-      { id: "ca-2", name: "Montreal, QC", subRegion: "Quebec" },
-      { id: "ca-3", name: "Vancouver, BC", subRegion: "British Columbia" },
-      { id: "ca-4", name: "Calgary, AB", subRegion: "Alberta" },
-    ],
-    all: [
-      { id: "ca-1", name: "Toronto, ON", subRegion: "Ontario" },
-      { id: "ca-2", name: "Montreal, QC", subRegion: "Quebec" },
-      { id: "ca-3", name: "Vancouver, BC", subRegion: "British Columbia" },
-      { id: "ca-4", name: "Calgary, AB", subRegion: "Alberta" },
-      { id: "ca-5", name: "Ottawa, ON", subRegion: "Ontario" },
-      { id: "ca-6", name: "Edmonton, AB", subRegion: "Alberta" },
-      { id: "ca-7", name: "Halifax, NS", subRegion: "Nova Scotia" },
-      { id: "ca-8", name: "Winnipeg, MB", subRegion: "Manitoba" },
-    ],
-  },
-  GB: {
-    major: [
-      { id: "gb-1", name: "London", subRegion: "England" },
-      { id: "gb-2", name: "Manchester", subRegion: "England" },
-      { id: "gb-3", name: "Birmingham", subRegion: "England" },
-      { id: "gb-4", name: "Edinburgh", subRegion: "Scotland" },
-    ],
-    all: [
-      { id: "gb-1", name: "London", subRegion: "England" },
-      { id: "gb-2", name: "Manchester", subRegion: "England" },
-      { id: "gb-3", name: "Birmingham", subRegion: "England" },
-      { id: "gb-4", name: "Edinburgh", subRegion: "Scotland" },
-      { id: "gb-5", name: "Glasgow", subRegion: "Scotland" },
-      { id: "gb-6", name: "Liverpool", subRegion: "England" },
-      { id: "gb-7", name: "Cardiff", subRegion: "Wales" },
-      { id: "gb-8", name: "Belfast", subRegion: "Northern Ireland" },
-    ],
-  },
-  AU: {
-    major: [
-      { id: "au-1", name: "Sydney", subRegion: "New South Wales" },
-      { id: "au-2", name: "Melbourne", subRegion: "Victoria" },
-      { id: "au-3", name: "Brisbane", subRegion: "Queensland" },
-      { id: "au-4", name: "Perth", subRegion: "Western Australia" },
-    ],
-    all: [
-      { id: "au-1", name: "Sydney", subRegion: "New South Wales" },
-      { id: "au-2", name: "Melbourne", subRegion: "Victoria" },
-      { id: "au-3", name: "Brisbane", subRegion: "Queensland" },
-      { id: "au-4", name: "Perth", subRegion: "Western Australia" },
-      { id: "au-5", name: "Adelaide", subRegion: "South Australia" },
-      { id: "au-6", name: "Gold Coast", subRegion: "Queensland" },
-    ],
-  },
-};
+function flagFor(code: string): string {
+  const map: Record<string, string> = {
+    US: "🇺🇸", CA: "🇨🇦", GB: "🇬🇧", AU: "🇦🇺", IN: "🇮🇳", FR: "🇫🇷",
+    DE: "🇩🇪", IT: "🇮🇹", JP: "🇯🇵", BR: "🇧🇷", MX: "🇲🇽", NL: "🇳🇱", ES: "🇪🇸",
+  };
+  return map[code] || "🌐";
+}
 
 export function CountryRegionModal({ open, onClose, onAddRegions }: CountryRegionModalProps) {
   const [step, setStep] = useState<1 | 2>(1);
@@ -130,6 +44,45 @@ export function CountryRegionModal({ open, onClose, onAddRegions }: CountryRegio
   const [countrySearch, setCountrySearch] = useState("");
   const [regionSearch, setRegionSearch] = useState("");
   const [selectedRegions, setSelectedRegions] = useState<string[]>([]);
+  const [countries, setCountries] = useState<Country[]>([]);
+  const [countryRegions, setCountryRegions] = useState<RegionRow[]>([]);
+  const [loadingCountries, setLoadingCountries] = useState(false);
+  const [loadingRegions, setLoadingRegions] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setLoadingCountries(true);
+    // /api/v1/regions returns regions plus a distinct list of countries with
+    // active regions. We use the countries[] field to drive Step 1, so the
+    // modal only shows countries that actually have seeded regions (kills
+    // the dead-end UX where 9 of 13 hardcoded countries had no regions).
+    api
+      .get<{ success: boolean; countries: { name: string; code: string; flag: string }[] }>(
+        "/api/v1/regions?isActive=true&limit=1"
+      )
+      .then((r) => {
+        const cs = ((r as any)?.countries || []).map((c: any) => ({
+          code: c.code,
+          name: c.name,
+          flag: c.flag || flagFor(c.code),
+        }));
+        setCountries(cs);
+      })
+      .catch(() => setCountries([]))
+      .finally(() => setLoadingCountries(false));
+  }, [open]);
+
+  useEffect(() => {
+    if (!open || !selectedCountry) return;
+    setLoadingRegions(true);
+    api
+      .get<{ success: boolean; data: RegionRow[] }>(
+        `/api/v1/regions?isActive=true&countryCode=${encodeURIComponent(selectedCountry.code)}&limit=500`
+      )
+      .then((r) => setCountryRegions((r as any)?.data || []))
+      .catch(() => setCountryRegions([]))
+      .finally(() => setLoadingRegions(false));
+  }, [open, selectedCountry]);
 
   const handleClose = () => {
     setStep(1);
@@ -137,6 +90,7 @@ export function CountryRegionModal({ open, onClose, onAddRegions }: CountryRegio
     setCountrySearch("");
     setRegionSearch("");
     setSelectedRegions([]);
+    setCountryRegions([]);
     onClose();
   };
 
@@ -151,52 +105,47 @@ export function CountryRegionModal({ open, onClose, onAddRegions }: CountryRegio
     setSelectedCountry(null);
     setRegionSearch("");
     setSelectedRegions([]);
+    setCountryRegions([]);
   };
 
   const handleAddSelected = () => {
     if (!selectedCountry) return;
-    
-    const regionsData = REGIONS_BY_COUNTRY[selectedCountry.code]?.all || [];
-    const regionsToAdd = selectedRegions.map(regionId => {
-      const region = regionsData.find(r => r.id === regionId);
+    const regionsToAdd = selectedRegions.map((regionId) => {
+      const region = countryRegions.find((r) => r.id === regionId);
       return {
         countryCode: selectedCountry.code,
         countryName: selectedCountry.name,
         countryFlag: selectedCountry.flag,
-        regionId,
+        regionId, // real cuid from the DB
         regionName: region?.name || "",
       };
     });
-
     onAddRegions(regionsToAdd);
     handleClose();
   };
 
-  const filteredCountries = COUNTRIES.filter(country =>
-    country.name.toLowerCase().includes(countrySearch.toLowerCase())
-  );
+  const filteredCountries = countries
+    .filter((c) => c.name.toLowerCase().includes(countrySearch.toLowerCase()))
+    .sort((a, b) => a.name.localeCompare(b.name));
 
-  const currentRegions = selectedCountry ? REGIONS_BY_COUNTRY[selectedCountry.code] : null;
-  const filteredMajorRegions = currentRegions?.major.filter(region =>
-    region.name.toLowerCase().includes(regionSearch.toLowerCase()) ||
-    region.subRegion.toLowerCase().includes(regionSearch.toLowerCase())
-  ) || [];
-  const filteredAllRegions = currentRegions?.all.filter(region =>
-    region.name.toLowerCase().includes(regionSearch.toLowerCase()) ||
-    region.subRegion.toLowerCase().includes(regionSearch.toLowerCase())
-  ) || [];
+  const filteredRegions = countryRegions.filter(
+    (r) =>
+      r.name.toLowerCase().includes(regionSearch.toLowerCase()) ||
+      (r.state || "").toLowerCase().includes(regionSearch.toLowerCase()) ||
+      (r.province || "").toLowerCase().includes(regionSearch.toLowerCase()) ||
+      r.city.toLowerCase().includes(regionSearch.toLowerCase())
+  );
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="w-[calc(100%-2rem)] max-w-[600px] max-h-[90vh] sm:max-h-[700px] p-0 gap-0">
         <DialogHeader className="p-4 sm:p-8 pb-3 sm:pb-4 border-b border-[rgba(46,122,217,0.25)]">
           <div className="flex items-center justify-between">
-            <DialogTitle className="text-2xl font-bold text-[#1A1A2E]">
-              Add Service Region
-            </DialogTitle>
+            <DialogTitle className="text-2xl font-bold text-[#1A1A2E]">Add Service Region</DialogTitle>
             <button
               onClick={handleClose}
               className="w-8 h-8 rounded-lg hover:bg-[#F0F7FF] flex items-center justify-center transition-colors"
+              aria-label="Close"
             >
               <X className="w-5 h-5 text-[#6B7280]" />
             </button>
@@ -208,234 +157,122 @@ export function CountryRegionModal({ open, onClose, onAddRegions }: CountryRegio
 
         <div className="p-4 sm:p-8 overflow-y-auto max-h-[calc(90vh-120px)] sm:max-h-[600px]">
           {step === 1 ? (
-            // Step 1: Select Country
             <div className="space-y-6">
               <div>
-                <p className="text-base font-semibold text-[#1A1A2E] mb-2">
-                  Step 1: Select Country
-                </p>
-                <p className="text-sm text-[#6B7280]">
-                  Choose the country where you want to offer services.
-                </p>
+                <p className="text-base font-semibold text-[#1A1A2E] mb-2">Step 1: Select Country</p>
+                <p className="text-sm text-[#6B7280]">Choose a country with available service regions.</p>
               </div>
 
               <div className="relative">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-[#9CA3AF]" />
                 <Input
+                  type="text"
                   placeholder="Search countries..."
                   value={countrySearch}
                   onChange={(e) => setCountrySearch(e.target.value)}
-                  className="h-11 pl-12 border-2 border-[rgba(46,122,217,0.25)] rounded-lg"
+                  className="pl-12 h-12"
                 />
               </div>
 
-              <div>
-                <p className="text-xs font-semibold text-[#6B7280] uppercase tracking-wider mb-3">
-                  Popular Countries
-                </p>
-                <div className="space-y-2">
-                  {filteredCountries.slice(0, 2).map((country) => (
-                    <button
-                      key={country.code}
-                      onClick={() => handleCountrySelect(country)}
-                      className="w-full h-14 flex items-center justify-between px-4 border border-[rgba(46,122,217,0.25)] rounded-lg hover:border-[#2E7AD9] hover:bg-white transition-colors shadow-[0_4px_16px_rgba(46,122,217,0.18)]"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="text-[32px]">{country.flag}</span>
-                        <span className="text-base font-semibold text-[#1A1A2E]">
-                          {country.name}
-                        </span>
-                      </div>
-                      <ArrowLeft className="w-5 h-5 text-[#9CA3AF] rotate-180" />
-                    </button>
-                  ))}
+              {loadingCountries ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-6 h-6 text-[#2E7AD9] animate-spin" />
                 </div>
-              </div>
-
-              <div>
-                <p className="text-xs font-semibold text-[#6B7280] uppercase tracking-wider mb-3">
-                  All Countries (Alphabetical)
-                </p>
-                <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2">
+              ) : filteredCountries.length === 0 ? (
+                <div className="text-center py-12 text-sm text-[#6B7280]">
+                  <Globe className="w-10 h-10 mx-auto mb-3 text-[#9CA3AF]" />
+                  No countries available. Add regions via Admin → Geographic Regions first.
+                </div>
+              ) : (
+                <div className="space-y-2">
                   {filteredCountries.map((country) => (
                     <button
                       key={country.code}
                       onClick={() => handleCountrySelect(country)}
-                      className="w-full h-14 flex items-center justify-between px-4 border border-[rgba(46,122,217,0.25)] rounded-lg hover:border-[#2E7AD9] hover:bg-white transition-colors shadow-[0_4px_16px_rgba(46,122,217,0.18)]"
+                      className="w-full flex items-center gap-3 p-3 rounded-lg border border-[rgba(46,122,217,0.25)] hover:bg-[#F0F7FF] hover:border-[#2E7AD9] transition-colors text-left"
                     >
-                      <div className="flex items-center gap-3">
-                        <span className="text-[32px]">{country.flag}</span>
-                        <span className="text-base font-semibold text-[#1A1A2E]">
-                          {country.name}
-                        </span>
-                      </div>
-                      <ArrowLeft className="w-5 h-5 text-[#9CA3AF] rotate-180" />
+                      <span className="text-2xl">{country.flag}</span>
+                      <span className="flex-1 text-sm font-medium text-[#1A1A2E]">{country.name}</span>
+                      <span className="text-xs text-[#9CA3AF]">{country.code}</span>
                     </button>
                   ))}
                 </div>
-              </div>
-
-              <div className="pt-6 flex justify-center">
-                <Button
-                  variant="outline"
-                  onClick={handleClose}
-                  className="w-[140px] h-11"
-                >
-                  Cancel
-                </Button>
-              </div>
+              )}
             </div>
           ) : (
-            // Step 2: Select Regions
             <div className="space-y-6">
               <button
                 onClick={handleBackToCountries}
-                className="flex items-center gap-2 text-sm text-[#6B7280] hover:text-[#1A1A2E] hover:underline"
+                className="flex items-center gap-2 text-sm text-[#6B7280] hover:text-[#1A1A2E] transition-colors"
               >
-                <ArrowLeft className="w-4 h-4" />
-                Back to Countries
+                <ArrowLeft className="w-4 h-4" /> Back to countries
               </button>
 
               <div>
-                <p className="text-base font-semibold text-[#1A1A2E] mb-2">
-                  Step 2: Select Regions in {selectedCountry?.name}
+                <p className="text-base font-semibold text-[#1A1A2E] mb-1 flex items-center gap-2">
+                  <span className="text-2xl">{selectedCountry?.flag}</span>
+                  Step 2: Select regions in {selectedCountry?.name}
                 </p>
-                <p className="text-sm text-[#6B7280]">
-                  Choose specific cities or states where you'll provide services.
-                </p>
+                <p className="text-sm text-[#6B7280]">Pick one or more regions.</p>
               </div>
 
               <div className="relative">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-[#9CA3AF]" />
                 <Input
-                  placeholder={`Search regions in ${selectedCountry?.name}...`}
+                  type="text"
+                  placeholder="Search regions..."
                   value={regionSearch}
                   onChange={(e) => setRegionSearch(e.target.value)}
-                  className="h-11 pl-12 border-2 border-[rgba(46,122,217,0.25)] rounded-lg"
+                  className="pl-12 h-12"
                 />
               </div>
 
-              <div>
-                <p className="text-xs font-semibold text-[#6B7280] uppercase tracking-wider mb-3">
-                  Major Cities
-                </p>
+              {loadingRegions ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-6 h-6 text-[#2E7AD9] animate-spin" />
+                </div>
+              ) : filteredRegions.length === 0 ? (
+                <div className="text-center py-12 text-sm text-[#6B7280]">
+                  No regions in {selectedCountry?.name} yet.
+                </div>
+              ) : (
                 <div className="space-y-2">
-                  {filteredMajorRegions.map((region) => {
-                    const isSelected = selectedRegions.includes(region.id);
+                  {filteredRegions.map((region) => {
+                    const checked = selectedRegions.includes(region.id);
                     return (
                       <div
                         key={region.id}
-                        onClick={() => {
-                          if (isSelected) {
-                            setSelectedRegions(selectedRegions.filter(id => id !== region.id));
-                          } else {
-                            setSelectedRegions([...selectedRegions, region.id]);
-                          }
-                        }}
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            if (isSelected) {
-                              setSelectedRegions(selectedRegions.filter(id => id !== region.id));
-                            } else {
-                              setSelectedRegions([...selectedRegions, region.id]);
-                            }
-                          }
-                        }}
-                        className={`w-full h-14 flex items-center gap-3 px-4 border rounded-lg transition-all cursor-pointer ${
-                          isSelected
-                            ? 'border-[#10B981] bg-[#D1FAE5]'
-                            : 'border-[rgba(46,122,217,0.25)] hover:border-[#2E7AD9] hover:bg-white'
+                        onClick={() =>
+                          setSelectedRegions((prev) =>
+                            checked ? prev.filter((id) => id !== region.id) : [...prev, region.id]
+                          )
+                        }
+                        className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                          checked
+                            ? "bg-[#F0F7FF] border-[#2E7AD9]"
+                            : "border-[rgba(46,122,217,0.25)] hover:bg-[#F0F7FF]"
                         }`}
                       >
-                        <Checkbox
-                          checked={isSelected}
-                          onCheckedChange={() => {}}
-                          className="w-5 h-5 pointer-events-none"
-                        />
-                        <span className="text-base font-semibold text-[#1A1A2E]">
-                          {region.name}
-                        </span>
-                        <span className="text-[13px] text-[#6B7280]">
-                          ({region.subRegion})
-                        </span>
+                        <Checkbox checked={checked} onCheckedChange={() => {}} className="pointer-events-none" />
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-[#1A1A2E]">{region.name}</p>
+                          <p className="text-xs text-[#6B7280]">{region.state || region.province || region.country}</p>
+                        </div>
                       </div>
                     );
                   })}
                 </div>
-              </div>
+              )}
 
-              <div>
-                <p className="text-xs font-semibold text-[#6B7280] uppercase tracking-wider mb-3">
-                  All Regions (Alphabetical)
-                </p>
-                <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2">
-                  {filteredAllRegions.map((region) => {
-                    const isSelected = selectedRegions.includes(region.id);
-                    return (
-                      <div
-                        key={region.id}
-                        onClick={() => {
-                          if (isSelected) {
-                            setSelectedRegions(selectedRegions.filter(id => id !== region.id));
-                          } else {
-                            setSelectedRegions([...selectedRegions, region.id]);
-                          }
-                        }}
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            if (isSelected) {
-                              setSelectedRegions(selectedRegions.filter(id => id !== region.id));
-                            } else {
-                              setSelectedRegions([...selectedRegions, region.id]);
-                            }
-                          }
-                        }}
-                        className={`w-full h-14 flex items-center gap-3 px-4 border rounded-lg transition-all cursor-pointer ${
-                          isSelected
-                            ? 'border-[#10B981] bg-[#D1FAE5]'
-                            : 'border-[rgba(46,122,217,0.25)] hover:border-[#2E7AD9] hover:bg-white'
-                        }`}
-                      >
-                        <Checkbox
-                          checked={isSelected}
-                          onCheckedChange={() => {}}
-                          className="w-5 h-5 pointer-events-none"
-                        />
-                        <span className="text-base font-semibold text-[#1A1A2E]">
-                          {region.name}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="pt-4">
-                <p className="text-sm text-[#6B7280] text-center mb-6">
-                  Selected: {selectedRegions.length} region{selectedRegions.length !== 1 ? 's' : ''}
-                </p>
-                <div className="flex gap-3 justify-center">
-                  <Button
-                    variant="outline"
-                    onClick={handleClose}
-                    className="w-[140px] h-11"
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    onClick={handleAddSelected}
-                    disabled={selectedRegions.length === 0}
-                    className="w-[180px] h-11 bg-[#2E7AD9] hover:bg-[#1E5DB0] text-white font-semibold disabled:bg-[rgba(46, 122, 217, 0.18)] disabled:cursor-not-allowed"
-                  >
-                    Add Selected
-                  </Button>
-                </div>
+              <div className="flex items-center justify-between pt-4 border-t border-[rgba(46,122,217,0.25)]">
+                <span className="text-sm text-[#6B7280]">{selectedRegions.length} selected</span>
+                <Button
+                  onClick={handleAddSelected}
+                  disabled={selectedRegions.length === 0}
+                  className="bg-[#2E7AD9] hover:bg-[#1E5DB0]"
+                >
+                  Add Selected
+                </Button>
               </div>
             </div>
           )}
