@@ -477,6 +477,295 @@ router.get('/michelle-profiles/:id/listings', authenticate, requireAdmin, async 
   }
 });
 
+// ========================================
+// MICHELLE LISTING CRUD (admin operates on the Michelle vendor's behalf)
+// ========================================
+
+const ADMIN_LISTING_MODELS: Record<string, string> = {
+  CLEANING: 'cleaningListing',
+  HANDYMAN: 'handymanListing',
+  BEAUTY: 'beautyListing',
+  BEAUTY_PRODUCTS: 'beautyProductListing',
+  GROCERIES: 'groceryListing',
+  FOOD: 'foodListing',
+  RENTALS: 'rentalListing',
+  RIDE_ASSISTANCE: 'rideAssistanceListing',
+  COMPANIONSHIP: 'companionshipListing',
+};
+
+function resolveAdminModelKey(t: string | undefined): string | null {
+  if (!t) return null;
+  return ADMIN_LISTING_MODELS[String(t).toUpperCase()] || null;
+}
+
+// Single-listing fetch for the wizard's edit mode
+router.get('/michelle-profiles/:profileId/listings/:type/:id', authenticate, requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const { profileId, type, id } = req.params;
+    const profile = await prisma.vendor.findFirst({ where: { id: profileId, isMichelle: true } });
+    if (!profile) return res.status(404).json({ error: 'Michelle profile not found' });
+
+    const modelKey = resolveAdminModelKey(type);
+    if (!modelKey) return res.status(400).json({ error: 'Invalid listing type' });
+
+    const row: any = await (prisma as any)[modelKey].findFirst({
+      where: { id, vendorId: profileId },
+    });
+    if (!row) return res.status(404).json({ error: 'Listing not found' });
+    res.json({ success: true, data: { ...row, category: String(type).toUpperCase() } });
+  } catch (e: any) {
+    console.error('Admin get michelle listing error:', e);
+    res.status(500).json({ error: 'Failed to load listing' });
+  }
+});
+
+// Create listing on behalf of a Michelle vendor
+router.post('/michelle-profiles/:profileId/listings', authenticate, requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const { profileId } = req.params;
+    const profile = await prisma.vendor.findFirst({ where: { id: profileId, isMichelle: true } });
+    if (!profile) return res.status(404).json({ error: 'Michelle profile not found' });
+
+    const b: any = req.body || {};
+    const category = String(b.category || '').toUpperCase();
+    if (!ADMIN_LISTING_MODELS[category]) return res.status(400).json({ error: 'Invalid category' });
+
+    const apiStatus = b.status === 'inactive' || b.status === 'DRAFT' ? 'DRAFT' : 'ACTIVE';
+    const desc = b.description || b.fullDescription || '';
+    const imgs = Array.isArray(b.images) ? b.images : [];
+    const numPrice = Number(b.price) || 0;
+    const included = Array.isArray(b.whatsIncluded) ? b.whatsIncluded : [];
+
+    let listing: any;
+    const vendorId = profile.id;
+
+    switch (category) {
+      case 'CLEANING':
+        listing = await prisma.cleaningListing.create({
+          data: {
+            vendorId, title: b.title, description: desc,
+            cleaningType: b.cleaningType || 'DEEP_CLEANING',
+            basePrice: numPrice, images: imgs, whatsIncluded: included,
+            duration: b.duration ? Number(b.duration) : null,
+            status: apiStatus as any,
+          },
+        });
+        break;
+      case 'HANDYMAN':
+        listing = await prisma.handymanListing.create({
+          data: {
+            vendorId, title: b.title, description: desc,
+            handymanType: b.handymanType || 'PLUMBING',
+            basePrice: numPrice, hourlyRate: b.hourlyRate ? Number(b.hourlyRate) : null,
+            services: Array.isArray(b.services) ? b.services : [],
+            images: imgs, whatsIncluded: included,
+            status: apiStatus as any,
+          },
+        });
+        break;
+      case 'BEAUTY':
+        listing = await prisma.beautyListing.create({
+          data: {
+            vendorId, title: b.title, description: desc,
+            beautyType: b.beautyType || 'HAIR_STYLING',
+            basePrice: numPrice,
+            duration: b.duration ? Number(b.duration) : 60,
+            services: Array.isArray(b.services) ? b.services : [],
+            images: imgs, portfolio: Array.isArray(b.portfolio) ? b.portfolio : [],
+            status: apiStatus as any,
+          },
+        });
+        break;
+      case 'BEAUTY_PRODUCTS':
+        listing = await (prisma as any).beautyProductListing.create({
+          data: {
+            vendorId, name: b.title, description: desc,
+            category: b.productCategory || 'Skincare',
+            brand: b.brand || null, price: numPrice,
+            quantityAmount: b.quantityAmount ? Number(b.quantityAmount) : null,
+            quantityUnit: b.quantityUnit || null,
+            image: imgs[0] || null,
+            status: apiStatus as any,
+          },
+        });
+        break;
+      case 'GROCERIES':
+        listing = await prisma.groceryListing.create({
+          data: {
+            vendorId, name: b.title, description: desc,
+            category: b.productCategory || 'Produce',
+            price: numPrice, unit: b.quantityUnit || 'each',
+            image: imgs[0] || null,
+            status: apiStatus as any,
+          },
+        });
+        break;
+      case 'FOOD':
+        listing = await (prisma as any).foodListing.create({
+          data: {
+            vendorId, name: b.title, description: desc,
+            category: b.productCategory || 'Main Courses',
+            cuisines: Array.isArray(b.cuisines) ? b.cuisines : [],
+            portionSize: b.portionSize || null,
+            quantityAmount: b.quantityAmount ? Number(b.quantityAmount) : null,
+            quantityUnit: b.quantityUnit || null,
+            price: numPrice, image: imgs[0] || null,
+            status: apiStatus as any,
+          },
+        });
+        break;
+      case 'RENTALS':
+        listing = await prisma.rentalListing.create({
+          data: {
+            vendorId, title: b.title, description: desc,
+            propertyType: b.propertyType || 'Apartment',
+            address: b.address || '', city: b.city || '',
+            state: b.state || '', zipCode: b.zipCode || '',
+            bedrooms: b.bedrooms ? Number(b.bedrooms) : 1,
+            bathrooms: b.bathrooms ? Number(b.bathrooms) : 1,
+            maxGuests: b.maxGuests ? Number(b.maxGuests) : null,
+            amenities: Array.isArray(b.amenities) ? b.amenities : [],
+            images: imgs,
+            pricePerNight: b.pricePerNight ? Number(b.pricePerNight) : numPrice,
+            cleaningFee: b.cleaningFee ? Number(b.cleaningFee) : null,
+            rules: Array.isArray(b.rules) ? b.rules : (b.houseRules ? [b.houseRules] : []),
+            minStay: b.minStay ? Number(b.minStay) : 1,
+            status: apiStatus as any,
+          },
+        });
+        break;
+      case 'RIDE_ASSISTANCE':
+        listing = await (prisma as any).rideAssistanceListing.create({
+          data: {
+            vendorId, title: b.title || 'Ride Assistance', description: desc,
+            longDescription: b.fullDescription || null,
+            hourlyRate: b.hourlyRate ? Number(b.hourlyRate) : numPrice,
+            image: imgs[0] || null, images: imgs,
+            vehicleTypes: Array.isArray(b.vehicleTypes) ? b.vehicleTypes : [],
+            specialFeatures: b.specialFeatures || null,
+            coverageArea: b.coverageArea || null,
+            totalSeats: b.totalSeats ? Number(b.totalSeats) : null,
+            status: apiStatus as any,
+          },
+        });
+        break;
+      case 'COMPANIONSHIP':
+        listing = await (prisma as any).companionshipListing.create({
+          data: {
+            vendorId, title: b.title, description: desc,
+            hourlyRate: b.hourlyRate ? Number(b.hourlyRate) : numPrice,
+            yearsOfExperience: b.yearsOfExperience ? Number(b.yearsOfExperience) : null,
+            image: imgs[0] || null,
+            credentialImages: Array.isArray(b.credentialImages) ? b.credentialImages : [],
+            certifications: Array.isArray(b.certifications) ? b.certifications : [],
+            specialties: Array.isArray(b.specialties) ? b.specialties : [],
+            supportTypes: Array.isArray(b.supportTypes) ? b.supportTypes : [],
+            languages: Array.isArray(b.languages) ? b.languages : [],
+            status: apiStatus as any,
+          },
+        });
+        break;
+    }
+
+    res.status(201).json({ success: true, data: { ...listing, category } });
+  } catch (e: any) {
+    console.error('Admin create michelle listing error:', e);
+    res.status(500).json({ error: e?.message || 'Failed to create listing' });
+  }
+});
+
+router.put('/michelle-profiles/:profileId/listings/:type/:id', authenticate, requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const { profileId, type, id } = req.params;
+    const profile = await prisma.vendor.findFirst({ where: { id: profileId, isMichelle: true } });
+    if (!profile) return res.status(404).json({ error: 'Michelle profile not found' });
+
+    const modelKey = resolveAdminModelKey(type);
+    if (!modelKey) return res.status(400).json({ error: 'Invalid listing type' });
+
+    const existing: any = await (prisma as any)[modelKey].findFirst({ where: { id, vendorId: profileId } });
+    if (!existing) return res.status(404).json({ error: 'Listing not found' });
+
+    const b: any = req.body || {};
+    const usesName = ['BEAUTY_PRODUCTS', 'GROCERIES', 'FOOD'].includes(String(type).toUpperCase());
+    const apiStatus = b.status === 'inactive' || b.status === 'DRAFT' ? 'DRAFT' : b.status === 'PAUSED' ? 'PAUSED' : 'ACTIVE';
+    const desc = b.description ?? b.fullDescription;
+    const numPrice = b.price !== undefined ? Number(b.price) : undefined;
+    const imgs = Array.isArray(b.images) ? b.images : undefined;
+
+    const data: any = {
+      ...(b.title !== undefined && (usesName ? { name: b.title } : { title: b.title })),
+      ...(desc !== undefined && { description: desc }),
+      ...(numPrice !== undefined && (usesName ? { price: numPrice } : { basePrice: numPrice })),
+      ...(imgs !== undefined && (usesName ? { image: imgs[0] || null } : { images: imgs })),
+      ...(b.status !== undefined && { status: apiStatus as any }),
+      ...(Array.isArray(b.whatsIncluded) && !usesName && { whatsIncluded: b.whatsIncluded }),
+      ...(b.cleaningType !== undefined && { cleaningType: b.cleaningType }),
+      ...(b.handymanType !== undefined && { handymanType: b.handymanType }),
+      ...(b.beautyType !== undefined && { beautyType: b.beautyType }),
+      ...(b.duration !== undefined && { duration: b.duration ? Number(b.duration) : null }),
+      ...(Array.isArray(b.services) && { services: b.services }),
+      ...(Array.isArray(b.portfolio) && { portfolio: b.portfolio }),
+      ...(Array.isArray(b.cuisines) && { cuisines: b.cuisines }),
+      ...(b.portionSize !== undefined && { portionSize: b.portionSize }),
+      ...(b.productCategory !== undefined && { category: b.productCategory }),
+      ...(b.brand !== undefined && { brand: b.brand }),
+      ...(b.quantityAmount !== undefined && { quantityAmount: b.quantityAmount ? Number(b.quantityAmount) : null }),
+      ...(b.quantityUnit !== undefined && (usesName ? { unit: b.quantityUnit } : { quantityUnit: b.quantityUnit })),
+      ...(b.propertyType !== undefined && { propertyType: b.propertyType }),
+      ...(b.address !== undefined && { address: b.address }),
+      ...(b.city !== undefined && { city: b.city }),
+      ...(b.state !== undefined && { state: b.state }),
+      ...(b.zipCode !== undefined && { zipCode: b.zipCode }),
+      ...(b.bedrooms !== undefined && { bedrooms: Number(b.bedrooms) }),
+      ...(b.bathrooms !== undefined && { bathrooms: Number(b.bathrooms) }),
+      ...(b.maxGuests !== undefined && { maxGuests: Number(b.maxGuests) }),
+      ...(Array.isArray(b.amenities) && { amenities: b.amenities }),
+      ...(b.pricePerNight !== undefined && { pricePerNight: Number(b.pricePerNight) }),
+      ...(b.cleaningFee !== undefined && { cleaningFee: Number(b.cleaningFee) }),
+      ...(Array.isArray(b.rules) && { rules: b.rules }),
+      ...(b.minStay !== undefined && { minStay: Number(b.minStay) }),
+      ...(b.hourlyRate !== undefined && { hourlyRate: Number(b.hourlyRate) }),
+      ...(Array.isArray(b.vehicleTypes) && { vehicleTypes: b.vehicleTypes }),
+      ...(b.specialFeatures !== undefined && { specialFeatures: b.specialFeatures }),
+      ...(b.coverageArea !== undefined && { coverageArea: b.coverageArea }),
+      ...(b.totalSeats !== undefined && { totalSeats: Number(b.totalSeats) }),
+      ...(b.yearsOfExperience !== undefined && { yearsOfExperience: Number(b.yearsOfExperience) }),
+      ...(Array.isArray(b.credentialImages) && { credentialImages: b.credentialImages }),
+      ...(Array.isArray(b.certifications) && { certifications: b.certifications }),
+      ...(Array.isArray(b.specialties) && { specialties: b.specialties }),
+      ...(Array.isArray(b.supportTypes) && { supportTypes: b.supportTypes }),
+      ...(Array.isArray(b.languages) && { languages: b.languages }),
+    };
+
+    const updated = await (prisma as any)[modelKey].update({ where: { id }, data });
+    res.json({ success: true, data: updated });
+  } catch (e: any) {
+    console.error('Admin update michelle listing error:', e);
+    res.status(500).json({ error: e?.message || 'Failed to update listing' });
+  }
+});
+
+router.delete('/michelle-profiles/:profileId/listings/:type/:id', authenticate, requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const { profileId, type, id } = req.params;
+    const profile = await prisma.vendor.findFirst({ where: { id: profileId, isMichelle: true } });
+    if (!profile) return res.status(404).json({ error: 'Michelle profile not found' });
+
+    const modelKey = resolveAdminModelKey(type);
+    if (!modelKey) return res.status(400).json({ error: 'Invalid listing type' });
+
+    const existing: any = await (prisma as any)[modelKey].findFirst({ where: { id, vendorId: profileId } });
+    if (!existing) return res.status(404).json({ error: 'Listing not found' });
+
+    await (prisma as any)[modelKey].delete({ where: { id } });
+    res.json({ success: true });
+  } catch (e: any) {
+    console.error('Admin delete michelle listing error:', e);
+    res.status(500).json({ error: e?.message || 'Failed to delete listing' });
+  }
+});
+
 // Get Michelle profile analytics
 router.get('/michelle-profiles/:id/analytics', authenticate, requireAdmin, async (req: AuthRequest, res) => {
   try {

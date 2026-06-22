@@ -1,5 +1,8 @@
-import { useState } from "react";
-import { useNavigate, useParams, Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useNavigate, useParams, Link, useSearchParams } from "react-router-dom";
+import { toast } from "sonner";
+import api from "../../../services/api";
+import { supabase } from "../../../lib/supabase";
 import {
   ArrowLeft,
   Upload,
@@ -61,17 +64,32 @@ const BEAUTY_SERVICES_INCLUDED_ITEMS: IncludedItem[] = [
   { id: "3", text: "Clean & hygienic setup", isCustom: false },
 ];
 
+const ENUM_TO_LABEL: Record<string, string> = {
+  CLEANING: "Cleaning Services",
+  HANDYMAN: "Handyman Services",
+  BEAUTY: "Beauty Services",
+  BEAUTY_PRODUCTS: "Beauty Products",
+  GROCERIES: "Grocery",
+  FOOD: "Food",
+  RENTALS: "Rental Properties",
+  RIDE_ASSISTANCE: "Ride Assistance",
+  COMPANIONSHIP: "Companionship Support",
+};
+
+const API_BASE =
+  (import.meta as any).env?.VITE_API_URL ||
+  (typeof window !== "undefined" && window.location.hostname !== "localhost"
+    ? "https://alishba-x-dohuub-production.up.railway.app"
+    : "http://localhost:3001");
+
 export function CreateEditServiceWizard() {
   const navigate = useNavigate();
   const { profileId, listingId } = useParams();
+  const [searchParams] = useSearchParams();
+  // Edit-mode URL may include ?type=BEAUTY etc — needed because the listing
+  // ID alone doesn't identify which table to query.
+  const typeQueryParam = searchParams.get("type") || null;
   const isEditing = !!listingId;
-
-  // Check if this is a Companionship Support profile and route to specialized form
-  const isCompanionshipSupportProfile = profileId === "32" || profileId === "33" || profileId === "34";
-  
-  if (isCompanionshipSupportProfile) {
-    return <CompanionshipSupportForm />;
-  }
 
   // Sidebar state
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -79,78 +97,65 @@ export function CreateEditServiceWizard() {
     typeof window !== 'undefined' && window.innerWidth >= 1024 ? false : true
   );
 
-  // Determine profile type based on profileId
-  // Profile IDs: "1", "2", "3" are Cleaning Services
-  // Profile IDs: "4", "5", "6" are Handyman Services
-  // Profile IDs: "10", "11", "12" are Beauty Services
-  // Profile IDs: "13", "14", "15" are Beauty Products
-  // Profile IDs: "7", "8", "9" are Grocery
-  // Profile IDs: "19", "20", "21" are Food
-  // Profile IDs: "22", "23", "24" are Rental Properties
-  // Profile IDs: "25", "26", "27" are Ride Assistance
-  const isCleaningProfile = profileId === "1" || profileId === "2" || profileId === "3";
-  const isHandymanProfile = profileId === "4" || profileId === "5" || profileId === "6";
-  const isBeautyServicesProfile = profileId === "10" || profileId === "11" || profileId === "12";
-  const isBeautyProductsProfile = profileId === "13" || profileId === "14" || profileId === "15";
-  const isGroceryProfile = profileId === "7" || profileId === "8" || profileId === "9";
-  const isFoodProfile = profileId === "19" || profileId === "20" || profileId === "21";
-  const isRentalPropertiesProfile = profileId === "22" || profileId === "23" || profileId === "24";
-  const isRideAssistanceProfile = profileId === "25" || profileId === "26" || profileId === "27";
-  
-  // Mock profile data based on category
-  const getProfileInfo = () => {
-    if (profileId === "1") return { name: "Sparkle Clean by Michelle", category: "Cleaning Services" };
-    if (profileId === "2") return { name: "Michelle's Deep Clean Express", category: "Cleaning Services" };
-    if (profileId === "3") return { name: "Green & Clean by Michelle", category: "Cleaning Services" };
-    if (profileId === "4") return { name: "Fix-It Pro by Michelle", category: "Handyman Services" };
-    if (profileId === "5") return { name: "Michelle's Home Repair Hub", category: "Handyman Services" };
-    if (profileId === "6") return { name: "Handyman Express Solutions", category: "Handyman Services" };
-    if (profileId === "7") return { name: "Fresh Harvest by Michelle", category: "Grocery" };
-    if (profileId === "8") return { name: "Organic Essentials Delivery", category: "Grocery" };
-    if (profileId === "9") return { name: "Michelle's Meal Prep & Groceries", category: "Grocery" };
-    if (profileId === "10") return { name: "Beauty by Michelle", category: "Beauty Services" };
-    if (profileId === "11") return { name: "Glam Studio Mobile", category: "Beauty Services" };
-    if (profileId === "12") return { name: "Michelle's Spa On-The-Go", category: "Beauty Services" };
-    if (profileId === "13") return { name: "Glam Cosmetics Shop", category: "Beauty Products" };
-    if (profileId === "14") return { name: "Pure Skincare Boutique", category: "Beauty Products" };
-    if (profileId === "15") return { name: "Beauty Essentials by Michelle", category: "Beauty Products" };
-    if (profileId === "19") return { name: "Mama's Kitchen", category: "Food" };
-    if (profileId === "20") return { name: "Chef's Table by Michelle", category: "Food" };
-    if (profileId === "21") return { name: "Homestyle Meals", category: "Food" };
-    if (profileId === "22") return { name: "Michelle's Properties", category: "Rental Properties" };
-    if (profileId === "23") return { name: "Urban Stays by Michelle", category: "Rental Properties" };
-    if (profileId === "24") return { name: "Cozy Rentals", category: "Rental Properties" };
-    if (profileId === "25") return { name: "CareWheels Transportation", category: "Ride Assistance" };
-    if (profileId === "26") return { name: "Senior Care Rides", category: "Ride Assistance" };
-    if (profileId === "27") return { name: "SafeTransit Solutions", category: "Ride Assistance" };
-    if (profileId === "32") return { name: "Caring Companions by Michelle", category: "Companionship Support" };
-    if (profileId === "33") return { name: "Michelle's Senior Care Network", category: "Companionship Support" };
-    if (profileId === "34") return { name: "Compassionate Care Services", category: "Companionship Support" };
-    return { name: "Sparkle Clean by Michelle", category: "Cleaning Services" };
-  };
-  
-  const { name: profileName, category: profileCategory } = getProfileInfo();
-  
-  // Mock vendor regions - these would be fetched from the vendor's store settings
-  const getVendorRegions = () => {
-    if (isRentalPropertiesProfile) {
-      return [
-        "Manhattan, New York, NY",
-        "Brooklyn, New York, NY",
-        "Queens, New York, NY",
-        "Bronx, New York, NY",
-        "Jersey City, NJ"
-      ];
-    }
-    return [
-      "New York, NY",
-      "Brooklyn, NY",
-      "Queens, NY",
-      "Manhattan, NY"
-    ];
-  };
-  
-  const vendorRegions = getVendorRegions();
+  // Real profile fetched from /admin/michelle-profiles/:id. Drives category +
+  // regions. Was previously a numeric profileId match that never matched real
+  // cuids — every real profile fell through to the Cleaning Services form.
+  const [profile, setProfile] = useState<{ id: string; name: string; categoryEnum: string; categoryLabel: string } | null>(null);
+  const [vendorRegionsList, setVendorRegionsList] = useState<string[]>([]);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [initialDataLoading, setInitialDataLoading] = useState(false);
+
+  useEffect(() => {
+    if (!profileId) return;
+    setProfileLoading(true);
+    api
+      .get<{ success: boolean; data: any }>(`/api/v1/admin/michelle-profiles/${profileId}`)
+      .then((r) => {
+        const v: any = (r as any)?.data;
+        if (!v) {
+          setProfileError("Profile not found");
+          return;
+        }
+        const categoryEnum = String(v.categories?.[0]?.category || "CLEANING").toUpperCase();
+        setProfile({
+          id: v.id,
+          name: v.businessName || "Untitled Profile",
+          categoryEnum,
+          categoryLabel: ENUM_TO_LABEL[categoryEnum] || categoryEnum,
+        });
+        const storeRegions = (v.stores || [])
+          .flatMap((s: any) => (s.regions || []).map((r: any) => r.region?.name))
+          .filter(Boolean);
+        const legacyAreas = (v.serviceAreas || []).map((s: any) => s.name).filter(Boolean);
+        const combined = Array.from(new Set([...storeRegions, ...legacyAreas]));
+        setVendorRegionsList(combined);
+      })
+      .catch((e: any) => {
+        setProfileError(e?.response?.data?.error || e?.message || "Failed to load profile");
+      })
+      .finally(() => setProfileLoading(false));
+  }, [profileId]);
+
+  const profileCategoryEnum = profile?.categoryEnum || "";
+  const profileCategory = profile?.categoryLabel || "Cleaning Services";
+  const profileName = profile?.name || "Profile";
+  const vendorRegions = vendorRegionsList.length > 0 ? vendorRegionsList : [];
+
+  // Route to the specialized companionship form for that category
+  if (profile?.categoryEnum === "COMPANIONSHIP") {
+    return <CompanionshipSupportForm />;
+  }
+
+  // Category boolean flags driven by the real enum from the API
+  const isCleaningProfile = profileCategoryEnum === "CLEANING";
+  const isHandymanProfile = profileCategoryEnum === "HANDYMAN";
+  const isBeautyServicesProfile = profileCategoryEnum === "BEAUTY";
+  const isBeautyProductsProfile = profileCategoryEnum === "BEAUTY_PRODUCTS";
+  const isGroceryProfile = profileCategoryEnum === "GROCERIES";
+  const isFoodProfile = profileCategoryEnum === "FOOD";
+  const isRentalPropertiesProfile = profileCategoryEnum === "RENTALS";
+  const isRideAssistanceProfile = profileCategoryEnum === "RIDE_ASSISTANCE";
   
   // Select default items based on category
   const getDefaultItems = () => {
@@ -299,19 +304,222 @@ export function CreateEditServiceWizard() {
     setSelectedItems(selectedItems.filter(itemId => itemId !== id));
   };
 
-  const handleSaveAsDraft = () => {
-    // Save as draft logic
-    navigate(`/admin/michelle-profiles/${profileId}/listings`);
+  // Upload a base64 data URL or File to /upload/image, returns hosted URL.
+  // The wizard captures images as base64 data URLs locally; we POST the raw
+  // File via FormData. Returns the original URL if it's already an https URL.
+  const uploadOne = async (img: ImageFile | null): Promise<string | null> => {
+    if (!img) return null;
+    if (img.url.startsWith("http")) return img.url;
+    if (!img.file) return null;
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+    const form = new FormData();
+    form.append("image", img.file);
+    const resp = await fetch(`${API_BASE}/api/v1/upload/image?type=listing`, {
+      method: "POST",
+      body: form,
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!resp.ok) throw new Error(`Image upload failed: HTTP ${resp.status}`);
+    const json = await resp.json();
+    return json?.data?.url || null;
   };
 
-  const handlePublish = () => {
-    // Publish logic
-    navigate(`/admin/michelle-profiles/${profileId}/listings`);
+  const uploadMany = async (imgs: ImageFile[]): Promise<string[]> => {
+    const out: string[] = [];
+    for (const img of imgs) {
+      const url = await uploadOne(img);
+      if (url) out.push(url);
+    }
+    return out;
   };
+
+  // Build the API payload for the current category. The admin endpoint at
+  // POST /admin/michelle-profiles/:profileId/listings dispatches by category.
+  const buildPayload = async (isDraft: boolean) => {
+    if (!profile) throw new Error("Profile not loaded");
+
+    const thumbUrl = await uploadOne(thumbnail);
+    const galleryUrls = await uploadMany(imageGallery);
+    const allImages = [thumbUrl, ...galleryUrls].filter(Boolean) as string[];
+
+    const titleField = isBeautyProductsProfile || isGroceryProfile || isFoodProfile ? itemName : serviceTitle;
+
+    const base: any = {
+      category: profile.categoryEnum,
+      title: titleField,
+      description: shortDescription,
+      fullDescription: longDescription || undefined,
+      images: allImages,
+      whatsIncluded: includedItems
+        .filter((it) => selectedItems.includes(it.id))
+        .map((it) => it.text),
+      status: isDraft ? "DRAFT" : "ACTIVE",
+    };
+
+    if (isCleaningProfile) {
+      base.price = parseFloat(price) || 0;
+      base.duration = duration ? parseInt(duration) : undefined;
+    } else if (isHandymanProfile) {
+      base.price = parseFloat(price) || 0;
+      if (pricingType === "hourly") base.hourlyRate = parseFloat(price) || 0;
+    } else if (isBeautyServicesProfile) {
+      base.price = parseFloat(price) || 0;
+      base.duration = duration ? parseInt(duration) : undefined;
+    } else if (isBeautyProductsProfile) {
+      base.price = parseFloat(price) || 0;
+      base.productCategory = productCategory || undefined;
+      base.quantityAmount = quantity ? parseFloat(quantity) : undefined;
+      base.quantityUnit = quantityUnit || undefined;
+    } else if (isGroceryProfile) {
+      base.price = parseFloat(price) || 0;
+      base.productCategory = productCategory || undefined;
+      base.quantityAmount = quantity ? parseFloat(quantity) : undefined;
+      base.quantityUnit = quantityUnit || undefined;
+    } else if (isFoodProfile) {
+      base.price = parseFloat(price) || 0;
+      base.productCategory = productCategory || undefined;
+      base.cuisines = cuisines;
+      base.portionSize = portionSize || undefined;
+      base.quantityAmount = quantity ? parseFloat(quantity) : undefined;
+      base.quantityUnit = quantityUnit || undefined;
+    } else if (isRentalPropertiesProfile) {
+      base.price = parseFloat(pricePerNight) || 0;
+      base.pricePerNight = parseFloat(pricePerNight) || 0;
+      base.propertyType = propertyType || undefined;
+      base.bedrooms = bedrooms ? parseInt(bedrooms) : undefined;
+      base.bathrooms = bathrooms ? parseFloat(bathrooms) : undefined;
+      base.maxGuests = maxGuests ? parseInt(maxGuests) : undefined;
+      base.amenities = amenities;
+      base.address = location || undefined;
+      base.cleaningFee = cleaningFee ? parseFloat(cleaningFee) : undefined;
+      base.rules = houseRules ? [houseRules] : [];
+    } else if (isRideAssistanceProfile) {
+      base.title = serviceTitle || `Ride Assistance — ${coverageArea}`;
+      base.hourlyRate = parseFloat(hourlyRate) || 0;
+      base.price = parseFloat(hourlyRate) || 0;
+      base.vehicleTypes = vehicleTypes;
+      base.specialFeatures = specialFeatures || undefined;
+      base.coverageArea = coverageArea || undefined;
+      base.totalSeats = totalSeats ? parseInt(totalSeats) : undefined;
+    }
+
+    return base;
+  };
+
+  const saveListing = async (isDraft: boolean) => {
+    if (!profile) {
+      toast.error("Profile not loaded yet");
+      return;
+    }
+    const titleField = isBeautyProductsProfile || isGroceryProfile || isFoodProfile ? itemName : serviceTitle;
+    if (!titleField.trim()) {
+      toast.error("Title is required");
+      return;
+    }
+    try {
+      const payload = await buildPayload(isDraft);
+      if (isEditing && listingId) {
+        const type = typeQueryParam || profile.categoryEnum;
+        await api.put(`/api/v1/admin/michelle-profiles/${profileId}/listings/${type}/${listingId}`, payload);
+        toast.success("Listing updated");
+      } else {
+        await api.post(`/api/v1/admin/michelle-profiles/${profileId}/listings`, payload);
+        toast.success(isDraft ? "Saved as draft" : "Listing published");
+      }
+      navigate(`/admin/michelle-profiles/${profileId}/listings`);
+    } catch (e: any) {
+      toast.error(e?.response?.data?.error || e?.message || "Failed to save listing");
+    }
+  };
+
+  const handleSaveAsDraft = () => saveListing(true);
+  const handlePublish = () => saveListing(false);
+
+  // Edit mode: fetch the existing listing and hydrate the form so the wizard
+  // doesn't open blank and overwrite the listing with empty fields on save.
+  useEffect(() => {
+    if (!isEditing || !listingId || !profile) return;
+    const type = typeQueryParam || profile.categoryEnum;
+    setInitialDataLoading(true);
+    api
+      .get<{ success: boolean; data: any }>(`/api/v1/admin/michelle-profiles/${profileId}/listings/${type}/${listingId}`)
+      .then((r) => {
+        const d: any = (r as any)?.data;
+        if (!d) return;
+        // Product-style schemas use `name`; service-style use `title`.
+        const productCats = ["BEAUTY_PRODUCTS", "GROCERIES", "FOOD"];
+        const isProduct = productCats.includes(profile.categoryEnum);
+        if (isProduct) setItemName(d.name || "");
+        else setServiceTitle(d.title || "");
+        setShortDescription(d.description || "");
+        setLongDescription(d.longDescription || d.fullDescription || "");
+        const priceVal = d.basePrice ?? d.price ?? d.hourlyRate ?? 0;
+        setPrice(String(priceVal));
+        if (Array.isArray(d.images) && d.images.length > 0) {
+          setThumbnail({ id: "existing-0", url: d.images[0] });
+          setImageGallery(d.images.slice(1).map((u: string, i: number) => ({ id: `existing-${i + 1}`, url: u })));
+        } else if (d.image) {
+          setThumbnail({ id: "existing-0", url: d.image });
+        }
+        if (Array.isArray(d.whatsIncluded) && d.whatsIncluded.length > 0) {
+          const items: IncludedItem[] = d.whatsIncluded.map((t: string, i: number) => ({
+            id: `loaded-${i}`, text: t, isCustom: true,
+          }));
+          setIncludedItems(items);
+          setSelectedItems(items.map((i) => i.id));
+        }
+        if (d.duration !== undefined && d.duration !== null) setDuration(String(d.duration));
+        if (d.productCategory || d.category) setProductCategory(d.productCategory || d.category || "");
+        if (d.quantityAmount !== undefined) setQuantity(String(d.quantityAmount));
+        if (d.quantityUnit || d.unit) setQuantityUnit(d.quantityUnit || d.unit || "");
+        if (Array.isArray(d.cuisines)) setCuisines(d.cuisines);
+        if (d.portionSize) setPortionSize(d.portionSize);
+        if (d.propertyType) setPropertyType(d.propertyType);
+        if (d.address) setLocation(d.address);
+        if (d.bedrooms !== undefined) setBedrooms(String(d.bedrooms));
+        if (d.bathrooms !== undefined) setBathrooms(String(d.bathrooms));
+        if (d.maxGuests !== undefined) setMaxGuests(String(d.maxGuests || ""));
+        if (Array.isArray(d.amenities)) setAmenities(d.amenities);
+        if (d.pricePerNight !== undefined) setPricePerNight(String(d.pricePerNight || ""));
+        if (d.cleaningFee !== undefined) setCleaningFee(String(d.cleaningFee || ""));
+        if (Array.isArray(d.rules) && d.rules.length > 0) setHouseRules(d.rules[0]);
+        if (d.hourlyRate !== undefined) setHourlyRate(String(d.hourlyRate || ""));
+        if (Array.isArray(d.vehicleTypes)) setVehicleTypes(d.vehicleTypes);
+        if (d.specialFeatures) setSpecialFeatures(d.specialFeatures);
+        if (d.coverageArea) setCoverageArea(d.coverageArea);
+        if (d.totalSeats !== undefined) setTotalSeats(String(d.totalSeats || ""));
+      })
+      .catch((e: any) => {
+        toast.error(e?.response?.data?.error || e?.message || "Failed to load listing");
+      })
+      .finally(() => setInitialDataLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditing, listingId, profile?.categoryEnum]);
 
   const titleCharCount = serviceTitle.length;
   const shortDescCharCount = shortDescription.length;
   const longDescCharCount = longDescription.length;
+
+  if (profileLoading) {
+    return (
+      <div className="min-h-screen bg-[#F0F7FF] flex items-center justify-center">
+        <div className="text-sm text-[#6B7280]">Loading profile…</div>
+      </div>
+    );
+  }
+
+  if (profileError || !profile) {
+    return (
+      <div className="min-h-screen bg-[#F0F7FF] flex flex-col items-center justify-center p-8">
+        <p className="text-[#1A1A2E] font-semibold mb-2">Could not load Michelle profile</p>
+        <p className="text-sm text-[#6B7280] mb-4">{profileError || "Profile not found"}</p>
+        <Button onClick={() => navigate("/admin/michelle-profiles")} className="bg-[#2E7AD9] hover:bg-[#1E5DB0]">
+          Back to Profiles
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#F0F7FF]">
