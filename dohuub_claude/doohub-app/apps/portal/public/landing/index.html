@@ -16,7 +16,7 @@
   --display:'Bricolage Grotesque',sans-serif;--body:'Hanken Grotesk',sans-serif;
   --radius:22px;--radius-lg:30px;
   --glass:rgba(255,255,255,.55);--glass-strong:rgba(255,255,255,.74);--glass-line:rgba(255,255,255,.65);
-  --glass-blur:blur(22px) saturate(170%);
+  --glass-blur:blur(12px) saturate(160%);
   --glass-shadow:0 8px 32px rgba(17,34,86,.10),0 2px 8px rgba(17,34,86,.06),inset 0 1px 0 rgba(255,255,255,.75);
   --glass-shadow-hi:0 22px 50px -16px rgba(37,76,189,.30),inset 0 1px 0 rgba(255,255,255,.85);
   --maxw:1200px;
@@ -473,7 +473,7 @@ const SCREENS=[
 ];
 const stage=document.getElementById('cfStage'),dotsW=document.getElementById('cfDots'),N=SCREENS.length;
 function cardHTML(s){
-  return `<div class="cf-phone"><div class="cf-screen"><img src="${s.src}" alt="${s.title}" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;object-position:center top;display:block"></div></div>`;
+  return `<div class="cf-phone"><div class="cf-screen"><img src="${s.src}" alt="${s.title}" decoding="async" style="width:100%;height:100%;object-fit:cover;object-position:center top;display:block"></div></div>`;
 }
 let active=Math.floor(N/2);
 SCREENS.forEach((s,i)=>{
