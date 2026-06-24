@@ -4,6 +4,6 @@
   "framework": "vite",
   "installCommand": "npm install --include=optional --legacy-peer-deps --force",
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/((?!landing/).*)", "destination": "/index.html" }
   ]
 }

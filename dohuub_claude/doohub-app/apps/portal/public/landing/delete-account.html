@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Delete Account - DoHuub</title>
+  <link rel="icon" type="image/png" href="assets/icon.png">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="legal.css">
+</head>
+<body>
+  <header class="header scrolled" id="header">
+    <div class="container header-inner">
+      <a href="index.html" class="logo">
+        <img src="assets/icon.png" alt="DoHuub" class="logo-img">
+        <span class="logo-text">DoHuub</span>
+      </a>
+      <nav class="nav">
+        <a href="index.html">Home</a>
+        <a href="support.html">Support</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="legal-page">
+    <div class="container">
+      <h1>Delete Your Account</h1>
+      <p class="last-updated">Request permanent deletion of your DoHuub account and data.</p>
+
+      <section>
+        <h2>What happens when you delete your account?</h2>
+        <p>When you request account deletion, the following will be permanently removed within 30 days:</p>
+        <ul>
+          <li>Your profile information (name, email, phone number, photo)</li>
+          <li>Your saved addresses</li>
+          <li>Your booking history</li>
+          <li>Your reviews and ratings</li>
+          <li>Your rewards points, streaks, and milestones</li>
+          <li>Your referral history</li>
+          <li>Your saved payment methods</li>
+        </ul>
+        <p><strong>This action is irreversible.</strong> Once your account is deleted, it cannot be recovered.</p>
+      </section>
+
+      <section>
+        <h2>Before you delete</h2>
+        <ul>
+          <li>Complete or cancel any pending bookings first</li>
+          <li>Redeem any unused rewards points, as they will be forfeited</li>
+          <li>Download any data you wish to keep by contacting <a href="mailto:privacy@dohuub.com">privacy@dohuub.com</a></li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Request Account Deletion</h2>
+        <p>You can delete your account using any of these methods:</p>
+
+        <div class="deletion-methods">
+          <div class="method-card">
+            <h3>Method 1: In the App</h3>
+            <p>Open DoHuub > Profile > Settings > Delete Account</p>
+          </div>
+
+          <div class="method-card">
+            <h3>Method 2: Email Request</h3>
+            <p>Send an email to <a href="mailto:privacy@dohuub.com">privacy@dohuub.com</a> from the email address associated with your account with the subject line "Account Deletion Request."</p>
+          </div>
+
+          <div class="method-card">
+            <h3>Method 3: Web Form</h3>
+            <form class="deletion-form" id="deletionForm">
+              <div class="form-group">
+                <label for="email">Email Address (associated with your account)</label>
+                <input type="email" id="email" name="email" required placeholder="your.email@example.com">
+              </div>
+              <div class="form-group">
+                <label for="reason">Reason for deletion (optional)</label>
+                <select id="reason" name="reason">
+                  <option value="">Select a reason...</option>
+                  <option value="no-longer-needed">I no longer need the service</option>
+                  <option value="privacy">Privacy concerns</option>
+                  <option value="switching">Switching to another service</option>
+                  <option value="experience">Bad experience</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="comments">Additional comments (optional)</label>
+                <textarea id="comments" name="comments" rows="3" placeholder="Let us know if there's anything we can improve..."></textarea>
+              </div>
+              <div class="form-group">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="confirm" required>
+                  I understand that this action is permanent and all my data will be deleted within 30 days.
+                </label>
+              </div>
+              <button type="submit" class="btn btn-danger">Request Account Deletion</button>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Questions?</h2>
+        <p>If you have any questions about account deletion or data handling, please contact us at <a href="mailto:privacy@dohuub.com">privacy@dohuub.com</a> or visit our <a href="support.html">Help Center</a>.</p>
+      </section>
+    </div>
+  </main>
+
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-bottom" style="border: none;">
+        <p>&copy; 2026 DoHuub. All rights reserved. | <a href="privacy-policy.html" style="color:#94a3b8">Privacy Policy</a> | <a href="terms.html" style="color:#94a3b8">Terms</a> | <a href="support.html" style="color:#94a3b8">Support</a></p>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    document.getElementById('deletionForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const email = document.getElementById('email').value;
+      const confirmed = document.getElementById('confirm').checked;
+      if (!confirmed) {
+        alert('Please confirm that you understand this action is permanent.');
+        return;
+      }
+      // In production, this would send to your API
+      alert('Account deletion request submitted for ' + email + '. You will receive a confirmation email within 24 hours. Your account and data will be permanently deleted within 30 days.');
+      this.reset();
+    });
+  </script>
+</body>
+</html>
