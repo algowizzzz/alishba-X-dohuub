@@ -488,9 +488,10 @@ function render(){
     let o=((i-active)%N+N)%N; if(o>N/2)o-=N;
     const ao=Math.abs(o),dir=Math.sign(o);
     c.style.transition = ao>4 ? 'none' : '';
-    const x=o===0?0:dir*(150+(ao-1)*64);
+    const x=o===0?0:dir*(170+(ao-1)*64);
     const sc=Math.max(.6,1-.12*ao), ry=o===0?0:dir*-30;
-    c.style.transform=`translate(calc(-50% + ${x}px),-50%) rotateY(${ry}deg) scale(${sc})`;
+    const tz=o===0?80:-ao*40;
+    c.style.transform=`translate(calc(-50% + ${x}px),-50%) translateZ(${tz}px) rotateY(${ry}deg) scale(${sc})`;
     c.style.opacity=ao>3?0:Math.max(0,1-.15*ao);
     c.style.filter=o===0?'none':`grayscale(${Math.min(.55,.22*ao)}) brightness(${1-.05*ao})`;
     c.style.zIndex=50-ao; c.style.pointerEvents=ao>3?'none':'auto';
