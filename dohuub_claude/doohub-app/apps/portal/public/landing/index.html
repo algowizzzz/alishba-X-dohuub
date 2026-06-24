@@ -312,7 +312,7 @@ h1,h2,h3,h4{font-family:var(--display);color:var(--ink);line-height:1.05;letter-
       <div class="float-chip fc2"><span class="ci" style="background:linear-gradient(135deg,#f59e0b,#fb7185)">★</span> 4.9 Rating</div>
       <div class="phone">
         <div class="phone-screen" style="background:#F0F7FF">
-          <img src="assets/image.png" alt="DoHuub App Home Screen" style="width:100%;height:100%;object-fit:cover;object-position:center top;display:block">
+          <img src="assets/image.webp" alt="DoHuub App Home Screen" fetchpriority="high" decoding="async" style="width:100%;height:100%;object-fit:cover;object-position:center top;display:block">
         </div>
       </div>
     </div>
@@ -460,20 +460,20 @@ document.querySelectorAll('.gcard,.tl-card').forEach(c=>c.addEventListener('mous
 /* ===== Endless coverflow ===== */
 const G={blue:'linear-gradient(135deg,#2563eb,#4f46e5)',cyan:'linear-gradient(135deg,#06b6d4,#0ea5e9)',orange:'linear-gradient(135deg,#f97316,#ef4444)',green:'linear-gradient(135deg,#10b981,#22c55e)',violet:'linear-gradient(135deg,#8b5cf6,#6366f1)',pink:'linear-gradient(135deg,#ec4899,#f43f5e)',amber:'linear-gradient(135deg,#f59e0b,#fb7185)',teal:'linear-gradient(135deg,#14b8a6,#10b981)',indigo:'linear-gradient(135deg,#4f46e5,#7c3aed)'};
 const SCREENS=[
- {title:'Home Screen',src:'assets/image.png'},
- {title:'Welcome to DoHuub',src:'assets/2.PNG'},
- {title:'Groceries & Food',src:'assets/Capture.PNG'},
- {title:'Industrial Cleaning',src:'assets/3.PNG'},
- {title:'Hair Styling',src:'assets/4.PNG'},
- {title:'Food Delivery',src:'assets/Capture1.PNG'},
- {title:'Rental Properties',src:'assets/9.PNG'},
- {title:'Order Status',src:'assets/7.PNG'},
- {title:'AI Assistant',src:'assets/5.PNG'},
- {title:'Profile & Rewards',src:'assets/6.PNG'}
+ {title:'Home Screen',src:'assets/image.webp'},
+ {title:'Welcome to DoHuub',src:'assets/2.webp'},
+ {title:'Groceries & Food',src:'assets/Capture.webp'},
+ {title:'Industrial Cleaning',src:'assets/3.webp'},
+ {title:'Hair Styling',src:'assets/4.webp'},
+ {title:'Food Delivery',src:'assets/Capture1.webp'},
+ {title:'Rental Properties',src:'assets/9.webp'},
+ {title:'Order Status',src:'assets/7.webp'},
+ {title:'AI Assistant',src:'assets/5.webp'},
+ {title:'Profile & Rewards',src:'assets/6.webp'}
 ];
 const stage=document.getElementById('cfStage'),dotsW=document.getElementById('cfDots'),N=SCREENS.length;
 function cardHTML(s){
-  return `<div class="cf-phone"><div class="cf-screen"><img src="${s.src}" alt="${s.title}" style="width:100%;height:100%;object-fit:cover;object-position:center top;display:block"></div></div>`;
+  return `<div class="cf-phone"><div class="cf-screen"><img src="${s.src}" alt="${s.title}" loading="lazy" decoding="async" style="width:100%;height:100%;object-fit:cover;object-position:center top;display:block"></div></div>`;
 }
 let active=Math.floor(N/2);
 SCREENS.forEach((s,i)=>{
