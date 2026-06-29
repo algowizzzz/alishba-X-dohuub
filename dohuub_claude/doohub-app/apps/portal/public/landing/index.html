@@ -101,7 +101,7 @@ h1,h2,h3,h4{font-family:var(--display);color:var(--ink);line-height:1.05;letter-
 .stars-sm{color:var(--amber);letter-spacing:1px}
 
 .hero-visual{display:flex;justify-content:center;position:relative;will-change:transform}
-.phone{width:300px;border-radius:44px;padding:13px;position:relative;animation:phoneFloat 6.5s ease-in-out infinite;background:linear-gradient(160deg,rgba(255,255,255,.5),rgba(255,255,255,.25));backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.7);box-shadow:0 50px 90px -28px rgba(37,76,189,.5),inset 0 1px 0 rgba(255,255,255,.9)}
+.phone{width:300px;border-radius:44px;padding:13px;position:relative;z-index:1;animation:phoneFloat 6.5s ease-in-out infinite;background:linear-gradient(160deg,#0b1430,#1a2547);border:1px solid #0b1430;box-shadow:0 50px 90px -28px rgba(11,20,48,.55),inset 0 1px 0 rgba(255,255,255,.08)}
 @keyframes phoneFloat{0%,100%{transform:translateY(0) rotate(-1.5deg)}50%{transform:translateY(-16px) rotate(-1.5deg)}}
 .phone::before{content:'';position:absolute;top:24px;left:50%;transform:translateX(-50%);width:88px;height:22px;background:#0b1430;border-radius:0 0 16px 16px;z-index:5}
 .phone-screen{background:rgba(245,247,251,.94);border-radius:34px;overflow:hidden;height:600px}
@@ -121,7 +121,7 @@ h1,h2,h3,h4{font-family:var(--display);color:var(--ink);line-height:1.05;letter-
 .ps-nav{position:absolute;bottom:13px;left:13px;right:13px;background:rgba(255,255,255,.88);backdrop-filter:blur(8px);border-radius:0 0 34px 34px;padding:14px 0 18px;display:flex;justify-content:space-around}
 .ps-nav i{width:22px;height:22px;border-radius:6px;background:var(--slate-200);display:block}
 .ps-nav i.act{background:var(--brand-500)}
-.float-chip{position:absolute;border-radius:15px;padding:11px 15px;display:flex;align-items:center;gap:10px;font-size:.82rem;font-weight:600;color:var(--ink);background:var(--glass-strong);backdrop-filter:var(--glass-blur);border:1px solid var(--glass-line);box-shadow:var(--glass-shadow)}
+.float-chip{position:absolute;z-index:10;border-radius:15px;padding:11px 15px;display:flex;align-items:center;gap:10px;font-size:.82rem;font-weight:600;color:var(--ink);background:var(--glass-strong);backdrop-filter:var(--glass-blur);border:1px solid var(--glass-line);box-shadow:var(--glass-shadow)}
 .float-chip .ci{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;color:#fff;flex:none}
 .fc1{top:54px;left:-14px;animation:phoneFloat 5.5s ease-in-out infinite}
 .fc2{bottom:88px;right:-22px;animation:phoneFloat 7.5s ease-in-out infinite .5s}
