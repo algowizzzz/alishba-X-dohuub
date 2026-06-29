@@ -168,7 +168,7 @@ h1,h2,h3,h4{font-family:var(--display);color:var(--ink);line-height:1.05;letter-
 .cf-stage{position:absolute;inset:0;transform-style:preserve-3d}
 .cf-card{position:absolute;top:50%;left:50%;width:236px;height:482px;transform:translate(-50%,-50%);transition:transform .55s cubic-bezier(.2,.8,.2,1),opacity .55s,filter .55s;cursor:pointer;will-change:transform,opacity}
 .cf-phone{width:100%;height:100%;padding:0;background:transparent}
-.cf-screen{height:100%;border-radius:32px;overflow:hidden;background:transparent;display:flex;flex-direction:column;filter:drop-shadow(0 28px 48px rgba(17,34,86,.35))}
+.cf-screen{height:100%;border-radius:32px;overflow:hidden;background:#0b1430;display:flex;flex-direction:column;filter:drop-shadow(0 28px 48px rgba(17,34,86,.35))}
 .cf-head{padding:30px 18px 22px;color:#fff;text-align:center;position:relative}
 .cf-head::after{content:'';position:absolute;top:14px;left:50%;transform:translateX(-50%);width:54px;height:5px;border-radius:3px;background:rgba(255,255,255,.5)}
 .cf-ic{width:80px;height:80px;border-radius:22px;background:rgba(255,255,255,.92);margin:6px auto 12px;overflow:hidden;box-shadow:0 12px 24px -8px rgba(0,0,0,.32);padding:13px}
@@ -481,7 +481,7 @@ const SCREENS=[
 ];
 const stage=document.getElementById('cfStage'),dotsW=document.getElementById('cfDots'),N=SCREENS.length;
 function cardHTML(s){
-  return `<div class="cf-phone"><div class="cf-screen"><img src="${s.src}" alt="${s.title}" decoding="async" style="width:100%;height:100%;object-fit:contain;display:block"></div></div>`;
+  return `<div class="cf-phone"><div class="cf-screen"><img src="${s.src}" alt="${s.title}" decoding="async" style="width:100%;height:100%;object-fit:contain;clip-path:inset(3% round 28px);display:block"></div></div>`;
 }
 let active=Math.floor(N/2);
 SCREENS.forEach((s,i)=>{
