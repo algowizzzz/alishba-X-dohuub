@@ -177,6 +177,7 @@ model UserProfile {
   lastName    String
   avatar      String?
   dateOfBirth DateTime?
+  country     String   @default("US")  // ISO 3166-1 alpha-2 — drives payment provider default
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -255,9 +256,11 @@ model Vendor {
   subscriptionStatus SubscriptionStatus @default(TRIAL)
   trialStartedAt     DateTime           @default(now())
   trialEndsAt        DateTime?
-  stripeAccountId    String?
-  stripePublishableKey String?
-  stripeSecretKey    String?
+  country            String             @default("US")   // ISO 3166-1 alpha-2 — drives payment provider + payout mode
+  stripeAccountId    String?            @unique          // Stripe Connect Express account (acct_...) for US vendor payouts
+  stripeOnboardingComplete Boolean      @default(false)  // Whether the Connect account is charges_enabled + payouts_enabled
+  stripePublishableKey String?          // legacy — unused, kept for schema stability
+  stripeSecretKey    String?            // legacy — unused, kept for schema stability
   rating             Float              @default(0)
   reviewCount        Int                @default(0)
   isActive           Boolean            @default(true)    // Kept for backward compatibility
@@ -344,8 +347,10 @@ model VendorAvailability {
 model VendorSubscription {
   id                   String             @id @default(cuid())
   vendorId             String             @unique
-  stripeSubscriptionId String?
-  planId               String?            // Plan identifier (basic, professional, enterprise)
+  planId               String?            // Plan identifier (basic, professional, enterprise) — source of truth
+  billingPeriod        String?            // 'monthly' | 'yearly'
+  provider             PaymentProvider?   // Which gateway the last charge went through
+  gatewayReference     String?            // Provider transaction id from the last successful charge (audit trail)
   status               SubscriptionStatus @default(TRIAL)
   currentPeriodStart   DateTime?
   currentPeriodEnd     DateTime?
@@ -923,25 +928,33 @@ model CartItem {
 // ============================================
 
 model Transaction {
-  id                    String        @id @default(cuid())
-  bookingId             String?       @unique
-  orderId               String?       @unique
-  stripePaymentIntentId String?       @unique
+  id                    String           @id @default(cuid())
+  bookingId             String?          @unique
+  orderId               String?          @unique
+  provider              PaymentProvider?
+  providerTransactionId String?          @unique
   amount                Float
   platformFee           Float
   vendorPayout          Float
-  currency              String        @default("USD")
-  status                PaymentStatus @default(PENDING)
+  currency              String           @default("USD")
+  status                PaymentStatus    @default(PENDING)
   paidAt                DateTime?
   refundedAt            DateTime?
   refundAmount          Float?
-  createdAt             DateTime      @default(now())
-  updatedAt             DateTime      @updatedAt
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
 
   booking Booking? @relation(fields: [bookingId], references: [id])
   order   Order?   @relation(fields: [orderId], references: [id])
 
   @@index([status])
+  @@index([provider])
+}
+
+enum PaymentProvider {
+  WIPAY
+  POWERTRANZ
+  STRIPE
 }
 
 // ============================================
