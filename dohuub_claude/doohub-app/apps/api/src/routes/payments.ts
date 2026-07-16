@@ -1,84 +1,93 @@
 import { Router } from 'express';
-import Stripe from 'stripe';
 import { prisma } from '@doohub/database';
 import { authenticate, AuthRequest } from '../middleware/auth';
+import { createWipayCheckout, wipayConfigured } from '../lib/wipay';
+import {
+  createPowertranzCheckout,
+  powertranzConfigured,
+} from '../lib/powertranz';
+import {
+  createStripeCheckoutSession,
+  retrieveStripeSession,
+  stripeConfigured,
+} from '../lib/stripe';
+import { logger } from '../lib/logger';
 
 const router = Router();
 
-// ---------------------------------------------------------------------------
-// Stripe client (module-load).
-// If the env var is missing we DON'T crash — we let the server boot and have
-// each Stripe-backed route return 503. That keeps local dev working without
-// keys, and lets the rest of the API keep serving.
-// ---------------------------------------------------------------------------
-const stripeSecret = process.env.STRIPE_SECRET_KEY;
-let stripe: Stripe | null = null;
+type Provider = 'WIPAY' | 'POWERTRANZ' | 'STRIPE';
 
-if (stripeSecret) {
-  stripe = new Stripe(stripeSecret);
-  console.log('[stripe] initialized');
-} else {
-  console.warn(
-    '[stripe] STRIPE_SECRET_KEY is not set — payment routes will return 503. ' +
-      'Set the env var in Railway / .env to enable real checkout.'
-  );
-}
-
-function stripeRequired(res: any): boolean {
-  if (!stripe) {
-    res.status(503).json({
-      success: false,
-      error:
-        'Stripe is not configured on this server. Ask the admin to set STRIPE_SECRET_KEY.',
-    });
-    return true;
-  }
-  return false;
+export function providerAvailable(provider: Provider): boolean {
+  if (provider === 'WIPAY') return wipayConfigured();
+  if (provider === 'POWERTRANZ') return powertranzConfigured();
+  return stripeConfigured();
 }
 
 // ---------------------------------------------------------------------------
-// Helper: look up or create a Stripe Customer for the current user and persist
-// the id on User.stripeCustomerId so we don't churn customers on every payment.
+// Reference IDs sent to gateways are prefixed so the shared webhook knows
+// which record to settle:
+//   bk-<bookingId>        — customer booking payment
+//   or-<orderId>          — customer marketplace order
+//   sub-<subscriptionId>  — vendor subscription charge
+// The webhook parses the prefix in payments-webhook.ts / payments-stripe-webhook.ts.
 // ---------------------------------------------------------------------------
-export async function getOrCreateStripeCustomer(
-  userId: string,
-  email: string
-): Promise<string> {
-  if (!stripe) throw new Error('Stripe not configured');
+export function prefixedReference(
+  kind: 'booking' | 'order' | 'subscription',
+  id: string
+): string {
+  const prefix = kind === 'booking' ? 'bk' : kind === 'order' ? 'or' : 'sub';
+  return `${prefix}-${id}`;
+}
 
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { id: true, email: true, stripeCustomerId: true },
-  });
-  if (user?.stripeCustomerId) return user.stripeCustomerId;
-
-  const customer = await stripe.customers.create({
-    email: user?.email || email,
-    metadata: { userId },
-  });
-
-  await prisma.user.update({
-    where: { id: userId },
-    data: { stripeCustomerId: customer.id },
-  });
-
-  return customer.id;
+export function parseReference(
+  ref: string
+): { kind: 'booking' | 'order' | 'subscription'; id: string } | null {
+  const [prefix, ...rest] = ref.split('-');
+  const id = rest.join('-');
+  if (!id) return null;
+  if (prefix === 'bk') return { kind: 'booking', id };
+  if (prefix === 'or') return { kind: 'order', id };
+  if (prefix === 'sub') return { kind: 'subscription', id };
+  return null;
 }
 
 // ---------------------------------------------------------------------------
 // POST /api/v1/payments/checkout-session
-// Body: { bookingId?: string, orderId?: string }
-// Creates a Stripe Checkout Session for the given booking or order.
-// Returns { url, sessionId } so the mobile app can open it in a browser.
+// Body: { provider: 'WIPAY' | 'POWERTRANZ' | 'STRIPE', bookingId?, orderId? }
+//
+// Creates a hosted-checkout session with the chosen provider and returns the
+// URL the mobile app should open in a browser.
+//
+// For Stripe with a US-based vendor whose Stripe Connect onboarding is
+// complete, we split the payment: platform fee stays on our balance, the
+// rest transfers to the vendor's Express account (automated payout).
+// For Stripe with a Caribbean vendor, we take the full charge; payout is
+// handled manually. WiPay/PowerTranz always settle manually.
 // ---------------------------------------------------------------------------
 router.post('/checkout-session', authenticate, async (req: AuthRequest, res) => {
-  if (stripeRequired(res)) return;
-
   try {
-    const { bookingId, orderId } = req.body as {
+    const { provider, bookingId, orderId } = req.body as {
+      provider?: Provider;
       bookingId?: string;
       orderId?: string;
     };
+
+    if (
+      provider !== 'WIPAY' &&
+      provider !== 'POWERTRANZ' &&
+      provider !== 'STRIPE'
+    ) {
+      return res
+        .status(400)
+        .json({ success: false, error: "provider must be 'WIPAY', 'POWERTRANZ' or 'STRIPE'" });
+    }
+
+    if (!providerAvailable(provider)) {
+      return res.status(503).json({
+        success: false,
+        error: `${provider} is not configured on this server. Ask the admin to set the ${provider} env vars.`,
+      });
+    }
 
     if (!bookingId && !orderId) {
       return res
@@ -86,9 +95,11 @@ router.post('/checkout-session', authenticate, async (req: AuthRequest, res) => 
         .json({ success: false, error: 'bookingId or orderId required' });
     }
 
-    let amount: number; // in cents
+    let amountUsd: number;
     let productName: string;
-    const metadata: Record<string, string> = { userId: req.user!.id };
+    let referenceId: string;
+    let vendorId: string;
+    let platformFee: number;
 
     if (bookingId) {
       const booking = await prisma.booking.findFirst({
@@ -103,11 +114,12 @@ router.post('/checkout-session', authenticate, async (req: AuthRequest, res) => 
         },
       });
       if (!booking) {
-        return res
-          .status(404)
-          .json({ success: false, error: 'Booking not found' });
+        return res.status(404).json({ success: false, error: 'Booking not found' });
       }
-      amount = Math.round(booking.total * 100);
+      amountUsd = booking.total;
+      referenceId = booking.id;
+      vendorId = booking.vendorId;
+      platformFee = booking.serviceFee;
       productName =
         booking.cleaningListing?.title ||
         booking.handymanListing?.title ||
@@ -116,56 +128,171 @@ router.post('/checkout-session', authenticate, async (req: AuthRequest, res) => 
         booking.rideAssistanceListing?.title ||
         booking.companionshipListing?.title ||
         `DoHuub booking ${booking.id.slice(0, 8)}`;
-      metadata.bookingId = booking.id;
     } else {
       const order = await prisma.order.findFirst({
         where: { id: orderId!, userId: req.user!.id },
       });
       if (!order) {
-        return res
-          .status(404)
-          .json({ success: false, error: 'Order not found' });
+        return res.status(404).json({ success: false, error: 'Order not found' });
       }
-      amount = Math.round(order.total * 100);
+      amountUsd = order.total;
+      referenceId = order.id;
+      vendorId = order.vendorId;
+      platformFee = order.serviceFee;
       productName = `DoHuub order ${order.id.slice(0, 8)}`;
-      metadata.orderId = order.id;
     }
 
-    const customerId = await getOrCreateStripeCustomer(
-      req.user!.id,
-      req.user!.email
+    const vendorPayout = amountUsd - platformFee;
+
+    const user = await prisma.user.findUnique({
+      where: { id: req.user!.id },
+      select: {
+        email: true,
+        phone: true,
+        profile: { select: { firstName: true, lastName: true } },
+      },
+    });
+    const customerName =
+      `${user?.profile?.firstName || ''} ${user?.profile?.lastName || ''}`.trim() ||
+      'DoHuub customer';
+
+    const apiBase = process.env.API_PUBLIC_URL || `http://localhost:${process.env.PORT || 3001}`;
+
+    // Pre-create the pending Transaction row so the webhook can find it.
+    // Idempotent — upsert on bookingId/orderId.
+    if (bookingId) {
+      await prisma.transaction.upsert({
+        where: { bookingId },
+        create: {
+          bookingId,
+          provider,
+          amount: amountUsd,
+          platformFee,
+          vendorPayout,
+          currency: 'USD',
+          status: 'PENDING',
+        },
+        update: {
+          provider,
+          amount: amountUsd,
+          status: 'PENDING',
+        },
+      });
+    } else {
+      await prisma.transaction.upsert({
+        where: { orderId: orderId! },
+        create: {
+          orderId,
+          provider,
+          amount: amountUsd,
+          platformFee,
+          vendorPayout,
+          currency: 'USD',
+          status: 'PENDING',
+        },
+        update: {
+          provider,
+          amount: amountUsd,
+          status: 'PENDING',
+        },
+      });
+    }
+
+    let redirectUrl: string;
+    let providerTransactionId: string | undefined;
+    const gatewayReference = prefixedReference(
+      bookingId ? 'booking' : 'order',
+      referenceId
     );
 
-    const returnUrl =
-      process.env.MOBILE_RETURN_URL || 'dohuub://checkout/return';
+    if (provider === 'WIPAY') {
+      const result = await createWipayCheckout({
+        orderId: gatewayReference,
+        totalUsd: amountUsd,
+        customerName,
+        customerEmail: user?.email || req.user!.email,
+        customerPhone: user?.phone || undefined,
+        responseUrl: `${apiBase}/api/v1/payments/webhook/wipay`,
+        productName,
+      });
+      redirectUrl = result.url;
+    } else if (provider === 'POWERTRANZ') {
+      const result = await createPowertranzCheckout({
+        orderId: gatewayReference,
+        totalUsd: amountUsd,
+        customerName,
+        customerEmail: user?.email || req.user!.email,
+        responseUrl: `${apiBase}/api/v1/payments/webhook/powertranz`,
+        productName,
+      });
+      redirectUrl = result.redirectUrl;
+      providerTransactionId = result.transactionIdentifier;
 
-    const session = await stripe!.checkout.sessions.create({
-      mode: 'payment',
-      customer: customerId,
-      line_items: [
-        {
-          price_data: {
-            currency: 'usd',
-            product_data: { name: productName },
-            unit_amount: amount,
-          },
-          quantity: 1,
+      if (bookingId) {
+        await prisma.transaction.update({
+          where: { bookingId },
+          data: { providerTransactionId },
+        });
+      } else {
+        await prisma.transaction.update({
+          where: { orderId: orderId! },
+          data: { providerTransactionId },
+        });
+      }
+    } else {
+      // STRIPE. Check whether the vendor is US + has completed Connect
+      // onboarding — if so, split payment via transfer_data.destination so the
+      // vendor's payout is automated. Otherwise take the full charge and settle
+      // the vendor manually.
+      const vendor = await prisma.vendor.findUnique({
+        where: { id: vendorId },
+        select: {
+          country: true,
+          stripeAccountId: true,
+          stripeOnboardingComplete: true,
         },
-      ],
-      success_url: `${returnUrl}?session={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${returnUrl}?cancelled=1`,
-      metadata,
-    });
+      });
+
+      const useConnect =
+        vendor?.country === 'US' &&
+        vendor.stripeAccountId &&
+        vendor.stripeOnboardingComplete;
+
+      const result = await createStripeCheckoutSession({
+        reference: gatewayReference,
+        totalUsd: amountUsd,
+        productName,
+        customerUserId: req.user!.id,
+        customerEmail: user?.email || req.user!.email,
+        connectedAccountId: useConnect ? vendor!.stripeAccountId! : undefined,
+        applicationFeeUsd: useConnect ? platformFee : undefined,
+      });
+      redirectUrl = result.url;
+      providerTransactionId = result.sessionId;
+
+      if (bookingId) {
+        await prisma.transaction.update({
+          where: { bookingId },
+          data: { providerTransactionId },
+        });
+      } else {
+        await prisma.transaction.update({
+          where: { orderId: orderId! },
+          data: { providerTransactionId },
+        });
+      }
+    }
 
     res.json({
       success: true,
       data: {
-        url: session.url,
-        sessionId: session.id,
+        url: redirectUrl,
+        provider,
+        sessionId: providerTransactionId || referenceId,
       },
     });
   } catch (error: any) {
-    console.error('Create checkout session error:', error);
+    logger.error({ err: error }, 'create checkout session failed');
     res
       .status(500)
       .json({ success: false, error: error.message || 'Failed to create checkout session' });
@@ -174,25 +301,62 @@ router.post('/checkout-session', authenticate, async (req: AuthRequest, res) => 
 
 // ---------------------------------------------------------------------------
 // GET /api/v1/payments/session/:id
-// Polled by the mobile app after returning from the Stripe-hosted checkout to
-// learn whether payment succeeded. The webhook is the source of truth — this
-// is a UX nicety so the user sees the right state without waiting on Stripe.
+// Polled by the mobile app after returning from the hosted checkout. Reads
+// our own Transaction row — kept updated by whichever gateway webhook fires.
+// Falls back to a direct Stripe lookup when id looks like a Stripe session
+// (cs_...) but the row hasn't been updated yet (webhook still in flight).
 // ---------------------------------------------------------------------------
 router.get('/session/:id', authenticate, async (req: AuthRequest, res) => {
-  if (stripeRequired(res)) return;
   try {
-    const session = await stripe!.checkout.sessions.retrieve(req.params.id);
+    const { id } = req.params;
+
+    const tx = await prisma.transaction.findFirst({
+      where: {
+        OR: [{ bookingId: id }, { orderId: id }, { providerTransactionId: id }],
+      },
+    });
+
+    if (!tx) {
+      return res.status(404).json({ success: false, error: 'Transaction not found' });
+    }
+
+    let paymentStatus =
+      tx.status === 'COMPLETED'
+        ? 'paid'
+        : tx.status === 'FAILED' || tx.status === 'REFUNDED'
+          ? 'failed'
+          : 'pending';
+
+    // For Stripe, if we're still pending and the id looks like a Checkout
+    // Session, do a live lookup so the UI shows the real state without
+    // waiting on the webhook.
+    if (
+      paymentStatus === 'pending' &&
+      tx.provider === 'STRIPE' &&
+      tx.providerTransactionId?.startsWith('cs_') &&
+      stripeConfigured()
+    ) {
+      try {
+        const session = await retrieveStripeSession(tx.providerTransactionId);
+        if (session.payment_status === 'paid') paymentStatus = 'paid';
+        else if (session.status === 'expired') paymentStatus = 'failed';
+      } catch (err) {
+        logger.warn({ err }, '[session] Stripe live lookup failed');
+      }
+    }
+
     res.json({
       success: true,
       data: {
-        paymentStatus: session.payment_status, // 'paid' | 'unpaid' | 'no_payment_required'
-        status: session.status,                // 'open' | 'complete' | 'expired'
-        amountTotal: session.amount_total ? session.amount_total / 100 : null,
-        currency: session.currency,
+        paymentStatus,
+        status: tx.status,
+        provider: tx.provider,
+        amountTotal: tx.amount,
+        currency: tx.currency,
       },
     });
   } catch (error: any) {
-    console.error('Retrieve session error:', error);
+    logger.error({ err: error }, 'retrieve session failed');
     res
       .status(500)
       .json({ success: false, error: error.message || 'Failed to retrieve session' });
@@ -200,148 +364,54 @@ router.get('/session/:id', authenticate, async (req: AuthRequest, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// LEGACY ROUTES — kept so existing mobile builds in the field don't break.
-// New flows should use /checkout-session above.
+// GET /api/v1/payments/providers
+// Returns the recommended provider for the current user + all available
+// providers, so the mobile checkout screen can render a filtered picker
+// (recommended on top, others collapsed).
 // ---------------------------------------------------------------------------
-
-// Legacy: create payment intent (now redirects to checkout-session conceptually)
-router.post('/create-intent', authenticate, async (req: AuthRequest, res) => {
-  if (stripeRequired(res)) return;
+router.get('/providers', authenticate, async (req: AuthRequest, res) => {
   try {
-    const { bookingId, orderId } = req.body;
-
-    let amount: number;
-    let metadata: any;
-
-    if (bookingId) {
-      const booking = await prisma.booking.findFirst({
-        where: { id: bookingId, userId: req.user!.id },
-      });
-      if (!booking) {
-        return res.status(404).json({ success: false, error: 'Booking not found' });
-      }
-      amount = Math.round(booking.total * 100);
-      metadata = { bookingId, userId: req.user!.id };
-    } else if (orderId) {
-      const order = await prisma.order.findFirst({
-        where: { id: orderId, userId: req.user!.id },
-      });
-      if (!order) {
-        return res.status(404).json({ success: false, error: 'Order not found' });
-      }
-      amount = Math.round(order.total * 100);
-      metadata = { orderId, userId: req.user!.id };
-    } else {
-      return res.status(400).json({ success: false, error: 'bookingId or orderId required' });
-    }
-
-    const customerId = await getOrCreateStripeCustomer(req.user!.id, req.user!.email);
-
-    const paymentIntent = await stripe!.paymentIntents.create({
-      amount,
-      currency: 'usd',
-      customer: customerId,
-      metadata,
-      automatic_payment_methods: { enabled: true },
+    const profile = await prisma.userProfile.findUnique({
+      where: { userId: req.user!.id },
+      select: { country: true },
     });
+    const country = (profile?.country || 'US').toUpperCase();
+
+    // US customers → Stripe. Caribbean → WiPay preferred (broader coverage
+    // than PowerTranz for SMBs). Users can still override in the picker.
+    const CARIBBEAN = new Set(['JM', 'TT', 'BB', 'GY', 'LC', 'AG', 'DM', 'VC', 'KN']);
+    const recommended: Provider = country === 'US'
+      ? 'STRIPE'
+      : CARIBBEAN.has(country)
+        ? 'WIPAY'
+        : 'STRIPE';
+
+    const available: { id: Provider; enabled: boolean }[] = [
+      { id: 'STRIPE', enabled: stripeConfigured() },
+      { id: 'WIPAY', enabled: wipayConfigured() },
+      { id: 'POWERTRANZ', enabled: powertranzConfigured() },
+    ];
 
     res.json({
       success: true,
       data: {
-        clientSecret: paymentIntent.client_secret,
-        paymentIntentId: paymentIntent.id,
-        amount: amount / 100,
-        currency: 'USD',
+        country,
+        recommended,
+        available,
       },
     });
-  } catch (error: any) {
-    console.error('Create payment intent error:', error);
-    res.status(500).json({ success: false, error: error.message || 'Failed to create payment intent' });
-  }
-});
-
-// Legacy: dev-only "confirm" used by the old mock flow. Kept so any in-flight
-// builds keep working; new code paths rely on the Stripe webhook.
-router.post('/confirm', authenticate, async (req: AuthRequest, res) => {
-  try {
-    const { bookingId, orderId, paymentIntentId } = req.body;
-
-    if (bookingId) {
-      await prisma.booking.update({
-        where: { id: bookingId },
-        data: {
-          status: 'ACCEPTED',
-          statusHistory: {
-            create: { status: 'ACCEPTED', note: 'Payment confirmed' },
-          },
-        },
-      });
-
-      const booking = await prisma.booking.findUnique({ where: { id: bookingId } });
-      if (booking) {
-        const platformFee = booking.serviceFee;
-        const vendorPayout = booking.total - platformFee;
-
-        await prisma.transaction.upsert({
-          where: { bookingId },
-          create: {
-            bookingId,
-            stripePaymentIntentId: paymentIntentId,
-            amount: booking.total,
-            platformFee,
-            vendorPayout,
-            status: 'COMPLETED',
-            paidAt: new Date(),
-          },
-          update: {
-            stripePaymentIntentId: paymentIntentId,
-            status: 'COMPLETED',
-            paidAt: new Date(),
-          },
-        });
-      }
-    }
-
-    if (orderId) {
-      await prisma.order.update({
-        where: { id: orderId },
-        data: { status: 'ACCEPTED' },
-      });
-
-      const order = await prisma.order.findUnique({ where: { id: orderId } });
-      if (order) {
-        const platformFee = order.serviceFee;
-        const vendorPayout = order.total - platformFee - order.deliveryFee;
-
-        await prisma.transaction.upsert({
-          where: { orderId },
-          create: {
-            orderId,
-            stripePaymentIntentId: paymentIntentId,
-            amount: order.total,
-            platformFee,
-            vendorPayout,
-            status: 'COMPLETED',
-            paidAt: new Date(),
-          },
-          update: {
-            stripePaymentIntentId: paymentIntentId,
-            status: 'COMPLETED',
-            paidAt: new Date(),
-          },
-        });
-      }
-    }
-
-    res.json({ success: true, message: 'Payment confirmed' });
-  } catch (error: any) {
-    console.error('Confirm payment error:', error);
-    res.status(500).json({ success: false, error: 'Failed to confirm payment' });
+  } catch (error) {
+    logger.error({ err: error }, 'get providers failed');
+    res.status(500).json({ success: false, error: 'Failed to get providers' });
   }
 });
 
 // ---------------------------------------------------------------------------
-// Stored payment methods (unrelated to checkout flow — keep as-is)
+// Stored payment methods.
+//
+// Stripe stores real tokens; WiPay + PowerTranz collect card details on the
+// hosted page each time. For the profile screen we keep the table as a
+// display-only card list.
 // ---------------------------------------------------------------------------
 router.get('/methods', authenticate, async (req: AuthRequest, res) => {
   try {
@@ -351,7 +421,7 @@ router.get('/methods', authenticate, async (req: AuthRequest, res) => {
     });
     res.json({ success: true, data: methods });
   } catch (error) {
-    console.error('Get payment methods error:', error);
+    logger.error({ err: error }, 'get payment methods failed');
     res.status(500).json({ success: false, error: 'Failed to get payment methods' });
   }
 });
@@ -370,7 +440,7 @@ router.post('/methods', authenticate, async (req: AuthRequest, res) => {
     const method = await prisma.paymentMethod.create({
       data: {
         userId: req.user!.id,
-        stripePaymentMethodId: `pm_mock_${Date.now()}`,
+        stripePaymentMethodId: `pm_local_${Date.now()}`,
         type: 'card',
         last4,
         brand,
@@ -382,7 +452,7 @@ router.post('/methods', authenticate, async (req: AuthRequest, res) => {
 
     res.status(201).json({ success: true, data: method });
   } catch (error) {
-    console.error('Add payment method error:', error);
+    logger.error({ err: error }, 'add payment method failed');
     res.status(500).json({ success: false, error: 'Failed to add payment method' });
   }
 });
@@ -395,7 +465,7 @@ router.delete('/methods/:id', authenticate, async (req: AuthRequest, res) => {
     });
     res.json({ success: true, message: 'Payment method deleted' });
   } catch (error) {
-    console.error('Delete payment method error:', error);
+    logger.error({ err: error }, 'delete payment method failed');
     res.status(500).json({ success: false, error: 'Failed to delete payment method' });
   }
 });

@@ -18,11 +18,15 @@ const baseSchema = z.object({
 });
 
 // Stricter in production — these MUST be set for a real launch.
-// Stripe is intentionally optional: payments routes return 503 cleanly when
-// STRIPE_SECRET_KEY is absent, so the rest of the API can still serve.
+// Payment gateways (WiPay, PowerTranz) are intentionally optional at env level:
+// each provider-backed route returns 503 cleanly when its credentials are
+// absent, so the rest of the API can still serve.
 // Email: either RESEND_API_KEY (HTTPS, Railway-friendly) OR SMTP_* must be set.
 const prodOnlySchema = z.object({
   ALLOWED_ORIGINS: z.string().min(1, 'Set ALLOWED_ORIGINS (comma-separated) in production'),
+  API_PUBLIC_URL: z
+    .string()
+    .url('Set API_PUBLIC_URL to the public https URL of this API — gateways POST callbacks here'),
   RESEND_API_KEY: z.string().optional(),
   SMTP_HOST: z.string().optional(),
   SMTP_USER: z.string().optional(),

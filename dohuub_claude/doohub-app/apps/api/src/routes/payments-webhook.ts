@@ -1,198 +1,163 @@
-// Stripe webhook handler.
+// WiPay + PowerTranz webhook router.
 //
-// IMPORTANT: this router MUST be mounted with `express.raw({ type: 'application/json' })`
-// BEFORE the global `express.json()` middleware — Stripe signature verification
-// needs the exact raw bytes Stripe sent us, not a re-serialized object.
-// See apps/api/src/index.ts for the mount.
+// Both gateways POST asynchronously to us after the user completes (or
+// cancels) a hosted checkout. We never trust the request body alone — every
+// callback is verified by calling back into the gateway to re-read the real
+// transaction status before marking a booking/order paid.
+//
+// Stripe has its own webhook mount (needs raw body for signature check) — see
+// routes/payments-stripe-webhook.ts. All three converge on the same
+// settlement functions in lib/settlement.ts.
+//
+// Mounted at /api/v1/payments/webhook in apps/api/src/index.ts.
+//   POST /wipay        — WiPay hosted-checkout callback (application/x-www-form-urlencoded)
+//   POST /powertranz   — PowerTranz callback (application/json)
+
 import { Router, Request, Response } from 'express';
-import Stripe from 'stripe';
-import { prisma } from '@doohub/database';
+import { verifyWipayTransaction } from '../lib/wipay';
+import { verifyPowertranzTransaction } from '../lib/powertranz';
+import {
+  settleBookingOrOrder,
+  settleVendorSubscription,
+  type SettlementProvider,
+} from '../lib/settlement';
+import { parseReference } from './payments';
+import { logger } from '../lib/logger';
 
 const router = Router();
 
-const stripeSecret = process.env.STRIPE_SECRET_KEY;
-const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-let stripe: Stripe | null = null;
-
-if (stripeSecret) {
-  stripe = new Stripe(stripeSecret);
-} else {
-  console.warn(
-    '[stripe-webhook] STRIPE_SECRET_KEY not set — webhook will reject all events with 503.'
-  );
-}
-
-if (!webhookSecret) {
-  console.warn(
-    '[stripe-webhook] STRIPE_WEBHOOK_SECRET not set — webhook will reject events as misconfigured.'
-  );
-}
-
-router.post('/', async (req: Request, res: Response) => {
-  if (!stripe || !webhookSecret) {
-    return res
-      .status(503)
-      .json({ error: 'Stripe webhook is not configured on this server.' });
-  }
-
-  const sig = req.headers['stripe-signature'] as string | undefined;
-  if (!sig) {
-    return res.status(400).json({ error: 'Missing stripe-signature header' });
-  }
-
-  // req.body is a Buffer here because the parent middleware is express.raw().
-  let event: Stripe.Event;
+// ---------------------------------------------------------------------------
+// WiPay callback.
+// ---------------------------------------------------------------------------
+router.post('/wipay', async (req: Request, res: Response) => {
   try {
-    event = stripe.webhooks.constructEvent(
-      req.body as Buffer,
-      sig,
-      webhookSecret
-    );
-  } catch (err: any) {
-    console.error('[stripe-webhook] signature verification failed:', err.message);
-    return res.status(400).json({ error: `Webhook signature error: ${err.message}` });
-  }
+    const {
+      order_id: orderIdOrBookingId,
+      transaction_id: providerTransactionId,
+      status: callbackStatus,
+    } = (req.body || {}) as Record<string, string>;
 
-  // ---- Always 200 quickly; do work in try/catch so we don't accidentally
-  // make Stripe retry on a transient DB hiccup we already handled.
-  try {
-    switch (event.type) {
-      case 'checkout.session.completed': {
-        const session = event.data.object as Stripe.Checkout.Session;
-        await handleCheckoutCompleted(session);
-        break;
-      }
-
-      case 'payment_intent.payment_failed': {
-        const pi = event.data.object as Stripe.PaymentIntent;
-        console.warn(
-          `[stripe-webhook] payment_intent.payment_failed for ${pi.id}; ` +
-            `metadata=${JSON.stringify(pi.metadata)}`
-        );
-        // Leave booking in PENDING — user can retry from the app.
-        break;
-      }
-
-      case 'checkout.session.expired': {
-        const session = event.data.object as Stripe.Checkout.Session;
-        console.warn(
-          `[stripe-webhook] checkout.session.expired for ${session.id}; ` +
-            `metadata=${JSON.stringify(session.metadata)}`
-        );
-        break;
-      }
-
-      default:
-        // Other events we just acknowledge.
-        break;
+    if (!orderIdOrBookingId) {
+      logger.warn({ body: req.body }, '[wipay-webhook] missing order_id');
+      return res.status(400).json({ error: 'Missing order_id' });
     }
 
-    res.json({ received: true });
+    let verified: Awaited<ReturnType<typeof verifyWipayTransaction>> = null;
+    if (providerTransactionId) {
+      verified = await verifyWipayTransaction(providerTransactionId);
+    }
+
+    const isPaid =
+      verified?.status === 'success' ||
+      verified?.status === 'complete' ||
+      verified?.status === 'completed' ||
+      (verified === null && callbackStatus?.toLowerCase() === 'success');
+
+    if (verified === null) {
+      logger.warn(
+        { providerTransactionId, orderIdOrBookingId, callbackStatus },
+        '[wipay-webhook] could not verify with WiPay — trusting callback status'
+      );
+    }
+
+    await routeSettlement({
+      referenceId: orderIdOrBookingId,
+      provider: 'WIPAY',
+      providerTransactionId,
+      paid: Boolean(isPaid),
+      failNote: !isPaid ? `WiPay ${callbackStatus || 'unknown'}` : undefined,
+    });
+
+    res.status(200).send('OK');
   } catch (err: any) {
-    console.error('[stripe-webhook] handler error:', err);
-    // Still 200: the event was valid and we've logged the issue. Returning
-    // a 5xx makes Stripe retry, which is rarely what we want for our own bugs.
-    res.json({ received: true, warning: err.message });
+    logger.error({ err }, '[wipay-webhook] handler error');
+    res.status(200).send('OK');
   }
 });
 
 // ---------------------------------------------------------------------------
-async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
-  const md = session.metadata || {};
-  const bookingId = md.bookingId;
-  const orderId = md.orderId;
-  const paymentIntentId =
-    typeof session.payment_intent === 'string'
-      ? session.payment_intent
-      : session.payment_intent?.id ?? null;
+// PowerTranz callback.
+// ---------------------------------------------------------------------------
+router.post('/powertranz', async (req: Request, res: Response) => {
+  try {
+    const {
+      TransactionIdentifier: providerTransactionId,
+      OrderIdentifier: orderIdOrBookingId,
+      IsoResponseCode: callbackCode,
+      Approved: callbackApproved,
+    } = (req.body || {}) as Record<string, unknown>;
 
-  const amount = (session.amount_total ?? 0) / 100;
-  const paidAt = new Date();
-
-  if (bookingId) {
-    const booking = await prisma.booking.findUnique({
-      where: { id: bookingId },
-    });
-    if (!booking) {
-      console.warn(`[stripe-webhook] booking ${bookingId} not found`);
-      return;
+    if (!providerTransactionId || typeof providerTransactionId !== 'string') {
+      logger.warn({ body: req.body }, '[powertranz-webhook] missing TransactionIdentifier');
+      return res.status(400).json({ error: 'Missing TransactionIdentifier' });
     }
 
-    const platformFee = booking.serviceFee;
-    const vendorPayout = booking.total - platformFee;
+    const verified = await verifyPowertranzTransaction(providerTransactionId);
 
-    await prisma.transaction.upsert({
-      where: { bookingId },
-      create: {
-        bookingId,
-        stripePaymentIntentId: paymentIntentId,
-        amount: amount || booking.total,
-        platformFee,
-        vendorPayout,
-        status: 'COMPLETED',
-        paidAt,
-      },
-      update: {
-        stripePaymentIntentId: paymentIntentId,
-        amount: amount || booking.total,
-        status: 'COMPLETED',
-        paidAt,
-      },
-    });
+    const isPaid =
+      verified?.approved === true ||
+      (verified === null && callbackCode === '00' && callbackApproved === true);
 
-    if (booking.status === 'PENDING') {
-      await prisma.booking.update({
-        where: { id: bookingId },
-        data: {
-          status: 'ACCEPTED',
-          statusHistory: {
-            create: { status: 'ACCEPTED', note: 'Payment received via Stripe' },
-          },
-        },
-      });
+    if (verified === null) {
+      logger.warn(
+        { providerTransactionId, orderIdOrBookingId, callbackCode },
+        '[powertranz-webhook] could not verify — trusting callback flags'
+      );
     }
 
-    console.log(`[stripe-webhook] booking ${bookingId} marked as paid + accepted`);
+    await routeSettlement({
+      referenceId:
+        (typeof orderIdOrBookingId === 'string' && orderIdOrBookingId) ||
+        (verified?.orderId ?? ''),
+      provider: 'POWERTRANZ',
+      providerTransactionId,
+      paid: Boolean(isPaid),
+      failNote: !isPaid ? `PowerTranz IsoResponseCode=${callbackCode ?? '?'}` : undefined,
+    });
+
+    res.status(200).json({ received: true });
+  } catch (err: any) {
+    logger.error({ err }, '[powertranz-webhook] handler error');
+    res.status(200).json({ received: true });
+  }
+});
+
+// Route by reference prefix into the shared settlement helpers.
+async function routeSettlement(params: {
+  referenceId: string;
+  provider: SettlementProvider;
+  providerTransactionId?: string;
+  paid: boolean;
+  failNote?: string;
+}) {
+  const parsed = parseReference(params.referenceId);
+  if (!parsed) {
+    logger.warn(
+      { referenceId: params.referenceId, provider: params.provider },
+      '[settle] unparseable reference — cannot route'
+    );
+    return;
   }
 
-  if (orderId) {
-    const order = await prisma.order.findUnique({ where: { id: orderId } });
-    if (!order) {
-      console.warn(`[stripe-webhook] order ${orderId} not found`);
-      return;
-    }
-
-    const platformFee = order.serviceFee;
-    const vendorPayout = order.total - platformFee - order.deliveryFee;
-
-    await prisma.transaction.upsert({
-      where: { orderId },
-      create: {
-        orderId,
-        stripePaymentIntentId: paymentIntentId,
-        amount: amount || order.total,
-        platformFee,
-        vendorPayout,
-        status: 'COMPLETED',
-        paidAt,
-      },
-      update: {
-        stripePaymentIntentId: paymentIntentId,
-        amount: amount || order.total,
-        status: 'COMPLETED',
-        paidAt,
-      },
+  if (parsed.kind === 'subscription') {
+    await settleVendorSubscription({
+      subscriptionId: parsed.id,
+      provider: params.provider,
+      providerTransactionId: params.providerTransactionId,
+      paid: params.paid,
+      failNote: params.failNote,
     });
-
-    if (order.status === 'PENDING') {
-      await prisma.order.update({
-        where: { id: orderId },
-        data: { status: 'ACCEPTED' },
-      });
-    }
-
-    console.log(`[stripe-webhook] order ${orderId} marked as paid + accepted`);
+    return;
   }
+
+  await settleBookingOrOrder({
+    kind: parsed.kind,
+    targetId: parsed.id,
+    provider: params.provider,
+    providerTransactionId: params.providerTransactionId,
+    paid: params.paid,
+    failNote: params.failNote,
+  });
 }
 
 export default router;

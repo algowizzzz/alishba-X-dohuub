@@ -38,7 +38,9 @@ import orderRoutes from './routes/orders';
 import cartRoutes from './routes/cart';
 import reviewRoutes from './routes/reviews';
 import paymentRoutes from './routes/payments';
-import stripeWebhookRoutes from './routes/payments-webhook';
+import paymentWebhookRoutes from './routes/payments-webhook';
+import paymentStripeWebhookRoutes from './routes/payments-stripe-webhook';
+import vendorStripeConnectRoutes from './routes/vendor-stripe-connect';
 import chatRoutes from './routes/chat';
 import notificationRoutes from './routes/notifications';
 import reportRoutes from './routes/reports';
@@ -102,16 +104,21 @@ app.use('/api/v1/auth/', authLimiter);
 app.use('/api/v1/payments/', paymentLimiter);
 
 // Stripe webhook MUST be mounted BEFORE express.json() so we can verify the
-// raw body signature. See apps/api/src/routes/payments-webhook.ts.
+// raw body signature. See apps/api/src/routes/payments-stripe-webhook.ts.
 app.use(
-  '/api/v1/payments/webhook',
+  '/api/v1/payments/webhook/stripe',
   express.raw({ type: 'application/json' }),
-  stripeWebhookRoutes
+  paymentStripeWebhookRoutes
 );
 
-// Body parsing
+// Body parsing. WiPay POSTs form-urlencoded callbacks and PowerTranz POSTs
+// JSON; both are handled by the router at /api/v1/payments/webhook.
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// Payment gateway webhooks (WiPay + PowerTranz). Verification happens
+// server-to-server inside the router — no signature-header body-raw dance.
+app.use('/api/v1/payments/webhook', paymentWebhookRoutes);
 
 // Structured request logging.
 app.use(
@@ -180,6 +187,7 @@ app.use('/api/v1/orders', orderRoutes);
 app.use('/api/v1/cart', cartRoutes);
 app.use('/api/v1/reviews', reviewRoutes);
 app.use('/api/v1/payments', paymentRoutes);
+app.use('/api/v1/vendor/stripe-connect', vendorStripeConnectRoutes);
 app.use('/api/v1/chat', chatRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
 app.use('/api/v1/reports', reportRoutes);
