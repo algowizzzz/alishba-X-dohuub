@@ -296,7 +296,17 @@ export function AllVendors() {
               : v.subscriptionStatus === "TRIAL" ? "trial"
               : v.isActive ? "active" : "inactive",
             subscriptionPlan: v.subscription?.planId || (v.subscriptionStatus === "TRIAL" ? "Trial" : "—"),
-            subscriptionFee: 49, // TODO: derive from SubscriptionPlan once plan→price join lands
+            subscriptionFee: (() => {
+              const planPrices: Record<string, { monthly: number; yearly: number }> = {
+                basic: { monthly: 29.99, yearly: 299.99 },
+                professional: { monthly: 79.99, yearly: 799.99 },
+                enterprise: { monthly: 199.99, yearly: 1999.99 },
+              };
+              const planId = v.subscription?.planId;
+              const billing = v.subscription?.billingPeriod === "yearly" ? "yearly" : "monthly";
+              if (!planId || !planPrices[planId]) return 0;
+              return planPrices[planId][billing];
+            })(),
             regions,
             joinedDate: v.createdAt,
             listingsCount: listingsTotal,

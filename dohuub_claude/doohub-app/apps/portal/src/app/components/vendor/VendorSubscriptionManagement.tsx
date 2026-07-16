@@ -20,8 +20,10 @@ interface Invoice {
   id: string;
   date: string;
   amount: number;
+  currency: string;
+  description: string;
   status: "Paid" | "Pending" | "Failed";
-  downloadUrl: string;
+  downloadUrl: string | null;
 }
 
 export function VendorSubscriptionManagement() {
@@ -49,9 +51,6 @@ export function VendorSubscriptionManagement() {
   };
 
   // Real subscription data, loaded from /vendors/me.
-  // Stripe billing isn't wired yet, so amount + paymentMethod stay placeholder
-  // until Stripe Connect is configured. Trial status, end date and cancel
-  // come from the real Vendor row.
   const [subscription, setSubscription] = useState<{
     plan: string;
     status: string;
@@ -59,6 +58,7 @@ export function VendorSubscriptionManagement() {
     billing: string;
     nextBillingDate: string | null;
     trialEndsDate: string | null;
+    trialDaysRemaining: number | null;
     paymentMethod: { type: string; last4: string; expiryDate: string } | null;
   }>({
     plan: "Trial",
@@ -67,6 +67,7 @@ export function VendorSubscriptionManagement() {
     billing: "—",
     nextBillingDate: null,
     trialEndsDate: null,
+    trialDaysRemaining: null,
     paymentMethod: null,
   });
 
@@ -78,6 +79,9 @@ export function VendorSubscriptionManagement() {
         if (!v) return;
         const trialEnds = v.trialEndsAt ? new Date(v.trialEndsAt) : null;
         const status = v.subscriptionStatus || "TRIAL";
+        const daysRemaining = trialEnds && status === "TRIAL"
+          ? Math.max(0, Math.ceil((trialEnds.getTime() - Date.now()) / (24 * 60 * 60 * 1000)))
+          : null;
         setSubscription({
           plan:
             status === "TRIAL"
@@ -89,7 +93,10 @@ export function VendorSubscriptionManagement() {
               : status === "EXPIRED"
               ? "Expired"
               : "—",
-          status: status.charAt(0) + status.slice(1).toLowerCase(),
+          status:
+            status === "TRIAL" && daysRemaining !== null && daysRemaining <= 3
+              ? "Trial Ending Soon"
+              : status.charAt(0) + status.slice(1).toLowerCase(),
           amount: null,
           billing: status === "TRIAL" ? "trial" : "monthly",
           nextBillingDate: trialEnds
@@ -98,6 +105,7 @@ export function VendorSubscriptionManagement() {
           trialEndsDate: trialEnds && status === "TRIAL"
             ? trialEnds.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
             : null,
+          trialDaysRemaining: daysRemaining,
           paymentMethod: null,
         });
       })
@@ -110,8 +118,38 @@ export function VendorSubscriptionManagement() {
     "Multi-region coverage",
   ];
 
-  // Billing history — empty until Stripe webhooks populate BillingHistory.
-  const invoices: Invoice[] = [];
+  // Billing history — populated by Stripe/WiPay/PowerTranz webhook via
+  // settleVendorSubscription() writing to BillingHistory. GET /vendors/me/billing-history
+  // returns it in descending order.
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [invoicesLoading, setInvoicesLoading] = useState(true);
+
+  useEffect(() => {
+    api
+      .get<{ success: boolean; data: any[] }>("/api/v1/vendors/me/billing-history")
+      .then((r) => {
+        const rows = (r as any)?.data || [];
+        setInvoices(
+          rows.map((row: any) => ({
+            id: row.id,
+            date: new Date(row.paidAt || row.createdAt).toLocaleDateString("en-US", {
+              year: "numeric",
+              month: "short",
+              day: "numeric",
+            }),
+            amount: row.amount,
+            currency: row.currency || "USD",
+            description: row.description || "Subscription payment",
+            status: row.paidAt ? "Paid" : "Pending",
+            downloadUrl: row.invoiceUrl || null,
+          }))
+        );
+      })
+      .catch(() => {
+        // Non-fatal — leave the list empty.
+      })
+      .finally(() => setInvoicesLoading(false));
+  }, []);
 
   const handleChangePlan = () => {
     // Navigate to change plan page
@@ -256,7 +294,7 @@ export function VendorSubscriptionManagement() {
                 </p>
               </div>
 
-              {/* Next Billing */}
+              {/* Next Billing / Trial Countdown */}
               <div className="bg-white border border-[rgba(46,122,217,0.25)] rounded-xl p-6 shadow-[0_2px_8px_rgba(46,122,217,0.10)]">
                 <p className="text-xs font-semibold text-[#6B7280] uppercase tracking-wide mb-2">
                   {subscription.trialEndsDate ? "Trial Ends" : "Next Billing Date"}
@@ -267,11 +305,27 @@ export function VendorSubscriptionManagement() {
                     {subscription.nextBillingDate || "—"}
                   </p>
                 </div>
-                <p className="text-sm text-[#6B7280] mt-1">
-                  {subscription.trialEndsDate
-                    ? "Subscription required after this date"
-                    : "Auto-renews on this date"}
-                </p>
+                {subscription.trialDaysRemaining !== null ? (
+                  <p
+                    className={`text-sm mt-1 font-semibold ${
+                      subscription.trialDaysRemaining <= 3
+                        ? "text-[#DC2626]"
+                        : "text-[#065F46]"
+                    }`}
+                  >
+                    {subscription.trialDaysRemaining === 0
+                      ? "Trial ends today"
+                      : subscription.trialDaysRemaining === 1
+                      ? "1 day remaining"
+                      : `${subscription.trialDaysRemaining} days remaining`}
+                  </p>
+                ) : (
+                  <p className="text-sm text-[#6B7280] mt-1">
+                    {subscription.trialEndsDate
+                      ? "Subscription required after this date"
+                      : "Auto-renews on this date"}
+                  </p>
+                )}
               </div>
 
               {/* Payment Method */}
@@ -295,13 +349,12 @@ export function VendorSubscriptionManagement() {
               </div>
             </div>
 
-            {/* Action Buttons — payments-bound actions are disabled until
-                Stripe Connect is wired. Cancel always works. */}
+            {/* Action Buttons */}
             <div className="flex flex-wrap gap-3">
-              <Button onClick={handleChangePlan} variant="default" disabled title="Stripe billing not yet configured">
+              <Button onClick={handleChangePlan} variant="default">
                 Change Plan
               </Button>
-              <Button onClick={handleUpdatePayment} variant="outline" disabled title="Stripe billing not yet configured">
+              <Button onClick={handleUpdatePayment} variant="outline">
                 <Edit className="w-4 h-4 mr-2" />
                 Update Payment Method
               </Button>
@@ -313,9 +366,6 @@ export function VendorSubscriptionManagement() {
                 Cancel Subscription
               </Button>
             </div>
-            <p className="text-xs text-[#6B7280] mt-3">
-              Plan changes and payment-method updates will be enabled when Stripe billing is connected.
-            </p>
           </div>
 
           {/* Plan Features */}
@@ -352,90 +402,139 @@ export function VendorSubscriptionManagement() {
                       Date
                     </th>
                     <th className="text-left py-3 px-4 text-xs font-semibold text-[#6B7280] uppercase tracking-wide">
+                      Description
+                    </th>
+                    <th className="text-left py-3 px-4 text-xs font-semibold text-[#6B7280] uppercase tracking-wide">
                       Amount
                     </th>
                     <th className="text-left py-3 px-4 text-xs font-semibold text-[#6B7280] uppercase tracking-wide">
                       Status
                     </th>
+                    <th className="text-left py-3 px-4 text-xs font-semibold text-[#6B7280] uppercase tracking-wide">
+                      Receipt
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {invoices.map((invoice) => (
-                    <tr key={invoice.id} className="border-b border-[rgba(46,122,217,0.25)] last:border-0">
-                      <td className="py-4 px-4">
-                        <p className="text-sm text-[#6B7280]">{invoice.date}</p>
-                      </td>
-                      <td className="py-4 px-4">
-                        <p className="text-sm font-semibold text-[#1A1A2E]">
-                          ${invoice.amount.toFixed(2)}
-                        </p>
-                      </td>
-                      <td className="py-4 px-4">
-                        <span
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
-                            invoice.status === "Paid"
-                              ? "bg-[#D1FAE5] text-[#065F46]"
-                              : invoice.status === "Pending"
-                              ? "bg-[#FEF3C7] text-[#92400E]"
-                              : "bg-[#FEE2E2] text-[#991B1B]"
-                          }`}
-                        >
-                          {invoice.status === "Paid" && (
-                            <span className="w-1.5 h-1.5 rounded-full bg-[#10B981]"></span>
-                          )}
-                          {invoice.status}
-                        </span>
+                  {invoicesLoading ? (
+                    <tr>
+                      <td colSpan={5} className="py-8 text-center text-sm text-[#6B7280]">
+                        Loading…
                       </td>
                     </tr>
-                  ))}
+                  ) : invoices.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="py-8 text-center text-sm text-[#6B7280]">
+                        No payments yet. Your first invoice will appear here after
+                        your trial ends and the first subscription charge succeeds.
+                      </td>
+                    </tr>
+                  ) : (
+                    invoices.map((invoice) => (
+                      <tr key={invoice.id} className="border-b border-[rgba(46,122,217,0.25)] last:border-0">
+                        <td className="py-4 px-4">
+                          <p className="text-sm text-[#6B7280]">{invoice.date}</p>
+                        </td>
+                        <td className="py-4 px-4">
+                          <p className="text-sm text-[#1A1A2E]">{invoice.description}</p>
+                        </td>
+                        <td className="py-4 px-4">
+                          <p className="text-sm font-semibold text-[#1A1A2E]">
+                            ${invoice.amount.toFixed(2)} {invoice.currency}
+                          </p>
+                        </td>
+                        <td className="py-4 px-4">
+                          <span
+                            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
+                              invoice.status === "Paid"
+                                ? "bg-[#D1FAE5] text-[#065F46]"
+                                : invoice.status === "Pending"
+                                ? "bg-[#FEF3C7] text-[#92400E]"
+                                : "bg-[#FEE2E2] text-[#991B1B]"
+                            }`}
+                          >
+                            {invoice.status === "Paid" && (
+                              <span className="w-1.5 h-1.5 rounded-full bg-[#10B981]"></span>
+                            )}
+                            {invoice.status}
+                          </span>
+                        </td>
+                        <td className="py-4 px-4">
+                          {invoice.downloadUrl ? (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => window.open(invoice.downloadUrl!, "_blank")}
+                            >
+                              <Download className="w-4 h-4 mr-1.5" />
+                              Download
+                            </Button>
+                          ) : (
+                            <span className="text-xs text-[#9CA3AF]">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
 
             {/* Mobile Cards */}
             <div className="md:hidden space-y-4">
-              {invoices.map((invoice) => (
-                <div
-                  key={invoice.id}
-                  className="border border-[rgba(46,122,217,0.25)] rounded-xl p-4"
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div>
-                      <p className="text-sm font-semibold text-[#1A1A2E] mb-1">
-                        {invoice.id}
-                      </p>
-                      <p className="text-xs text-[#6B7280]">{invoice.date}</p>
+              {invoicesLoading ? (
+                <p className="text-center text-sm text-[#6B7280] py-6">Loading…</p>
+              ) : invoices.length === 0 ? (
+                <p className="text-center text-sm text-[#6B7280] py-6">
+                  No payments yet. Your first invoice will appear here after your
+                  trial ends and the first subscription charge succeeds.
+                </p>
+              ) : (
+                invoices.map((invoice) => (
+                  <div
+                    key={invoice.id}
+                    className="border border-[rgba(46,122,217,0.25)] rounded-xl p-4"
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <p className="text-sm font-semibold text-[#1A1A2E] mb-1">
+                          {invoice.description}
+                        </p>
+                        <p className="text-xs text-[#6B7280]">{invoice.date}</p>
+                      </div>
+                      <span
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
+                          invoice.status === "Paid"
+                            ? "bg-[#D1FAE5] text-[#065F46]"
+                            : invoice.status === "Pending"
+                            ? "bg-[#FEF3C7] text-[#92400E]"
+                            : "bg-[#FEE2E2] text-[#991B1B]"
+                        }`}
+                      >
+                        {invoice.status === "Paid" && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#10B981]"></span>
+                        )}
+                        {invoice.status}
+                      </span>
                     </div>
-                    <span
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
-                        invoice.status === "Paid"
-                          ? "bg-[#D1FAE5] text-[#065F46]"
-                          : invoice.status === "Pending"
-                          ? "bg-[#FEF3C7] text-[#92400E]"
-                          : "bg-[#FEE2E2] text-[#991B1B]"
-                      }`}
-                    >
-                      {invoice.status === "Paid" && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#10B981]"></span>
-                      )}
-                      {invoice.status}
-                    </span>
+                    <div className="flex items-center justify-between">
+                      <p className="text-lg font-bold text-[#1A1A2E]">
+                        ${invoice.amount.toFixed(2)} {invoice.currency}
+                      </p>
+                      {invoice.downloadUrl ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => window.open(invoice.downloadUrl!, "_blank")}
+                        >
+                          <Download className="w-4 h-4 mr-2" />
+                          Download
+                        </Button>
+                      ) : null}
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <p className="text-lg font-bold text-[#1A1A2E]">
-                      ${invoice.amount.toFixed(2)}
-                    </p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => window.open(invoice.downloadUrl, "_blank")}
-                    >
-                      <Download className="w-4 h-4 mr-2" />
-                      Download
-                    </Button>
-                  </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
         </div>
