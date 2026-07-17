@@ -1,13 +1,35 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { VendorSidebar } from "./VendorSidebar";
 import { VendorTopNav } from "./VendorTopNav";
-import { Check, ArrowRight, AlertCircle } from "lucide-react";
+import { Check, ArrowRight, AlertCircle, CreditCard, ShieldCheck, Zap } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../ui/button";
 import api from "../../../services/api";
 import { toast } from "sonner";
 
 type PlanType = "monthly" | "yearly";
+type Provider = "STRIPE" | "WIPAY" | "POWERTRANZ";
+
+const PROVIDER_META: Record<
+  Provider,
+  { label: string; tagline: string; Icon: typeof CreditCard }
+> = {
+  STRIPE: {
+    label: "Card (Stripe)",
+    tagline: "Visa / Mastercard / Amex — best for US vendors",
+    Icon: Zap,
+  },
+  WIPAY: {
+    label: "WiPay",
+    tagline: "Cards & bank — used across the Caribbean",
+    Icon: CreditCard,
+  },
+  POWERTRANZ: {
+    label: "PowerTranz",
+    tagline: "Visa / Mastercard via First Atlantic Commerce",
+    Icon: ShieldCheck,
+  },
+};
 
 export function VendorChangePlan() {
   const navigate = useNavigate();
@@ -16,7 +38,40 @@ export function VendorChangePlan() {
     typeof window !== "undefined" && window.innerWidth >= 1024 ? false : true
   );
   const [selectedPlan, setSelectedPlan] = useState<PlanType>("yearly");
+  const [recommendedProvider, setRecommendedProvider] = useState<Provider>("STRIPE");
+  const [availableProviders, setAvailableProviders] = useState<Provider[]>([
+    "STRIPE",
+    "WIPAY",
+    "POWERTRANZ",
+  ]);
+  const [selectedProvider, setSelectedProvider] = useState<Provider>("STRIPE");
+  const [showOtherProviders, setShowOtherProviders] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await api.get<{
+          success: boolean;
+          data?: {
+            country: string;
+            recommended: Provider;
+            available: { id: Provider; enabled: boolean }[];
+          };
+        }>("/api/v1/subscriptions/providers");
+        if (!res?.data) return;
+        const enabled = res.data.available.filter((p) => p.enabled).map((p) => p.id);
+        const rec = enabled.includes(res.data.recommended)
+          ? res.data.recommended
+          : enabled[0] || "STRIPE";
+        setRecommendedProvider(rec);
+        setAvailableProviders(enabled.length ? enabled : ["STRIPE", "WIPAY", "POWERTRANZ"]);
+        setSelectedProvider(rec);
+      } catch {
+        // Non-fatal — fall back to defaults.
+      }
+    })();
+  }, []);
 
   const handleSidebarToggle = () => {
     if (typeof window !== "undefined" && window.innerWidth >= 1024) {
@@ -67,16 +122,40 @@ export function VendorChangePlan() {
 
   const [isChanging, setIsChanging] = useState(false);
   const handleConfirmChange = async () => {
-    // Map UI billing-frequency to a real backend plan id
-    const planId = selectedPlan === "monthly" ? "basic" : "professional";
+    // UI is a monthly-vs-yearly toggle for the Professional plan today.
+    // Change here if the change-plan page adds a plan tier selector.
+    const planId = "professional";
+    const billingPeriod = selectedPlan === "monthly" ? "monthly" : "yearly";
     setIsChanging(true);
     try {
-      await api.put("/api/v1/subscriptions/change-plan", { planId });
-      toast.success("Plan updated successfully");
-      setShowConfirmModal(false);
-      navigate("/vendor/subscription-management");
+      // Stage the plan selection first — this doesn't activate anything until
+      // payment succeeds via the hosted checkout below.
+      await api.put("/api/v1/subscriptions/change-plan", { planId, billingPeriod });
+
+      // Ask the API for a WiPay/PowerTranz hosted-checkout URL and redirect.
+      // The gateway webhook flips the subscription to ACTIVE after payment.
+      const res = await api.post<{
+        success: boolean;
+        data?: { url: string };
+        error?: string;
+      }>("/api/v1/subscriptions/checkout-session", {
+        provider: selectedProvider,
+        planId,
+        billingPeriod,
+        returnUrl: window.location.origin + "/vendor/subscription-management?checkout=return",
+      });
+
+      if (!res?.data?.url) {
+        throw new Error(res?.error || "Could not start checkout");
+      }
+
+      // Full-page redirect — some gateways refuse to load inside an iframe,
+      // and a redirect gives us a clean back-navigation into the portal.
+      window.location.href = res.data.url;
     } catch (e: any) {
-      toast.error(e?.response?.data?.error || e?.message || "Failed to change plan");
+      toast.error(
+        e?.response?.data?.error || e?.message || "Failed to start checkout"
+      );
     } finally {
       setIsChanging(false);
     }
@@ -239,6 +318,97 @@ export function VendorChangePlan() {
             </div>
           </div>
 
+          {/* Payment provider picker — filtered by vendor country */}
+          <div className="bg-white border border-[rgba(46,122,217,0.25)] rounded-2xl p-6 sm:p-8 mb-6 shadow-[0_4px_16px_rgba(46,122,217,0.18)]">
+            <h2 className="text-xl font-bold text-[#1A1A2E] mb-2">
+              Payment Method
+            </h2>
+            <p className="text-sm text-[#6B7280] mb-6">
+              We'll pick the best option for your region — you can pay a
+              different way if you'd like.
+            </p>
+
+            {(() => {
+              const ProviderButton = ({
+                id,
+                isRecommended,
+              }: {
+                id: Provider;
+                isRecommended: boolean;
+              }) => {
+                const meta = PROVIDER_META[id];
+                const Icon = meta.Icon;
+                const isSelected = selectedProvider === id;
+                return (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedProvider(id)}
+                    className={`
+                      relative w-full border-2 rounded-2xl p-6 text-left transition-all flex items-start gap-4 mb-3
+                      ${
+                        isSelected
+                          ? "border-[#2E7AD9] bg-white"
+                          : "border-[rgba(46,122,217,0.25)] hover:border-[rgba(46,122,217,0.4)]"
+                      }
+                    `}
+                  >
+                    <Icon className="w-6 h-6 text-[#2E7AD9] shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 flex-wrap mb-1">
+                        <h3 className="text-base font-bold text-[#1A1A2E]">
+                          {meta.label}
+                        </h3>
+                        {isRecommended && (
+                          <span className="text-[10px] font-semibold text-[#1E5DB0] bg-[rgba(46,122,217,0.12)] px-2 py-0.5 rounded-full">
+                            Recommended for your region
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-[#6B7280]">{meta.tagline}</p>
+                    </div>
+                    {isSelected && (
+                      <div className="w-6 h-6 bg-[#2E7AD9] rounded-full flex items-center justify-center shrink-0">
+                        <Check className="w-4 h-4 text-white" />
+                      </div>
+                    )}
+                  </button>
+                );
+              };
+
+              const others = availableProviders.filter(
+                (p) => p !== recommendedProvider
+              );
+
+              return (
+                <>
+                  <ProviderButton id={recommendedProvider} isRecommended={true} />
+                  {others.length > 0 && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setShowOtherProviders((v) => !v)}
+                        className="text-sm text-[#6B7280] hover:text-[#1A1A2E] font-medium flex items-center gap-1 mt-2 mb-2"
+                      >
+                        {showOtherProviders
+                          ? "Hide other payment methods"
+                          : "Other payment methods"}
+                        <ArrowRight
+                          className={`w-4 h-4 transition-transform ${
+                            showOtherProviders ? "rotate-90" : ""
+                          }`}
+                        />
+                      </button>
+                      {showOtherProviders &&
+                        others.map((id) => (
+                          <ProviderButton key={id} id={id} isRecommended={false} />
+                        ))}
+                    </>
+                  )}
+                </>
+              );
+            })()}
+          </div>
+
           {/* Billing Info */}
           {selectedPlan !== currentPlan.type && (
             <div className="bg-[#FFFBEB] border border-[#FDE68A] rounded-2xl p-6 mb-6">
@@ -286,10 +456,9 @@ export function VendorChangePlan() {
               Confirm Plan Change
             </h2>
             <p className="text-sm text-[#6B7280] mb-6">
-              Are you sure you want to change to the {plans[selectedPlan].name}?
-              {selectedPlan === "yearly"
-                ? " You'll be charged $470 immediately."
-                : " You'll be charged $49 immediately."}
+              You'll be redirected to {PROVIDER_META[selectedProvider].label} to
+              complete payment on their secure hosted page. Your{" "}
+              {plans[selectedPlan].name} activates as soon as the charge clears.
             </p>
 
             <div className="bg-white rounded-xl p-4 mb-6">
@@ -330,7 +499,9 @@ export function VendorChangePlan() {
                 disabled={isChanging}
                 className="flex-1"
               >
-                {isChanging ? "Updating..." : "Confirm Change"}
+                {isChanging
+                  ? "Starting checkout..."
+                  : `Continue to ${PROVIDER_META[selectedProvider].label}`}
               </Button>
             </div>
           </div>
