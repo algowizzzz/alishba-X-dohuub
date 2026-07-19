@@ -45,6 +45,7 @@ import { VendorChangePlan } from './components/vendor/VendorChangePlan';
 import { VendorUpdatePayment } from './components/vendor/VendorUpdatePayment';
 import { VendorProfile } from './components/vendor/VendorProfile';
 import { VendorSettings } from './components/vendor/VendorSettings';
+import { VendorStripeConnect } from './components/vendor/VendorStripeConnect';
 
 const adminOnly = (el: React.ReactNode) => (
   <ProtectedRoute allow={['ADMIN']} loginPath="/admin/login">
@@ -121,6 +122,7 @@ export default function App() {
           <Route path="/vendor/profile" element={<VendorProfile />} />
           <Route path="/vendor/availability" element={<VendorAvailability />} />
           <Route path="/vendor/settings" element={<VendorSettings />} />
+          <Route path="/vendor/stripe-connect" element={<VendorStripeConnect />} />
         </Route>
       </Routes>
     </BrowserRouter>
