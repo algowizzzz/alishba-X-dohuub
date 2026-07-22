@@ -77,7 +77,11 @@ function VendorPage({ vendorId }: { vendorId: string }) {
   const liveRating =
     liveReviewCount > 0
       ? reviews.reduce((sum, r) => sum + (Number(r.rating) || 0), 0) / liveReviewCount
-      : Number(vendor.rating ?? 0);
+      : 0;
+  const ratingLabel =
+    liveReviewCount > 0
+      ? `${liveRating.toFixed(1)} (${liveReviewCount} reviews)`
+      : 'No reviews yet';
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
@@ -107,9 +111,15 @@ function VendorPage({ vendorId }: { vendorId: string }) {
                 )}
               </View>
               <View style={styles.ratingRow}>
-                <Ionicons name="star" size={14} color="#FACC15" />
-                <Text style={styles.ratingValue}>{liveRating.toFixed(1)}</Text>
-                <Text style={styles.reviewCountText}>({liveReviewCount} reviews)</Text>
+                {liveReviewCount > 0 ? (
+                  <>
+                    <Ionicons name="star" size={14} color="#FACC15" />
+                    <Text style={styles.ratingValue}>{liveRating.toFixed(1)}</Text>
+                    <Text style={styles.reviewCountText}>({liveReviewCount} reviews)</Text>
+                  </>
+                ) : (
+                  <Text style={styles.reviewCountText}>No reviews yet</Text>
+                )}
               </View>
             </View>
           </View>
@@ -146,10 +156,14 @@ function VendorPage({ vendorId }: { vendorId: string }) {
                 <View style={styles.serviceCardInfo}>
                   <Text style={styles.serviceCardName} numberOfLines={2}>{listing.title}</Text>
                   <View style={styles.ratingRow}>
-                    <Ionicons name="star" size={12} color="#F59E0B" />
-                    <Text style={styles.serviceCardRating}>
-                      {liveRating.toFixed(1)}
-                    </Text>
+                    {liveReviewCount > 0 ? (
+                      <>
+                        <Ionicons name="star" size={12} color="#F59E0B" />
+                        <Text style={styles.serviceCardRating}>{liveRating.toFixed(1)}</Text>
+                      </>
+                    ) : (
+                      <Text style={styles.serviceCardRating}>New</Text>
+                    )}
                   </View>
                   {listing.description ? (
                     <Text style={styles.serviceCardDesc} numberOfLines={2}>{listing.description}</Text>
@@ -209,7 +223,11 @@ function ServiceDetailPage({ vendorId, listingId }: { vendorId: string; listingI
   const liveRating =
     liveReviewCount > 0
       ? reviews.reduce((sum, r) => sum + (Number(r.rating) || 0), 0) / liveReviewCount
-      : Number(vendor.rating ?? 0);
+      : 0;
+  const ratingLabel =
+    liveReviewCount > 0
+      ? `${liveRating.toFixed(1)} (${liveReviewCount} reviews)`
+      : 'No reviews yet';
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
@@ -229,10 +247,14 @@ function ServiceDetailPage({ vendorId, listingId }: { vendorId: string; listingI
         <View style={styles.detailTitleSection}>
           <Text style={styles.detailTitle}>{listing.title}</Text>
           <View style={styles.ratingRow}>
-            <Ionicons name="star" size={14} color="#F59E0B" />
-            <Text style={styles.ratingText}>
-              {liveRating.toFixed(1)} ({liveReviewCount} reviews)
-            </Text>
+            {liveReviewCount > 0 ? (
+              <>
+                <Ionicons name="star" size={14} color="#F59E0B" />
+                <Text style={styles.ratingText}>{ratingLabel}</Text>
+              </>
+            ) : (
+              <Text style={styles.ratingText}>No reviews yet</Text>
+            )}
           </View>
           {listing.description ? (
             <Text style={styles.detailDesc}>{listing.description}</Text>
@@ -252,8 +274,16 @@ function ServiceDetailPage({ vendorId, listingId }: { vendorId: string; listingI
             <Text style={styles.vendorNameSmall}>{vendor.businessName}</Text>
             {vendor.isMichelle && <PoweredByDoHuubBadge />}
             <View style={styles.ratingRow}>
-              <Ionicons name="star" size={12} color="#F59E0B" />
-              <Text style={styles.vendorRatingSmall}>{liveRating.toFixed(1)} ({liveReviewCount})</Text>
+              {liveReviewCount > 0 ? (
+                <>
+                  <Ionicons name="star" size={12} color="#F59E0B" />
+                  <Text style={styles.vendorRatingSmall}>
+                    {liveRating.toFixed(1)} ({liveReviewCount})
+                  </Text>
+                </>
+              ) : (
+                <Text style={styles.vendorRatingSmall}>No reviews yet</Text>
+              )}
             </View>
           </View>
         </View>

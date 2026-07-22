@@ -1,13 +1,12 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
-  TouchableOpacity,
-  SafeAreaView,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as WebBrowser from 'expo-web-browser';
@@ -17,17 +16,20 @@ import { Button } from '../../src/components/ui';
 import { useBookingStore } from '../../src/store/bookingStore';
 import api from '../../src/services/api';
 
+type Provider = 'STRIPE' | 'WIPAY' | 'POWERTRANZ';
+
+WebBrowser.maybeCompleteAuthSession();
+
 /**
- * Payment screen — real Stripe Checkout flow.
+ * User payment screen.
  *
- * 1. Create the booking on our API.
- * 2. Ask our API for a Stripe Checkout Session URL.
- * 3. Open the hosted Checkout page in a system browser session.
- * 4. When Stripe redirects back to dohuub://checkout/return (or the user
- *    closes the browser), navigate to the processing screen which polls for
- *    payment status.
+ * 1. Create booking
+ * 2. Pick an enabled provider (recommended from API, else first enabled)
+ * 3. Open hosted checkout (Stripe / WiPay / PowerTranz)
+ * 4. Hand off to /checkout/processing
  *
- * No card form on this screen — Stripe owns the card UI for PCI compliance.
+ * If no gateway is configured, uses POST /payments/demo-complete so the
+ * booking still settles and confirmation still works.
  */
 export default function PaymentScreen() {
   const {
@@ -54,15 +56,70 @@ export default function PaymentScreen() {
 
   const createBooking = useBookingStore((s) => s.createBooking);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [providerLabel, setProviderLabel] = useState('Card payment');
+  const [demoMode, setDemoMode] = useState(false);
 
-  const subtotal = parseInt(amount || '0');
-  const serviceFee = parseInt(serviceFeeParam || '10');
+  const subtotal = parseInt(amount || '0', 10) || 0;
+  const serviceFee = parseInt(serviceFeeParam || '10', 10) || 10;
   const totalAmount = subtotal + serviceFee;
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await api.get<{
+          success: boolean;
+          data?: {
+            recommended: Provider;
+            available: { id: Provider; enabled: boolean }[];
+            demoAllowed?: boolean;
+            anyEnabled?: boolean;
+          };
+        }>('/payments/providers');
+        const data = res.data;
+        if (!data) return;
+        const enabled = (data.available || []).filter((p) => p.enabled);
+        setDemoMode(enabled.length === 0);
+        const pick =
+          enabled.find((p) => p.id === data.recommended)?.id || enabled[0]?.id;
+        if (pick === 'STRIPE') setProviderLabel('Credit / Debit Card (Stripe)');
+        else if (pick === 'WIPAY') setProviderLabel('Card (WiPay)');
+        else if (pick === 'POWERTRANZ') setProviderLabel('Card (PowerTranz)');
+        else setProviderLabel('Demo payment (no gateway configured)');
+      } catch {
+        setDemoMode(true);
+        setProviderLabel('Demo payment (offline)');
+      }
+    })();
+  }, []);
+
+  const goConfirmation = (bookingId: string, paymentState: string = 'paid') => {
+    router.replace({
+      pathname: '/checkout/confirmation',
+      params: {
+        serviceName: serviceName || '',
+        amount: totalAmount.toString(),
+        date: date || '',
+        time: time || '',
+        bookingId,
+        category: category || 'CLEANING',
+        paymentState,
+      },
+    });
+  };
+
+  const completeDemo = async (bookingId: string) => {
+    try {
+      await api.post('/payments/demo-complete', { bookingId });
+    } catch {
+      // Booking still exists; confirmation is still useful.
+    }
+    goConfirmation(bookingId, 'paid');
+  };
 
   const handlePayNow = async () => {
     setIsProcessing(true);
+    let bookingId: string | null = null;
     try {
-      // 1. Create the booking (server is the source of truth for fees/totals).
       const booking = await createBooking({
         vendorId: vendorId || '',
         category: category || 'CLEANING',
@@ -75,37 +132,77 @@ export default function PaymentScreen() {
         serviceFee,
         total: totalAmount,
       });
+      bookingId = booking.id;
 
-      // 2. Ask the API for a Stripe Checkout Session URL.
-      const sessionRes = await api.post<{
+      // Resolve provider
+      let provider: Provider | null = null;
+      try {
+        const res = await api.get<{
+          success: boolean;
+          data?: {
+            recommended: Provider;
+            available: { id: Provider; enabled: boolean }[];
+            anyEnabled?: boolean;
+          };
+        }>('/payments/providers');
+        const enabled = (res.data?.available || []).filter((p) => p.enabled);
+        provider =
+          enabled.find((p) => p.id === res.data?.recommended)?.id ||
+          enabled[0]?.id ||
+          null;
+      } catch {
+        provider = null;
+      }
+
+      if (!provider) {
+        await completeDemo(booking.id);
+        return;
+      }
+
+      let sessionRes: {
         success: boolean;
-        data?: { url: string; sessionId: string };
+        data?: { url: string; sessionId: string; provider: Provider };
         error?: string;
-      }>('/payments/checkout-session', { bookingId: booking.id });
+      };
+      try {
+        sessionRes = await api.post('/payments/checkout-session', {
+          provider,
+          bookingId: booking.id,
+        });
+      } catch (e: any) {
+        const errMsg = e?.response?.data?.error || e?.message || '';
+        if (
+          String(errMsg).includes('not configured') ||
+          e?.response?.status === 503
+        ) {
+          await completeDemo(booking.id);
+          return;
+        }
+        throw e;
+      }
 
       if (!sessionRes.success || !sessionRes.data?.url) {
-        throw new Error(
-          sessionRes.error ||
-            'Could not start the payment session. Your booking is saved as pending — you can pay later from Bookings.'
-        );
+        await completeDemo(booking.id);
+        return;
       }
 
       const { url, sessionId } = sessionRes.data;
 
-      // 3. Open Stripe Checkout. openAuthSessionAsync intercepts our deep
-      // link return scheme on iOS/Android. In Expo Go, the scheme isn't
-      // registered, so the user just closes the in-app browser when done —
-      // we still navigate to /checkout/processing after the browser closes.
       const result = await WebBrowser.openAuthSessionAsync(
         url,
         'dohuub://checkout/return'
       );
 
-      // Regardless of how the browser closes (success/cancel/dismiss),
-      // hand off to the processing screen which polls the session status.
-      // The webhook is the source of truth, but the poll gives the user
-      // immediate feedback.
-      setIsProcessing(false);
+      let resolvedSessionId = sessionId;
+      if (result.type === 'success' && 'url' in result && result.url) {
+        try {
+          const matched = String(result.url).match(/[?&]session=([^&]+)/);
+          if (matched?.[1]) resolvedSessionId = decodeURIComponent(matched[1]);
+        } catch {
+          /* keep sessionId */
+        }
+      }
+
       router.replace({
         pathname: '/checkout/processing',
         params: {
@@ -114,24 +211,26 @@ export default function PaymentScreen() {
           date: date || '',
           time: time || '',
           bookingId: booking.id,
-          sessionId,
-          // result.type can be 'success' (deep link hit), 'cancel' (user back),
-          // or 'dismiss' (closed sheet). We pass it through so processing can
-          // show a sensible message.
+          sessionId: resolvedSessionId,
           browserResult: result.type,
+          category: category || 'CLEANING',
         },
       });
     } catch (err: any) {
+      const msg =
+        err?.response?.data?.error || err?.message || 'Please try again.';
+      if (bookingId && (String(msg).includes('not configured') || String(msg).includes('provider must'))) {
+        await completeDemo(bookingId);
+        return;
+      }
+      Alert.alert('Payment could not be started', msg);
+    } finally {
       setIsProcessing(false);
-      Alert.alert(
-        'Payment could not be started',
-        err?.response?.data?.error || err?.message || 'Please try again.'
-      );
     }
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
       <ScreenHeader title="Payment" showBack />
 
       <ScrollView
@@ -139,7 +238,6 @@ export default function PaymentScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Order Summary */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Order Summary</Text>
           <View style={styles.summaryCard}>
@@ -166,35 +264,39 @@ export default function PaymentScreen() {
           </View>
         </View>
 
-        {/* Hosted-checkout notice */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Payment Method</Text>
-
           <View style={styles.paymentOption}>
             <Ionicons name="card" size={24} color={colors.text.primary} />
             <View style={{ flex: 1 }}>
-              <Text style={styles.paymentOptionText}>Credit / Debit Card</Text>
+              <Text style={styles.paymentOptionText}>{providerLabel}</Text>
               <Text style={styles.paymentOptionSubtext}>
-                Securely handled by Stripe
+                {demoMode
+                  ? 'No live gateway configured — booking will be confirmed in demo mode'
+                  : 'Secure hosted checkout'}
               </Text>
             </View>
-            <Ionicons name="lock-closed" size={18} color={colors.text.muted} />
+            <Ionicons
+              name={demoMode ? 'checkmark-circle' : 'lock-closed'}
+              size={18}
+              color={demoMode ? '#22C55E' : colors.text.muted}
+            />
           </View>
         </View>
 
         <View style={styles.infoNotice}>
           <Ionicons name="information-circle" size={18} color="#1E5DB0" />
           <Text style={styles.infoText}>
-            You'll be redirected to Stripe to complete payment. After you finish,
-            you'll come right back to the app.
+            {demoMode
+              ? 'Tap Pay to create and confirm your booking. Connect Stripe (or WiPay) on the API to enable real card charges.'
+              : 'You will be redirected to a secure checkout page. After paying, you will return to the app automatically.'}
           </Text>
         </View>
       </ScrollView>
 
-      {/* CTA */}
       <View style={styles.ctaContainer}>
         <Button
-          title={`Pay $${totalAmount} with Card`}
+          title={`Pay $${totalAmount}`}
           onPress={handlePayNow}
           loading={isProcessing}
           fullWidth

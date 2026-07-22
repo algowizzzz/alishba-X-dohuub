@@ -204,13 +204,19 @@ export default function CleaningServicesScreen() {
                   </View>
 
                   <View style={styles.ratingRow}>
-                    <View style={styles.ratingInner}>
-                      <Ionicons name="star" size={14} color="#FACC15" />
-                      <Text style={styles.ratingText}>
-                        {Number(vendor.rating || 0).toFixed(1)}
-                      </Text>
-                    </View>
-                    <Text style={styles.reviewCount}>({vendor.reviewCount || 0})</Text>
+                    {(vendor.reviewCount || 0) > 0 ? (
+                      <>
+                        <View style={styles.ratingInner}>
+                          <Ionicons name="star" size={14} color="#FACC15" />
+                          <Text style={styles.ratingText}>
+                            {Number(vendor.rating || 0).toFixed(1)}
+                          </Text>
+                        </View>
+                        <Text style={styles.reviewCount}>({vendor.reviewCount})</Text>
+                      </>
+                    ) : (
+                      <Text style={styles.reviewCount}>No reviews yet</Text>
+                    )}
                   </View>
 
                   <Text style={styles.tagline} numberOfLines={1}>{vendor.tagline}</Text>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, fontSize } from '../../src/constants/theme';
@@ -15,7 +16,7 @@ type PaymentState = 'checking' | 'paid' | 'pending' | 'failed';
  * session endpoint once or twice for immediate UX feedback.
  */
 export default function PaymentProcessingScreen() {
-  const { serviceName, amount, date, time, bookingId, sessionId, browserResult } =
+  const { serviceName, amount, date, time, bookingId, sessionId, browserResult, category } =
     useLocalSearchParams<{
       serviceName: string;
       amount: string;
@@ -24,6 +25,7 @@ export default function PaymentProcessingScreen() {
       bookingId: string;
       sessionId?: string;
       browserResult?: string;
+      category?: string;
     }>();
 
   const [state, setState] = useState<PaymentState>('checking');
@@ -34,18 +36,19 @@ export default function PaymentProcessingScreen() {
     let cancelled = false;
 
     async function pollOnce(): Promise<'paid' | 'pending' | 'failed' | null> {
-      if (!sessionId) return null;
+      const id = sessionId || bookingId;
+      if (!id) return null;
       try {
         const res = await api.get<{
           success: boolean;
           data?: { paymentStatus: string; status: string };
-        }>(`/payments/session/${sessionId}`);
+        }>(`/payments/session/${id}`);
 
         if (!res.success || !res.data) return null;
         const ps = res.data.paymentStatus;
         const s = res.data.status;
-        if (ps === 'paid' || ps === 'no_payment_required') return 'paid';
-        if (s === 'expired') return 'failed';
+        if (ps === 'paid' || ps === 'no_payment_required' || s === 'COMPLETED') return 'paid';
+        if (ps === 'failed' || s === 'FAILED' || s === 'expired') return 'failed';
         return 'pending';
       } catch {
         return null;
@@ -95,6 +98,7 @@ export default function PaymentProcessingScreen() {
           time,
           bookingId,
           paymentState: state,
+          category: category || '',
         },
       });
     }, 900);
@@ -156,7 +160,7 @@ export default function PaymentProcessingScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']}>
       <View style={styles.content}>{renderBody()}</View>
     </SafeAreaView>
   );

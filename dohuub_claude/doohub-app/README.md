@@ -128,7 +128,7 @@ API_URL="http://localhost:3001"
 JWT_SECRET="your-super-secret-jwt-key-change-in-production"
 JWT_EXPIRES_IN="7d"
 
-# Stripe (optional for dev)
+# Stripe (optional for dev — see PAYMENT_README.md + STRIPE_SETUP.md)
 STRIPE_SECRET_KEY=""
 STRIPE_PUBLISHABLE_KEY=""
 
@@ -208,6 +208,11 @@ npx expo start --clear
 - Expo: 8081
 - PostgreSQL: 5432
 - Redis: 6379
+
+## Documentation
+
+- [`PAYMENT_README.md`](./PAYMENT_README.md) — User-side payment flow status (demo vs live Stripe) and what’s left on mobile
+- [`STRIPE_SETUP.md`](./STRIPE_SETUP.md) — Stripe keys, Railway env, webhooks, troubleshooting
 
 ## License
 

@@ -11,6 +11,7 @@ import {
   retrieveStripeSession,
   stripeConfigured,
 } from '../lib/stripe';
+import { settleBookingOrOrder } from '../lib/settlement';
 import { logger } from '../lib/logger';
 
 const router = Router();
@@ -329,7 +330,8 @@ router.get('/session/:id', authenticate, async (req: AuthRequest, res) => {
 
     // For Stripe, if we're still pending and the id looks like a Checkout
     // Session, do a live lookup so the UI shows the real state without
-    // waiting on the webhook.
+    // waiting on the webhook. If Stripe says paid, settle immediately so
+    // booking flips to ACCEPTED even when the webhook is delayed/missing.
     if (
       paymentStatus === 'pending' &&
       tx.provider === 'STRIPE' &&
@@ -338,8 +340,22 @@ router.get('/session/:id', authenticate, async (req: AuthRequest, res) => {
     ) {
       try {
         const session = await retrieveStripeSession(tx.providerTransactionId);
-        if (session.payment_status === 'paid') paymentStatus = 'paid';
-        else if (session.status === 'expired') paymentStatus = 'failed';
+        if (session.payment_status === 'paid') {
+          paymentStatus = 'paid';
+          const reference = (session.metadata?.reference ?? '').toString();
+          const parsed = reference ? parseReference(reference) : null;
+          if (parsed && (parsed.kind === 'booking' || parsed.kind === 'order')) {
+            await settleBookingOrOrder({
+              kind: parsed.kind,
+              targetId: parsed.id,
+              provider: 'STRIPE',
+              providerTransactionId: session.id,
+              paid: true,
+            });
+          }
+        } else if (session.status === 'expired') {
+          paymentStatus = 'failed';
+        }
       } catch (err) {
         logger.warn({ err }, '[session] Stripe live lookup failed');
       }
@@ -398,11 +414,123 @@ router.get('/providers', authenticate, async (req: AuthRequest, res) => {
         country,
         recommended,
         available,
+        anyEnabled: available.some((p) => p.enabled),
+        demoAllowed:
+          process.env.ALLOW_DEMO_PAYMENTS === 'true' ||
+          !available.some((p) => p.enabled),
       },
     });
   } catch (error) {
     logger.error({ err: error }, 'get providers failed');
     res.status(500).json({ success: false, error: 'Failed to get providers' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/v1/payments/demo-complete
+// Marks a booking/order as paid without a gateway. Allowed only when
+// ALLOW_DEMO_PAYMENTS=true OR no payment providers are configured.
+// ---------------------------------------------------------------------------
+router.post('/demo-complete', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const { bookingId, orderId } = req.body as {
+      bookingId?: string;
+      orderId?: string;
+    };
+
+    const anyGateway =
+      stripeConfigured() || wipayConfigured() || powertranzConfigured();
+    const demoAllowed =
+      process.env.ALLOW_DEMO_PAYMENTS === 'true' || !anyGateway;
+
+    if (!demoAllowed) {
+      return res.status(403).json({
+        success: false,
+        error:
+          'Demo payments are disabled because a live gateway is configured. Use Stripe/WiPay checkout.',
+      });
+    }
+
+    if (!bookingId && !orderId) {
+      return res
+        .status(400)
+        .json({ success: false, error: 'bookingId or orderId required' });
+    }
+
+    if (bookingId) {
+      const booking = await prisma.booking.findFirst({
+        where: { id: bookingId, userId: req.user!.id },
+      });
+      if (!booking) {
+        return res.status(404).json({ success: false, error: 'Booking not found' });
+      }
+
+      await prisma.transaction.upsert({
+        where: { bookingId },
+        create: {
+          bookingId,
+          provider: 'STRIPE',
+          amount: booking.total,
+          platformFee: booking.serviceFee,
+          vendorPayout: booking.total - booking.serviceFee,
+          currency: 'USD',
+          status: 'PENDING',
+          providerTransactionId: `demo_${bookingId}`,
+        },
+        update: {
+          status: 'PENDING',
+          providerTransactionId: `demo_${bookingId}`,
+        },
+      });
+
+      await settleBookingOrOrder({
+        kind: 'booking',
+        targetId: bookingId,
+        provider: 'STRIPE',
+        providerTransactionId: `demo_${bookingId}`,
+        paid: true,
+      });
+    } else {
+      const order = await prisma.order.findFirst({
+        where: { id: orderId!, userId: req.user!.id },
+      });
+      if (!order) {
+        return res.status(404).json({ success: false, error: 'Order not found' });
+      }
+
+      await prisma.transaction.upsert({
+        where: { orderId: orderId! },
+        create: {
+          orderId,
+          provider: 'STRIPE',
+          amount: order.total,
+          platformFee: order.serviceFee,
+          vendorPayout: order.total - order.serviceFee,
+          currency: 'USD',
+          status: 'PENDING',
+          providerTransactionId: `demo_${orderId}`,
+        },
+        update: {
+          status: 'PENDING',
+          providerTransactionId: `demo_${orderId}`,
+        },
+      });
+
+      await settleBookingOrOrder({
+        kind: 'order',
+        targetId: orderId!,
+        provider: 'STRIPE',
+        providerTransactionId: `demo_${orderId}`,
+        paid: true,
+      });
+    }
+
+    res.json({ success: true, data: { demo: true, paid: true } });
+  } catch (error: any) {
+    logger.error({ err: error }, 'demo-complete failed');
+    res
+      .status(500)
+      .json({ success: false, error: error.message || 'Demo complete failed' });
   }
 });
 
