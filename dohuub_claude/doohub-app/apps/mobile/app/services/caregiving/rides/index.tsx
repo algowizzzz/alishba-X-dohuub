@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, fontSize } from '../../../../src/constants/theme';
 import { getRideListings } from '../../../../src/lib/queries';
+import { ServiceSearchBar } from '../../../../src/components/ui/ServiceSearchBar';
 
 const PURPLE = '#A855F7';
 
@@ -30,6 +31,7 @@ export default function RideProvidersScreen() {
   const [accessibleOnly, setAccessibleOnly] = useState(false);
   const [providers, setProviders] = useState<RideProvider[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     (async () => {
@@ -66,6 +68,10 @@ export default function RideProvidersScreen() {
     setSelectedVehicles(p => p.includes(v) ? p.filter(x => x !== v) : [...p, v]);
 
   const filtered = providers.filter(p => {
+    const q = search.trim().toLowerCase();
+    if (q && !p.name.toLowerCase().includes(q) && !p.description.toLowerCase().includes(q) && !p.coverageArea.toLowerCase().includes(q)) {
+      return false;
+    }
     if (selectedVehicles.length > 0 && !selectedVehicles.some(v => p.vehicleTypes.includes(v))) return false;
     if (accessibleOnly && !p.wheelchairAccessible) return false;
     return true;
@@ -96,6 +102,12 @@ export default function RideProvidersScreen() {
         </TouchableOpacity>
       </View>
 
+      <ServiceSearchBar
+        value={search}
+        onChangeText={setSearch}
+        placeholder="Search ride providers..."
+      />
+
       {loading ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator size="large" color={PURPLE} />
@@ -106,6 +118,7 @@ export default function RideProvidersScreen() {
         keyExtractor={i => i.id}
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
         ListEmptyComponent={<Text style={{ color: colors.text.secondary, textAlign: 'center', marginTop: 40 }}>No ride providers found.</Text>}
         renderItem={({ item }) => (
           <TouchableOpacity style={styles.card} onPress={() => goToDetail(item)} activeOpacity={0.8}>

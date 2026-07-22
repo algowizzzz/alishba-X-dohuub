@@ -6,8 +6,8 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
-  SafeAreaView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, fontSize, borderRadius, borderWidth } from '../../src/constants/theme';
@@ -59,7 +59,7 @@ export default function RewardsWalletScreen() {
   const recentTx = transactions.slice(0, 5);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom', 'left', 'right']}>
       <ScreenHeader title="Rewards Wallet" showBack />
 
       <ScrollView
@@ -185,7 +185,7 @@ export default function RewardsWalletScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1, backgroundColor: '#FFFFFF' },
   scrollView: { flex: 1 },
   scrollContent: { padding: spacing.lg },
 

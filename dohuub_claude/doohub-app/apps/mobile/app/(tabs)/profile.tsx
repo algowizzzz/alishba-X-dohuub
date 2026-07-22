@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   Switch,
   Image,
   Modal,
@@ -13,6 +12,7 @@ import {
   ActivityIndicator,
   Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Alert } from 'react-native';
@@ -249,19 +249,38 @@ export default function ProfileScreen() {
 
   const handleDeleteAccount = async () => {
     setIsDeleting(true);
+    console.log('[DeleteAccount] start', {
+      userId: user?.id,
+      email: user?.email,
+      endpoint: ENDPOINTS.USERS.ME,
+      confirm: 'DELETE',
+    });
     try {
-      await api.delete(ENDPOINTS.USERS.ME, { confirm: 'DELETE' });
+      const result = await api.delete(ENDPOINTS.USERS.ME, { confirm: 'DELETE' });
+      console.log('[DeleteAccount] API success', result);
       // The server has anonymized the account; tear down the local session too.
       await logout();
+      console.log('[DeleteAccount] local logout complete');
       setShowDeleteModal(false);
       router.replace('/(auth)/welcome');
     } catch (err: any) {
+      console.error('[DeleteAccount] failed', {
+        message: err?.message,
+        status: err?.response?.status,
+        statusText: err?.response?.statusText,
+        data: err?.response?.data,
+        url: err?.config?.url,
+        method: err?.config?.method,
+        hasAuthHeader: Boolean(err?.config?.headers?.Authorization || err?.config?.headers?.authorization),
+      });
       const msg =
         err?.response?.data?.error ||
+        err?.message ||
         'We could not delete your account right now. Please try again or contact support.';
       Alert.alert('Delete failed', msg);
     } finally {
       setIsDeleting(false);
+      console.log('[DeleteAccount] finished (isDeleting=false)');
     }
   };
 
@@ -303,7 +322,7 @@ export default function ProfileScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Profile</Text>
@@ -314,15 +333,19 @@ export default function ProfileScreen() {
         <View style={styles.profileSection}>
           <View style={styles.avatar}>
             <Image
-              source={{
-                uri: user?.profile?.avatar || 'https://randomuser.me/api/portraits/men/32.jpg',
-              }}
+              source={
+                user?.profile?.avatar
+                  ? { uri: user.profile.avatar }
+                  : require('../../assets/placeholder-image.jpeg')
+              }
               style={styles.avatarImage}
             />
           </View>
           <View style={styles.profileInfo}>
             <Text style={styles.userName}>
-              {user?.profile?.firstName || 'Your'} {user?.profile?.lastName || 'Name'}
+              {[user?.profile?.firstName, user?.profile?.lastName]
+                .filter((part) => Boolean(part && String(part).trim()))
+                .join(' ') || 'Your Name'}
             </Text>
             <Text style={styles.userEmail}>{user?.email || 'email@example.com'}</Text>
             <TouchableOpacity onPress={() => nav('/profile/edit')}>
@@ -384,7 +407,7 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: C.bg,
+    backgroundColor: '#FFFFFF',
   },
   header: {
     paddingHorizontal: 24,

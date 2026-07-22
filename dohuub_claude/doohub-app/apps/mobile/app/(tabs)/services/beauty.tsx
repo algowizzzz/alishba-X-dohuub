@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -12,9 +12,9 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { getServiceImage } from '../../../src/constants/serviceImages';
 import { getBeautyListings } from '../../../src/lib/queries';
 import { Card, Rating, PoweredByDoHuubBadge } from '../../../src/components/ui';
+import { ServiceSearchBar } from '../../../src/components/ui/ServiceSearchBar';
 import { colors, spacing, fontSize, borderRadius } from '../../../src/constants/theme';
 
 const BEAUTY_PHOTOS = [
@@ -39,6 +39,7 @@ export default function BeautyServicesScreen() {
   const [selectedType, setSelectedType] = useState('all');
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     fetchListings();
@@ -47,9 +48,7 @@ export default function BeautyServicesScreen() {
   const fetchListings = async () => {
     try {
       const data = await getBeautyListings();
-      // Filter by type if selected
       const filtered = selectedType === 'all' ? data : data.filter((item: any) => item.beautyType === selectedType);
-      // Map to include vendor info at top level for rendering
       setListings(filtered.map((item: any) => ({ ...item, vendor: item.Vendor })));
     } catch (error) {
       console.error('Failed to fetch listings:', error);
@@ -71,17 +70,25 @@ export default function BeautyServicesScreen() {
     } as any);
   };
 
+  const filteredListings = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return listings;
+    return listings.filter((item) => {
+      const business = item.vendor?.businessName || '';
+      const title = item.title || '';
+      return business.toLowerCase().includes(q) || title.toLowerCase().includes(q);
+    });
+  }, [listings, search]);
+
   const renderListingCard = ({ item, index }: { item: any; index: number }) => (
     <Card style={styles.listingCard} onPress={() => handleListingPress(item)}>
       <View style={styles.cardRow}>
-        {/* Left: Service Image */}
         <Image
           source={{ uri: BEAUTY_PHOTOS[index % BEAUTY_PHOTOS.length] }}
           style={styles.cardImage}
           resizeMode="cover"
         />
 
-        {/* Right: Info */}
         <View style={styles.cardInfo}>
           <View style={styles.nameRow}>
             <Text style={styles.listingTitle} numberOfLines={1}>{item.vendor?.businessName || item.title}</Text>
@@ -114,6 +121,12 @@ export default function BeautyServicesScreen() {
         <View style={styles.placeholder} />
       </View>
 
+      <ServiceSearchBar
+        value={search}
+        onChangeText={setSearch}
+        placeholder="Search beauty services..."
+      />
+
       <View style={styles.filterTabs}>
         {BEAUTY_TYPES.map((type) => (
           <TouchableOpacity
@@ -129,16 +142,19 @@ export default function BeautyServicesScreen() {
       </View>
 
       <FlatList
-        data={listings}
+        data={filteredListings}
         renderItem={renderListingCard}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.listContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <Ionicons name="cut-outline" size={48} color={colors.text.muted} />
-            <Text style={styles.emptyText}>No beauty services available</Text>
+            <Ionicons name={search ? 'search-outline' : 'cut-outline'} size={48} color={colors.text.muted} />
+            <Text style={styles.emptyText}>
+              {search ? 'No matches for your search' : 'No beauty services available'}
+            </Text>
           </View>
         }
       />

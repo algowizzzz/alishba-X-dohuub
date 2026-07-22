@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView } from
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, fontSize } from '../../../../src/constants/theme';
-import { getReviewsByVendor } from '../../../../src/lib/queries';
+import { getReviewsByVendor, getReviewAuthorName } from '../../../../src/lib/queries';
 
 const FILTER_TABS = ['All', '5★', '4★', '3★', '2★', '1★'];
 
@@ -22,10 +22,7 @@ function formatRelativeDate(iso: string): string {
 }
 
 function reviewerName(r: any): string {
-  const p = r?.User?.UserProfile;
-  if (p?.firstName) return `${p.firstName} ${p.lastName?.[0] ?? ''}.`.trim();
-  if (r?.User?.email) return r.User.email.split('@')[0];
-  return 'Anonymous';
+  return getReviewAuthorName(r);
 }
 
 export default function BeautyReviewsScreen() {

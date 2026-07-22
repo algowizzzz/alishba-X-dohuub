@@ -4,103 +4,218 @@ import {
   Text,
   StyleSheet,
   ScrollView,
+  TextInput,
   TouchableOpacity,
-  SafeAreaView,
   Switch,
   ActivityIndicator,
+  Alert,
+  Platform,
+  StatusBar,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, fontSize, borderRadius, borderWidth } from '../../../src/constants/theme';
-import { ScreenHeader } from '../../../src/components/composite';
-import { Button } from '../../../src/components/ui';
+import { LinearGradient } from 'expo-linear-gradient';
 import { ConfirmModal } from '../../../src/components/modals';
-import { supabase } from '../../../src/lib/supabase';
+import api from '../../../src/services/api';
 
-interface CardData {
-  id: string;
-  type: string;
-  last4: string;
-  expiry: string;
-  cardholderName: string;
-  isDefault: boolean;
+function detectCardType(cardNumber: string): string {
+  const cleaned = cardNumber.replace(/\D/g, '');
+  if (cleaned.startsWith('4')) return 'visa';
+  if (cleaned.startsWith('5')) return 'mastercard';
+  if (cleaned.startsWith('3')) return 'amex';
+  return 'card';
 }
 
-/**
- * Edit Payment Method Screen matching wireframe:
- * - Card info display
- * - Set as default toggle
- * - Delete card button
- */
+function getCardName(type: string) {
+  switch ((type || '').toLowerCase()) {
+    case 'visa':
+      return 'Visa';
+    case 'mastercard':
+      return 'Mastercard';
+    case 'amex':
+      return 'Amex';
+    default:
+      return 'Card';
+  }
+}
+
 export default function EditPaymentScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const [card, setCard] = useState<CardData | null>(null);
-  const [isDefault, setIsDefault] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [notFound, setNotFound] = useState(false);
+
+  const [cardNumber, setCardNumber] = useState('');
+  const [originalLast4, setOriginalLast4] = useState('');
+  const [cardBrand, setCardBrand] = useState('card');
+  const [expiry, setExpiry] = useState('');
+  const [isDefault, setIsDefault] = useState(false);
+  const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const [focusedField, setFocusedField] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchCard = async () => {
-      if (!id) return;
+      if (!id) {
+        setNotFound(true);
+        setIsLoading(false);
+        return;
+      }
+
       try {
-        const { data, error } = await supabase
-          .from('PaymentMethod')
-          .select('*')
-          .eq('id', id)
-          .single();
+        const response = await api.get<{ success: boolean; data?: any[] }>('/payments/methods');
+        const methods = response?.data || [];
+        const data = methods.find((pm) => pm.id === id);
 
-        if (error) throw error;
-
-        if (data) {
-          setCard({
-            id: data.id,
-            type: (data.type || '').toLowerCase(),
-            last4: data.last4 || '',
-            expiry: `${data.expiryMonth}/${String(data.expiryYear).slice(-2)}`,
-            cardholderName: data.cardholderName || '',
-            isDefault: !!data.isDefault,
-          });
-          setIsDefault(!!data.isDefault);
+        if (!data) {
+          setNotFound(true);
+          return;
         }
+
+        const brand = String(data.brand || data.type || 'card').toLowerCase();
+        const last4 = data.last4 || '';
+        setOriginalLast4(last4);
+        setCardBrand(brand);
+        setCardNumber(`•••• •••• •••• ${last4}`);
+        setExpiry(
+          data.expiryMonth && data.expiryYear
+            ? `${String(data.expiryMonth).padStart(2, '0')}/${String(data.expiryYear).slice(-2)}`
+            : ''
+        );
+        setIsDefault(!!data.isDefault);
       } catch (error) {
         console.error('Failed to fetch card:', error);
+        setNotFound(true);
       } finally {
         setIsLoading(false);
       }
     };
+
     fetchCard();
   }, [id]);
 
+  const formatCardNumber = (text: string) => {
+    const cleaned = text.replace(/\D/g, '');
+    const limited = cleaned.slice(0, 16);
+    return limited.match(/.{1,4}/g)?.join(' ') || limited;
+  };
+
+  const formatExpiry = (text: string) => {
+    const cleaned = text.replace(/\D/g, '');
+    if (cleaned.length >= 2) {
+      return cleaned.substring(0, 2) + '/' + cleaned.substring(2, 4);
+    }
+    return cleaned;
+  };
+
+  const handleCardNumberChange = (text: string) => {
+    // If user starts typing over the masked value, replace with digits only
+    if (text.includes('•')) {
+      const digits = text.replace(/[•\s]/g, '').replace(/\D/g, '');
+      setCardNumber(formatCardNumber(digits));
+    } else {
+      setCardNumber(formatCardNumber(text));
+    }
+    if (errors.cardNumber) setErrors({ ...errors, cardNumber: '' });
+  };
+
+  const handleExpiryChange = (text: string) => {
+    setExpiry(formatExpiry(text));
+    if (errors.expiry) setErrors({ ...errors, expiry: '' });
+  };
+
+  const getEffectiveLast4 = () => {
+    const digits = cardNumber.replace(/\D/g, '').replace(/•/g, '');
+    if (digits.length >= 4) return digits.slice(-4);
+    return originalLast4;
+  };
+
+  const getEffectiveBrand = () => {
+    const digits = cardNumber.replace(/\D/g, '');
+    if (digits.length >= 1 && !cardNumber.includes('•')) {
+      return detectCardType(cardNumber);
+    }
+    return cardBrand;
+  };
+
+  const validateForm = () => {
+    const newErrors: { [key: string]: string } = {};
+    const digits = cardNumber.replace(/\D/g, '');
+    const isMasked = cardNumber.includes('•');
+
+    if (!isMasked && digits.length > 0 && (digits.length < 13 || digits.length > 16)) {
+      newErrors.cardNumber = 'Invalid card number';
+    }
+
+    if (!expiry || expiry.length < 5) {
+      newErrors.expiry = 'Expiry date is required';
+    } else {
+      const [monthStr, yearStr] = expiry.split('/');
+      const month = parseInt(monthStr, 10);
+      const year = parseInt(yearStr, 10);
+      const currentYear = new Date().getFullYear() % 100;
+      const currentMonth = new Date().getMonth() + 1;
+
+      if (month < 1 || month > 12) {
+        newErrors.expiry = 'Invalid month';
+      } else if (year < currentYear || (year === currentYear && month < currentMonth)) {
+        newErrors.expiry = 'Card has expired';
+      }
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleSave = async () => {
-    if (!id) return;
+    if (!id || !validateForm()) return;
+
     setIsSaving(true);
     try {
-      // If setting as default, first unset all other defaults for this user
-      if (isDefault && !card?.isDefault) {
-        const { data: currentCard } = await supabase
-          .from('PaymentMethod')
-          .select('userId')
-          .eq('id', id)
-          .single();
+      const [monthStr, yearStr] = expiry.split('/');
+      const brand = getEffectiveBrand();
+      const last4 = getEffectiveLast4();
+      const payload = {
+        last4,
+        brand,
+        expiryMonth: parseInt(monthStr, 10),
+        expiryYear: 2000 + parseInt(yearStr, 10),
+        isDefault,
+      };
 
-        if (currentCard?.userId) {
-          await supabase
-            .from('PaymentMethod')
-            .update({ isDefault: false })
-            .eq('userId', currentCard.userId);
+      try {
+        const response = await api.patch<{ success: boolean; data?: any; error?: string }>(
+          `/payments/methods/${id}`,
+          payload
+        );
+        if (!response.success) {
+          throw new Error(response.error || 'Failed to update card');
+        }
+      } catch (patchError: any) {
+        const status = patchError?.response?.status;
+        // Older API builds may not support PATCH — recreate the card instead
+        if (status === 404 || status === 405) {
+          await api.delete(`/payments/methods/${id}`);
+          const created = await api.post<{ success: boolean; error?: string }>(
+            '/payments/methods',
+            payload
+          );
+          if (!created.success) {
+            throw new Error(created.error || 'Failed to update card');
+          }
+        } else {
+          throw patchError;
         }
       }
 
-      const { error } = await supabase
-        .from('PaymentMethod')
-        .update({ isDefault })
-        .eq('id', id);
-
-      if (error) throw error;
       router.back();
-    } catch (error) {
-      console.error('Failed to save card:', error);
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.error ||
+        error?.message ||
+        'Failed to update card. Please try again.';
+      Alert.alert('Error', message);
     } finally {
       setIsSaving(false);
     }
@@ -109,49 +224,67 @@ export default function EditPaymentScreen() {
   const handleDelete = async () => {
     if (!id) return;
     try {
-      const { error } = await supabase
-        .from('PaymentMethod')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
+      await api.delete(`/payments/methods/${id}`);
       setShowDeleteModal(false);
       router.back();
-    } catch (error) {
-      console.error('Failed to delete card:', error);
+    } catch (error: any) {
+      Alert.alert(
+        'Error',
+        error?.response?.data?.error || error?.message || 'Failed to remove card'
+      );
     }
   };
 
-  const getCardName = (type: string) => {
-    switch (type) {
-      case 'visa':
-        return 'Visa';
-      case 'mastercard':
-        return 'Mastercard';
-      case 'amex':
-        return 'American Express';
-      default:
-        return 'Card';
-    }
+  const getBorderColor = (field: string) => {
+    if (errors[field]) return '#EF4444';
+    if (focusedField === field) return '#2E7AD9';
+    return 'rgba(46, 122, 217, 0.15)';
   };
+
+  const getBorderWidth = (field: string) => {
+    if (errors[field] || focusedField === field) return 2;
+    return 1;
+  };
+
+  const previewBrand = getEffectiveBrand();
+  const previewLast4 = getEffectiveLast4();
+  const previewNumber = cardNumber.includes('•')
+    ? cardNumber
+    : cardNumber || `•••• •••• •••• ${originalLast4}`;
 
   if (isLoading) {
     return (
       <SafeAreaView style={styles.container}>
-        <ScreenHeader title="Edit Payment Method" showBack />
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color={colors.primary} />
+        <View style={styles.header}>
+          <View style={styles.headerInner}>
+            <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+              <Ionicons name="arrow-back" size={20} color="#1E293B" />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Edit Payment Method</Text>
+            <View style={{ width: 40 }} />
+          </View>
+        </View>
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color="#2E7AD9" />
         </View>
       </SafeAreaView>
     );
   }
 
-  if (!card) {
+  if (notFound) {
     return (
       <SafeAreaView style={styles.container}>
-        <ScreenHeader title="Edit Payment Method" showBack />
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <Text style={{ color: colors.text.secondary, fontSize: fontSize.md }}>Card not found</Text>
+        <View style={styles.header}>
+          <View style={styles.headerInner}>
+            <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+              <Ionicons name="arrow-back" size={20} color="#1E293B" />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>Edit Payment Method</Text>
+            <View style={{ width: 40 }} />
+          </View>
+        </View>
+        <View style={styles.centered}>
+          <Text style={styles.notFoundText}>Card not found</Text>
         </View>
       </SafeAreaView>
     );
@@ -159,91 +292,136 @@ export default function EditPaymentScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScreenHeader title="Edit Payment Method" showBack />
+      <StatusBar barStyle="dark-content" backgroundColor="#F0F7FF" />
+
+      <View style={styles.header}>
+        <View style={styles.headerInner}>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={20} color="#1E293B" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Edit Payment Method</Text>
+          <View style={{ width: 40 }} />
+        </View>
+      </View>
 
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
       >
-        {/* Card Preview */}
-        <View style={styles.cardPreview}>
+        <LinearGradient colors={['#2E7AD9', '#1E6BC9']} style={styles.cardPreview}>
           <View style={styles.cardPreviewTop}>
-            <Ionicons name="card" size={32} color={colors.text.inverse} />
-            <Text style={styles.cardPreviewType}>{getCardName(card.type)}</Text>
+            <Ionicons name="card" size={40} color="#FFFFFF" />
+            <Text style={styles.cardTypeLabel}>{getCardName(previewBrand)}</Text>
           </View>
-          <Text style={styles.cardPreviewNumber}>
-            •••• •••• •••• {card.last4}
-          </Text>
+          <Text style={styles.cardPreviewNumber}>{previewNumber}</Text>
           <View style={styles.cardPreviewBottom}>
             <View>
-              <Text style={styles.cardPreviewLabel}>CARDHOLDER</Text>
-              <Text style={styles.cardPreviewValue}>{card.cardholderName}</Text>
+              <Text style={styles.cardPreviewLabel}>Last 4</Text>
+              <Text style={styles.cardPreviewValue}>{previewLast4 || '----'}</Text>
             </View>
             <View>
-              <Text style={styles.cardPreviewLabel}>EXPIRES</Text>
-              <Text style={styles.cardPreviewValue}>{card.expiry}</Text>
+              <Text style={styles.cardPreviewLabel}>Expires</Text>
+              <Text style={styles.cardPreviewValue}>{expiry || 'MM/YY'}</Text>
             </View>
           </View>
+        </LinearGradient>
+
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Card Number</Text>
+          <View
+            style={[
+              styles.inputContainer,
+              { borderColor: getBorderColor('cardNumber'), borderWidth: getBorderWidth('cardNumber') },
+            ]}
+          >
+            <TextInput
+              style={styles.input}
+              placeholder="1234 5678 9012 3456"
+              placeholderTextColor="#94A3B8"
+              value={cardNumber}
+              onChangeText={handleCardNumberChange}
+              onFocus={() => {
+                setFocusedField('cardNumber');
+                if (cardNumber.includes('•')) setCardNumber('');
+              }}
+              onBlur={() => {
+                setFocusedField(null);
+                if (!cardNumber.replace(/\D/g, '')) {
+                  setCardNumber(`•••• •••• •••• ${originalLast4}`);
+                }
+              }}
+              keyboardType="numeric"
+              maxLength={19}
+            />
+          </View>
+          {errors.cardNumber ? (
+            <View style={styles.errorRow}>
+              <Ionicons name="alert-circle" size={14} color="#EF4444" />
+              <Text style={styles.errorText}>{errors.cardNumber}</Text>
+            </View>
+          ) : (
+            <Text style={styles.hintText}>Tap to enter a new card number, or leave as-is</Text>
+          )}
         </View>
 
-        {/* Card Details */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Card Details</Text>
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Card Type</Text>
-            <Text style={styles.detailValue}>{getCardName(card.type)}</Text>
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Expiry Date *</Text>
+          <View
+            style={[
+              styles.inputContainer,
+              { borderColor: getBorderColor('expiry'), borderWidth: getBorderWidth('expiry') },
+            ]}
+          >
+            <TextInput
+              style={styles.input}
+              placeholder="MM/YY"
+              placeholderTextColor="#94A3B8"
+              value={expiry}
+              onChangeText={handleExpiryChange}
+              onFocus={() => setFocusedField('expiry')}
+              onBlur={() => setFocusedField(null)}
+              keyboardType="numeric"
+              maxLength={5}
+            />
           </View>
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Card Number</Text>
-            <Text style={styles.detailValue}>•••• {card.last4}</Text>
-          </View>
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Expiry</Text>
-            <Text style={styles.detailValue}>{card.expiry}</Text>
-          </View>
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Cardholder</Text>
-            <Text style={styles.detailValue}>{card.cardholderName}</Text>
-          </View>
+          {errors.expiry ? (
+            <View style={styles.errorRow}>
+              <Ionicons name="alert-circle" size={14} color="#EF4444" />
+              <Text style={styles.errorText}>{errors.expiry}</Text>
+            </View>
+          ) : null}
         </View>
 
-        {/* Set as Default */}
         <View style={styles.toggleRow}>
           <View style={styles.toggleInfo}>
             <Text style={styles.toggleLabel}>Default Payment Method</Text>
-            <Text style={styles.toggleDescription}>
-              Use this card for all payments
-            </Text>
+            <Text style={styles.toggleDescription}>Use this card for all payments</Text>
           </View>
           <Switch
             value={isDefault}
             onValueChange={setIsDefault}
-            trackColor={{ false: colors.border.default, true: colors.text.secondary }}
-            thumbColor={colors.background}
+            trackColor={{ false: '#CBD5E1', true: '#93C5FD' }}
+            thumbColor={isDefault ? '#2E7AD9' : '#F8FAFC'}
           />
         </View>
 
-        {/* Save Button */}
-        <Button
-          title="Save Changes"
-          onPress={handleSave}
-          fullWidth
-          loading={isSaving}
-          style={styles.saveButton}
-        />
+        <TouchableOpacity onPress={handleSave} disabled={isSaving} activeOpacity={0.85}>
+          <LinearGradient
+            colors={['#2E7AD9', '#1E6BC9']}
+            style={[styles.saveBtn, isSaving && { opacity: 0.6 }]}
+          >
+            <Text style={styles.saveBtnText}>{isSaving ? 'Saving...' : 'Save Changes'}</Text>
+          </LinearGradient>
+        </TouchableOpacity>
 
-        {/* Delete Button */}
-        <TouchableOpacity
-          style={styles.deleteButton}
-          onPress={() => setShowDeleteModal(true)}
-        >
-          <Ionicons name="trash-outline" size={20} color={colors.status.error} />
+        <TouchableOpacity style={styles.deleteButton} onPress={() => setShowDeleteModal(true)}>
+          <Ionicons name="trash-outline" size={20} color="#EF4444" />
           <Text style={styles.deleteText}>Remove Card</Text>
         </TouchableOpacity>
       </ScrollView>
 
-      {/* Delete Confirmation Modal */}
       <ConfirmModal
         visible={showDeleteModal}
         onClose={() => setShowDeleteModal(false)}
@@ -261,114 +439,183 @@ export default function EditPaymentScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#F0F7FF',
+  },
+  header: {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    paddingHorizontal: 24,
+    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 0) + 12 : 12,
+    paddingBottom: 16,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 15,
+    elevation: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(46, 122, 217, 0.08)',
+  },
+  headerInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  headerTitle: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1E293B',
+  },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  notFoundText: {
+    fontSize: 15,
+    color: '#64748B',
   },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    padding: spacing.lg,
-    paddingBottom: spacing.xxl,
+    padding: 24,
+    paddingBottom: 40,
   },
   cardPreview: {
-    backgroundColor: colors.primary,
-    borderRadius: borderRadius.xl,
-    padding: spacing.lg,
-    marginBottom: spacing.xl,
+    borderRadius: 16,
+    padding: 24,
+    marginBottom: 24,
   },
   cardPreviewTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.lg,
+    alignItems: 'flex-start',
+    marginBottom: 48,
   },
-  cardPreviewType: {
-    fontSize: fontSize.sm,
-    color: colors.text.muted,
+  cardTypeLabel: {
+    fontSize: 14,
+    color: 'rgba(255, 255, 255, 0.8)',
+    fontWeight: '500',
   },
   cardPreviewNumber: {
-    fontSize: fontSize.xl,
+    fontSize: 18,
     fontWeight: '600',
-    color: colors.text.inverse,
+    color: '#FFFFFF',
     letterSpacing: 2,
-    fontFamily: 'monospace',
-    marginBottom: spacing.lg,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    marginBottom: 24,
   },
   cardPreviewBottom: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'flex-end',
   },
   cardPreviewLabel: {
-    fontSize: fontSize.xs,
-    color: colors.text.muted,
-    marginBottom: spacing.xs,
+    fontSize: 11,
+    color: 'rgba(255, 255, 255, 0.6)',
+    marginBottom: 4,
   },
   cardPreviewValue: {
-    fontSize: fontSize.sm,
-    color: colors.text.inverse,
+    fontSize: 14,
+    color: '#FFFFFF',
     fontWeight: '500',
   },
-  section: {
-    marginBottom: spacing.xl,
+  inputGroup: {
+    marginBottom: 16,
   },
-  sectionTitle: {
-    fontSize: fontSize.lg,
-    fontWeight: '600',
-    color: colors.text.primary,
-    marginBottom: spacing.md,
+  label: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#1E293B',
+    marginBottom: 8,
   },
-  detailRow: {
+  inputContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(46, 122, 217, 0.15)',
+  },
+  input: {
+    padding: 16,
+    fontSize: 15,
+    color: '#1E293B',
+  },
+  hintText: {
+    marginTop: 6,
+    fontSize: 12,
+    color: '#94A3B8',
+  },
+  errorRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.sm,
-    borderBottomWidth: borderWidth.thin,
-    borderBottomColor: colors.secondary,
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 6,
   },
-  detailLabel: {
-    fontSize: fontSize.md,
-    color: colors.text.secondary,
-  },
-  detailValue: {
-    fontSize: fontSize.md,
-    color: colors.text.primary,
-    fontWeight: '500',
+  errorText: {
+    fontSize: 12,
+    color: '#EF4444',
   },
   toggleRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: spacing.md,
-    borderWidth: borderWidth.default,
-    borderColor: colors.border.default,
-    borderRadius: borderRadius.lg,
-    marginBottom: spacing.xl,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(46, 122, 217, 0.15)',
+    padding: 16,
+    marginBottom: 24,
+    marginTop: 8,
   },
   toggleInfo: {
     flex: 1,
+    marginRight: 12,
   },
   toggleLabel: {
-    fontSize: fontSize.md,
+    fontSize: 15,
     fontWeight: '600',
-    color: colors.text.primary,
-    marginBottom: spacing.xs,
+    color: '#1E293B',
+    marginBottom: 4,
   },
   toggleDescription: {
-    fontSize: fontSize.sm,
-    color: colors.text.secondary,
+    fontSize: 13,
+    color: '#64748B',
   },
-  saveButton: {
-    marginBottom: spacing.md,
+  saveBtn: {
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+  },
+  saveBtnText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
   deleteButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.md,
-    marginTop: spacing.md,
+    gap: 8,
+    paddingVertical: 16,
+    marginTop: 8,
   },
   deleteText: {
-    fontSize: fontSize.md,
-    color: colors.status.error,
+    fontSize: 15,
+    color: '#EF4444',
+    fontWeight: '500',
   },
 });
-

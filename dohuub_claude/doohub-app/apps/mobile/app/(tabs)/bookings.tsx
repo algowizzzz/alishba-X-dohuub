@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -6,15 +6,28 @@ import {
   FlatList,
   TouchableOpacity,
   RefreshControl,
-  SafeAreaView,
   Image,
+  LayoutChangeEvent,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+} from 'react-native-reanimated';
 import { useBookingStore } from '../../src/store/bookingStore';
 import { colors, spacing, fontSize, borderRadius, borderWidth } from '../../src/constants/theme';
 
-const TABS = ['All', 'Upcoming', 'In Progress', 'Completed'];
+type TabKey = 'All' | 'Upcoming' | 'In Progress' | 'Completed';
+
+const TABS: { key: TabKey; label: string }[] = [
+  { key: 'All', label: 'All' },
+  { key: 'Upcoming', label: 'Upcoming' },
+  { key: 'In Progress', label: 'In Progress' },
+  { key: 'Completed', label: 'Completed' },
+];
 
 const STATUS_STYLES: Record<string, { bg: string; text: string; label: string }> = {
   PENDING: { bg: 'rgba(46, 122, 217, 0.1)', text: colors.text.primary, label: 'Pending' },
@@ -25,20 +38,79 @@ const STATUS_STYLES: Record<string, { bg: string; text: string; label: string }>
   DECLINED: { bg: '#FEE2E2', text: '#991B1B', label: 'Declined' },
 };
 
+const EMPTY_COPY: Record<
+  TabKey,
+  { title: string; subtitle: string; icon: keyof typeof Ionicons.glyphMap; showBrowse: boolean }
+> = {
+  All: {
+    title: 'No bookings yet',
+    subtitle: 'Explore services and book your first appointment — cleaning, beauty, rides, and more.',
+    icon: 'calendar-outline',
+    showBrowse: true,
+  },
+  Upcoming: {
+    title: 'Nothing upcoming',
+    subtitle: 'When you book a service, your confirmed appointments will show up here.',
+    icon: 'calendar-outline',
+    showBrowse: true,
+  },
+  'In Progress': {
+    title: 'No active bookings',
+    subtitle: 'Services that are currently underway will appear in this tab.',
+    icon: 'time-outline',
+    showBrowse: false,
+  },
+  Completed: {
+    title: 'No completed bookings',
+    subtitle: 'Finished services will land here so you can review and rebook anytime.',
+    icon: 'checkmark-done-outline',
+    showBrowse: false,
+  },
+};
+
+function matchesTab(status: string, tab: TabKey) {
+  if (tab === 'All') return true;
+  if (tab === 'Upcoming') return status === 'ACCEPTED' || status === 'PENDING';
+  if (tab === 'In Progress') return status === 'IN_PROGRESS';
+  if (tab === 'Completed') return status === 'COMPLETED';
+  return true;
+}
+
 /**
- * My Bookings screen matching wireframe:
- * - Header with title
- * - Tab filters with glow shadow on active tab
- * - Booking cards with left accent border, 64px icon, powered badge, points badge
+ * My Bookings screen:
+ * - Segmented filter tabs with icons + counts
+ * - Polished empty state per tab
  */
 export default function BookingsScreen() {
-  const [activeTab, setActiveTab] = useState('All');
-  const { bookings, fetchBookings, isLoading, error, clearError } = useBookingStore();
+  const [activeTab, setActiveTab] = useState<TabKey>('All');
+  const { bookings, fetchBookings, clearError } = useBookingStore();
   const [refreshing, setRefreshing] = useState(false);
+  const [tabWidth, setTabWidth] = useState(0);
+  const indicatorX = useSharedValue(0);
+
+  const activeIndex = TABS.findIndex((t) => t.key === activeTab);
 
   useEffect(() => {
     fetchBookings();
   }, []);
+
+  useEffect(() => {
+    if (tabWidth <= 0) return;
+    indicatorX.value = withSpring(activeIndex * tabWidth, {
+      damping: 20,
+      stiffness: 220,
+      mass: 0.6,
+    });
+  }, [activeIndex, tabWidth, indicatorX]);
+
+  const indicatorStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: indicatorX.value }],
+  }));
+
+  const onTrackLayout = (e: LayoutChangeEvent) => {
+    const w = e.nativeEvent.layout.width / TABS.length;
+    setTabWidth(w);
+  };
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -47,22 +119,24 @@ export default function BookingsScreen() {
     setRefreshing(false);
   };
 
-  const displayBookings = bookings;
+  const tabCounts = useMemo(() => {
+    const counts: Record<TabKey, number> = {
+      All: bookings.length,
+      Upcoming: 0,
+      'In Progress': 0,
+      Completed: 0,
+    };
+    for (const booking of bookings) {
+      if (matchesTab(booking.status, 'Upcoming')) counts.Upcoming += 1;
+      if (matchesTab(booking.status, 'In Progress')) counts['In Progress'] += 1;
+      if (matchesTab(booking.status, 'Completed')) counts.Completed += 1;
+    }
+    return counts;
+  }, [bookings]);
 
-  const filteredBookings = displayBookings.filter((booking: any) => {
-    if (activeTab === 'All') return true;
-    if (activeTab === 'Upcoming') return booking.status === 'ACCEPTED';
-    if (activeTab === 'In Progress') return booking.status === 'IN_PROGRESS';
-    if (activeTab === 'Completed') return booking.status === 'COMPLETED';
-    return true;
-  });
-
-  const isTrackable = (status: string) =>
-    ['ACCEPTED', 'IN_PROGRESS'].includes(status);
-
-  const handleTrackBooking = (bookingId: string) => {
-    router.push(`/bookings/${bookingId}/tracking` as any);
-  };
+  const filteredBookings = bookings.filter((booking: any) =>
+    matchesTab(booking.status, activeTab)
+  );
 
   const renderBookingCard = ({ item }: { item: any }) => {
     const status = STATUS_STYLES[item.status] || STATUS_STYLES.PENDING;
@@ -77,8 +151,8 @@ export default function BookingsScreen() {
       <TouchableOpacity
         style={styles.bookingCard}
         onPress={() => router.push(`/bookings/${item.id}` as any)}
+        activeOpacity={0.85}
       >
-        {/* Left accent border */}
         <View style={styles.accentBorder} />
 
         <View style={styles.bookingCardInner}>
@@ -92,14 +166,18 @@ export default function BookingsScreen() {
             )}
             <View style={styles.bookingInfo}>
               <View style={styles.titleRow}>
-                <Text style={styles.bookingTitle} numberOfLines={1}>{serviceName}</Text>
+                <Text style={styles.bookingTitle} numberOfLines={1}>
+                  {serviceName}
+                </Text>
                 {isPowered && (
                   <View style={styles.poweredBadge}>
                     <Text style={styles.poweredBadgeText}>Powered by DoHuub</Text>
                   </View>
                 )}
               </View>
-              <Text style={styles.bookingVendor}>{item.vendor?.businessName || 'Provider'}</Text>
+              <Text style={styles.bookingVendor}>
+                {item.vendor?.businessName || 'Provider'}
+              </Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={colors.text.muted} />
           </View>
@@ -108,7 +186,9 @@ export default function BookingsScreen() {
             <View style={styles.detailRow}>
               <Ionicons name="calendar-outline" size={16} color={colors.text.secondary} />
               <Text style={styles.detailText}>
-                {item.scheduledDate ? new Date(item.scheduledDate).toLocaleDateString() : 'TBD'}
+                {item.scheduledDate
+                  ? new Date(item.scheduledDate).toLocaleDateString()
+                  : 'TBD'}
                 {item.scheduledTime && ` at ${item.scheduledTime}`}
               </Text>
             </View>
@@ -134,7 +214,9 @@ export default function BookingsScreen() {
               )}
               {pointsRedeemed != null && pointsRedeemed > 0 && (
                 <View style={[styles.pointsBadge, { backgroundColor: '#FEF3C7' }]}>
-                  <Text style={[styles.pointsBadgeText, { color: '#D97706' }]}>-{pointsRedeemed} pts</Text>
+                  <Text style={[styles.pointsBadgeText, { color: '#D97706' }]}>
+                    -{pointsRedeemed} pts
+                  </Text>
                 </View>
               )}
             </View>
@@ -147,69 +229,100 @@ export default function BookingsScreen() {
     );
   };
 
-  const renderEmptyState = () => (
-    <View style={styles.emptyState}>
-      <View style={styles.emptyIcon}>
-        <Ionicons name="calendar-outline" size={64} color={colors.primary} />
-      </View>
-      <Text style={styles.emptyTitle}>No bookings yet</Text>
-      <Text style={styles.emptyText}>Start exploring services to make your first booking</Text>
-      <TouchableOpacity
-        style={styles.browseButton}
-        onPress={() => router.push('/(tabs)')}
-      >
-        <Text style={styles.browseButtonText}>Browse Services</Text>
-      </TouchableOpacity>
-    </View>
-  );
+  const renderEmptyState = () => {
+    const copy = EMPTY_COPY[activeTab];
 
-  const renderErrorState = () => (
-    <View style={styles.emptyState}>
-      <View style={[styles.emptyIcon, { backgroundColor: '#FEE2E2' }]}>
-        <Ionicons name="alert-circle-outline" size={64} color="#991B1B" />
+    return (
+      <View style={styles.emptyState}>
+        <View style={styles.emptyArt}>
+          <View style={styles.emptyRingOuter} />
+          <View style={styles.emptyRingMid} />
+          <View style={styles.emptyIcon}>
+            <Ionicons name={copy.icon} size={36} color={colors.primary} />
+          </View>
+        </View>
+
+        <Text style={styles.emptyTitle}>{copy.title}</Text>
+        <Text style={styles.emptyText}>{copy.subtitle}</Text>
+
+        {copy.showBrowse && (
+          <TouchableOpacity
+            style={styles.browseButton}
+            onPress={() => router.push('/(tabs)')}
+            activeOpacity={0.9}
+          >
+            <Ionicons name="compass-outline" size={18} color="#FFFFFF" />
+            <Text style={styles.browseButtonText}>Browse Services</Text>
+          </TouchableOpacity>
+        )}
+
+        {activeTab !== 'All' && (
+          <TouchableOpacity
+            style={styles.emptySecondary}
+            onPress={() => setActiveTab('All')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.emptySecondaryText}>View all bookings</Text>
+          </TouchableOpacity>
+        )}
       </View>
-      <Text style={styles.emptyTitle}>Unable to load bookings</Text>
-      <Text style={styles.emptyText}>{error || 'Please check your connection and try again'}</Text>
-      <TouchableOpacity
-        style={styles.browseButton}
-        onPress={onRefresh}
-      >
-        <Text style={styles.browseButtonText}>Try Again</Text>
-      </TouchableOpacity>
-    </View>
-  );
+    );
+  };
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <View style={styles.header}>
         <Text style={styles.title}>My Bookings</Text>
+        <Text style={styles.subtitle}>
+          {tabCounts.All === 0
+            ? 'Track and manage your services'
+            : `${tabCounts.All} booking${tabCounts.All === 1 ? '' : 's'} total`}
+        </Text>
       </View>
 
-      {/* Tabs */}
-      <View style={styles.tabs}>
-        {TABS.map((tab) => (
-          <TouchableOpacity
-            key={tab}
-            style={[styles.tab, activeTab === tab && styles.tabActive]}
-            onPress={() => setActiveTab(tab)}
-          >
-            <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
-              {tab}
-            </Text>
-          </TouchableOpacity>
-        ))}
+      <View style={styles.filterWrap}>
+        <View style={styles.filterTrack} onLayout={onTrackLayout}>
+          {TABS.map((tab) => {
+            const active = activeTab === tab.key;
+            return (
+              <TouchableOpacity
+                key={tab.key}
+                style={styles.filterTab}
+                onPress={() => setActiveTab(tab.key)}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+              >
+                <Text
+                  style={[styles.filterTabText, active && styles.filterTabTextActive]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.7}
+                >
+                  {tab.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+          {tabWidth > 0 && (
+            <Animated.View
+              style={[
+                styles.slidingUnderline,
+                { width: Math.max(tabWidth * 0.42, 28) },
+                { left: (tabWidth - Math.max(tabWidth * 0.42, 28)) / 2 },
+                indicatorStyle,
+              ]}
+            />
+          )}
+        </View>
       </View>
 
-      {/* Bookings List */}
       <FlatList
         data={filteredBookings}
         renderItem={renderBookingCard}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         ListEmptyComponent={renderEmptyState}
         showsVerticalScrollIndicator={false}
       />
@@ -220,56 +333,59 @@ export default function BookingsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#FFFFFF',
   },
   header: {
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(46, 122, 217, 0.08)',
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 15,
-    elevation: 3,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
   },
   title: {
-    fontSize: 20,
-    fontWeight: '600',
+    fontSize: 24,
+    fontWeight: '700',
     color: colors.text.primary,
+    letterSpacing: -0.3,
   },
-  tabs: {
-    flexDirection: 'row',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    gap: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(46, 122, 217, 0.1)',
-  },
-  tab: {
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: borderRadius.full,
-    backgroundColor: colors.secondary,
-  },
-  tabActive: {
-    backgroundColor: colors.primary,
-    shadowColor: '#4CA6FA',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 4,
-  },
-  tabText: {
-    fontSize: fontSize.sm,
-    color: colors.text.secondary,
+  subtitle: {
+    marginTop: 4,
+    fontSize: 13,
     fontWeight: '500',
+    color: colors.text.secondary,
   },
-  tabTextActive: {
-    color: colors.text.inverse,
+  filterWrap: {
+    paddingHorizontal: 20,
+    paddingTop: 8,
+  },
+  filterTrack: {
+    flexDirection: 'row',
+    position: 'relative',
+    borderBottomWidth: 1,
+    borderBottomColor: '#EEF2F7',
+  },
+  filterTab: {
+    flex: 1,
+    minWidth: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+  },
+  filterTabText: {
+    fontSize: 13,
+    color: '#94A3B8',
+    fontWeight: '500',
+    textAlign: 'center',
+    letterSpacing: -0.1,
+  },
+  filterTabTextActive: {
+    color: '#1E293B',
+    fontWeight: '700',
+  },
+  slidingUnderline: {
+    position: 'absolute',
+    bottom: -1,
+    height: 3,
+    borderRadius: 999,
+    backgroundColor: '#2E7AD9',
   },
   list: {
     padding: spacing.lg,
@@ -281,13 +397,8 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     backgroundColor: colors.surface,
     borderWidth: borderWidth.thin,
-    borderColor: 'rgba(46, 122, 217, 0.08)',
+    borderColor: 'rgba(15, 23, 42, 0.08)',
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 1,
   },
   accentBorder: {
     width: 3,
@@ -306,7 +417,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: borderRadius.lg,
-    backgroundColor: colors.secondary,
+    backgroundColor: '#F1F5F9',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: spacing.md,
@@ -364,7 +475,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: spacing.md,
     borderTopWidth: borderWidth.thin,
-    borderTopColor: 'rgba(46, 122, 217, 0.1)',
+    borderTopColor: 'rgba(15, 23, 42, 0.06)',
   },
   footerBadges: {
     flexDirection: 'row',
@@ -397,66 +508,83 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.text.primary,
   },
-  trackingIndicator: {
-    marginRight: spacing.sm,
-  },
-  trackingDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#22C55E',
-  },
-  trackButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    paddingVertical: spacing.xs,
-    paddingHorizontal: spacing.md,
-    backgroundColor: colors.primary,
-    borderRadius: borderRadius.full,
-  },
-  trackButtonText: {
-    fontSize: fontSize.sm,
-    fontWeight: '600',
-    color: colors.text.inverse,
-  },
+
   emptyState: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: spacing.xxl * 2,
+    paddingHorizontal: 28,
+    paddingVertical: 56,
+  },
+  emptyArt: {
+    width: 140,
+    height: 140,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
+  },
+  emptyRingOuter: {
+    position: 'absolute',
+    width: 140,
+    height: 140,
+    borderRadius: 70,
+    backgroundColor: 'rgba(46, 122, 217, 0.06)',
+  },
+  emptyRingMid: {
+    position: 'absolute',
+    width: 108,
+    height: 108,
+    borderRadius: 54,
+    backgroundColor: 'rgba(46, 122, 217, 0.1)',
   },
   emptyIcon: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: colors.secondary,
+    width: 76,
+    height: 76,
+    borderRadius: 28,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: 'rgba(46, 122, 217, 0.16)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: spacing.lg,
   },
   emptyTitle: {
-    fontSize: fontSize.xl,
-    fontWeight: '600',
+    fontSize: 20,
+    fontWeight: '700',
     color: colors.text.primary,
-    marginBottom: spacing.xs,
+    marginBottom: 8,
+    textAlign: 'center',
+    letterSpacing: -0.2,
   },
   emptyText: {
-    fontSize: fontSize.md,
+    fontSize: 14,
+    lineHeight: 21,
     color: colors.text.secondary,
-    marginBottom: spacing.xl,
+    marginBottom: 28,
     textAlign: 'center',
-    maxWidth: 280,
+    maxWidth: 300,
   },
   browseButton: {
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.xl,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 22,
     backgroundColor: colors.primary,
-    borderRadius: borderRadius.lg,
+    borderRadius: 14,
   },
   browseButtonText: {
-    fontSize: fontSize.md,
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  emptySecondary: {
+    marginTop: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  emptySecondaryText: {
+    fontSize: 14,
     fontWeight: '600',
-    color: colors.text.inverse,
+    color: colors.primary,
   },
 });

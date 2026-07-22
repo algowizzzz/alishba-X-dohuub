@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,18 +6,16 @@ import {
   FlatList,
   TouchableOpacity,
   RefreshControl,
-  SafeAreaView,
   ActivityIndicator,
   Platform,
   StatusBar,
   Alert,
 } from 'react-native';
-import { router } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { getPaymentMethods } from '../../src/lib/queries';
-import { useAuthStore } from '../../src/store/authStore';
-import { supabase } from '../../src/lib/supabase';
+import api from '../../src/services/api';
 
 interface PaymentMethod {
   id: string;
@@ -41,32 +39,42 @@ const getCardType = (type: string) => {
 };
 
 export default function PaymentMethodsScreen() {
-  const user = useAuthStore((s) => s.user);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchPaymentMethods = useCallback(async () => {
-    if (!user?.id) return;
     try {
-      const data = await getPaymentMethods(user.id);
-      const mapped: PaymentMethod[] = (data || []).map((pm: any) => ({
+      const response = await api.get<{ success: boolean; data?: any[] }>(
+        '/payments/methods'
+      );
+      const data = response?.data || [];
+      const mapped: PaymentMethod[] = data.map((pm: any) => ({
         id: pm.id,
-        type: (pm.type || '').toLowerCase() as PaymentMethod['type'],
+        type: String(pm.brand || pm.type || 'card').toLowerCase() as PaymentMethod['type'],
         last4: pm.last4 || '',
-        expiry: `${String(pm.expiryMonth).padStart(2, '0')}/${String(pm.expiryYear).slice(-2)}`,
+        expiry: `${String(pm.expiryMonth ?? '').padStart(2, '0')}/${String(pm.expiryYear ?? '').slice(-2)}`,
         isDefault: !!pm.isDefault,
       }));
       setPaymentMethods(mapped);
     } catch (error) {
       console.error('Failed to fetch payment methods:', error);
+      setPaymentMethods([]);
     }
-  }, [user?.id]);
+  }, []);
 
-  useEffect(() => {
-    setIsLoading(true);
-    fetchPaymentMethods().finally(() => setIsLoading(false));
-  }, [fetchPaymentMethods]);
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      setIsLoading(true);
+      fetchPaymentMethods().finally(() => {
+        if (active) setIsLoading(false);
+      });
+      return () => {
+        active = false;
+      };
+    }, [fetchPaymentMethods])
+  );
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -90,7 +98,7 @@ export default function PaymentMethodsScreen() {
         style: 'destructive',
         onPress: async () => {
           try {
-            await supabase.from('PaymentMethod').delete().eq('id', cardId);
+            await api.delete(`/payments/methods/${cardId}`);
             await fetchPaymentMethods();
           } catch (error) {
             Alert.alert('Error', 'Failed to delete card');
@@ -102,12 +110,7 @@ export default function PaymentMethodsScreen() {
 
   const handleSetDefault = async (cardId: string) => {
     try {
-      const userId = user?.id;
-      if (!userId) return;
-      // Unset all defaults first
-      await supabase.from('PaymentMethod').update({ isDefault: false }).eq('userId', userId);
-      // Set new default
-      await supabase.from('PaymentMethod').update({ isDefault: true }).eq('id', cardId);
+      await api.patch(`/payments/methods/${cardId}`, { isDefault: true });
       await fetchPaymentMethods();
     } catch (error) {
       Alert.alert('Error', 'Failed to update default card');

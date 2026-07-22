@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { getCleaningListings } from '../../../src/lib/queries';
+import { ServiceSearchBar } from '../../../src/components/ui/ServiceSearchBar';
 
 // Boss vendor logos
 const cleaningLogos = [
@@ -82,6 +83,7 @@ const FALLBACK_VENDORS = [
 export default function CleaningServicesScreen() {
   const [vendors, setVendors] = useState<any[]>(FALLBACK_VENDORS);
   const [refreshing, setRefreshing] = useState(false);
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     fetchVendors();
@@ -91,16 +93,17 @@ export default function CleaningServicesScreen() {
     try {
       const data = await getCleaningListings();
       if (data && data.length > 0) {
-        // Map DB data to vendor format
+        // Map DB data to vendor format — listings include Vendor/business when present
         const mapped = data.map((item: any, index: number) => ({
           id: item.id || item.vendorId || String(index),
           name: item.Vendor?.businessName || item.title || FALLBACK_VENDORS[index % FALLBACK_VENDORS.length].name,
-          rating: item.Vendor?.rating || FALLBACK_VENDORS[index % FALLBACK_VENDORS.length].rating,
-          reviewCount: item.Vendor?.reviewCount || FALLBACK_VENDORS[index % FALLBACK_VENDORS.length].reviewCount,
+          rating: item.Vendor?.rating ?? 0,
+          reviewCount: item.Vendor?.reviewCount ?? 0,
           tagline: item.title || item.description || FALLBACK_VENDORS[index % FALLBACK_VENDORS.length].tagline,
           isPoweredByDoHuub: item.Vendor?.isMichelle || false,
-          startingPrice: item.basePrice || FALLBACK_VENDORS[index % FALLBACK_VENDORS.length].startingPrice,
+          startingPrice: item.basePrice ?? FALLBACK_VENDORS[index % FALLBACK_VENDORS.length].startingPrice,
           vendorId: item.vendorId,
+          logo: item.Vendor?.logo || null,
         }));
         setVendors(mapped);
       }
@@ -122,6 +125,16 @@ export default function CleaningServicesScreen() {
     } as any);
   };
 
+  const filteredVendors = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return vendors;
+    return vendors.filter(
+      (v) =>
+        v.name?.toLowerCase().includes(q) ||
+        v.tagline?.toLowerCase().includes(q)
+    );
+  }, [vendors, search]);
+
   return (
     <View style={styles.container}>
       {/* Header — glassmorphic with rounded bottom, matching boss */}
@@ -137,55 +150,75 @@ export default function CleaningServicesScreen() {
         </View>
       </View>
 
+      <ServiceSearchBar
+        value={search}
+        onChangeText={setSearch}
+        placeholder="Search cleaning services..."
+      />
+
       {/* Vendor Cards List */}
       <ScrollView
         style={styles.list}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        {vendors.map((vendor, index) => (
-          <TouchableOpacity
-            key={vendor.id}
-            style={styles.vendorCard}
-            onPress={() => handleVendorPress(vendor)}
-            activeOpacity={0.7}
-          >
-            <View style={styles.cardRow}>
-              {/* Vendor Logo — real image */}
-              <Image
-                source={cleaningLogos[index % cleaningLogos.length]}
-                style={styles.vendorLogo}
-                resizeMode="cover"
-              />
+        {filteredVendors.length === 0 ? (
+          <View style={styles.emptySearch}>
+            <Ionicons name="search-outline" size={36} color="#94A3B8" />
+            <Text style={styles.emptySearchTitle}>No matches</Text>
+            <Text style={styles.emptySearchText}>Try a different business or service name</Text>
+          </View>
+        ) : (
+          filteredVendors.map((vendor, index) => (
+            <TouchableOpacity
+              key={vendor.id}
+              style={styles.vendorCard}
+              onPress={() => handleVendorPress(vendor)}
+              activeOpacity={0.7}
+            >
+              <View style={styles.cardRow}>
+                {vendor.logo ? (
+                  <Image
+                    source={{ uri: vendor.logo }}
+                    style={styles.vendorLogo}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <Image
+                    source={cleaningLogos[index % cleaningLogos.length]}
+                    style={styles.vendorLogo}
+                    resizeMode="cover"
+                  />
+                )}
 
-              {/* Vendor Info */}
-              <View style={styles.vendorInfo}>
-                {/* Name + Badge Row */}
-                <View style={styles.nameRow}>
-                  <Text style={styles.vendorName} numberOfLines={1}>{vendor.name}</Text>
-                  {vendor.isPoweredByDoHuub && (
-                    <View style={styles.dohuubBadge}>
-                      <Text style={styles.dohuubBadgeText}>Powered by DoHuub</Text>
-                    </View>
-                  )}
-                </View>
-
-                {/* Rating Row */}
-                <View style={styles.ratingRow}>
-                  <View style={styles.ratingInner}>
-                    <Ionicons name="star" size={14} color="#FACC15" />
-                    <Text style={styles.ratingText}>{vendor.rating}</Text>
+                <View style={styles.vendorInfo}>
+                  <View style={styles.nameRow}>
+                    <Text style={styles.vendorName} numberOfLines={1}>{vendor.name}</Text>
+                    {vendor.isPoweredByDoHuub && (
+                      <View style={styles.dohuubBadge}>
+                        <Text style={styles.dohuubBadgeText}>Powered by DoHuub</Text>
+                      </View>
+                    )}
                   </View>
-                  <Text style={styles.reviewCount}>({vendor.reviewCount})</Text>
-                </View>
 
-                {/* Tagline */}
-                <Text style={styles.tagline} numberOfLines={1}>{vendor.tagline}</Text>
+                  <View style={styles.ratingRow}>
+                    <View style={styles.ratingInner}>
+                      <Ionicons name="star" size={14} color="#FACC15" />
+                      <Text style={styles.ratingText}>
+                        {Number(vendor.rating || 0).toFixed(1)}
+                      </Text>
+                    </View>
+                    <Text style={styles.reviewCount}>({vendor.reviewCount || 0})</Text>
+                  </View>
+
+                  <Text style={styles.tagline} numberOfLines={1}>{vendor.tagline}</Text>
+                </View>
               </View>
-            </View>
-          </TouchableOpacity>
-        ))}
+            </TouchableOpacity>
+          ))
+        )}
 
         <View style={{ height: 100 }} />
       </ScrollView>
@@ -318,5 +351,21 @@ const styles = StyleSheet.create({
   tagline: {
     fontSize: 14,
     color: '#64748B',
+  },
+  emptySearch: {
+    alignItems: 'center',
+    paddingVertical: 48,
+    gap: 8,
+  },
+  emptySearchTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1E293B',
+    marginTop: 8,
+  },
+  emptySearchText: {
+    fontSize: 14,
+    color: '#64748B',
+    textAlign: 'center',
   },
 });

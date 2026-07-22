@@ -1,44 +1,67 @@
-import React, { useEffect } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  SafeAreaView,
   Alert,
   Platform,
+  RefreshControl,
+  ActivityIndicator,
 } from 'react-native';
-import { router } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { router, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../src/store/authStore';
-import { supabase } from '../../src/lib/supabase';
-import { LinearGradient } from 'expo-linear-gradient';
+import api from '../../src/services/api';
 
 const ADDRESS_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
   HOME: 'home',
   WORK: 'briefcase-outline',
   OTHER: 'location-outline',
+  DOCTOR: 'medical-outline',
+  PHARMACY: 'medkit-outline',
   Home: 'home',
   Work: 'briefcase-outline',
   Other: 'location-outline',
 };
 
-export default function AddressesScreen() {
-  const { addresses, deleteAddress, fetchAddresses, setSelectedAddress } = useAuthStore();
+function formatTypeLabel(type?: string, label?: string) {
+  if (label && label.trim()) return label;
+  const t = (type || '').toUpperCase();
+  if (t === 'HOME') return 'Home';
+  if (t === 'WORK') return 'Work';
+  if (t === 'DOCTOR') return 'Doctor';
+  if (t === 'PHARMACY') return 'Pharmacy';
+  return 'Other';
+}
 
-  useEffect(() => {
-    fetchAddresses();
-  }, []);
+export default function AddressesScreen() {
+  const { addresses, deleteAddress, fetchAddresses, updateAddress } = useAuthStore();
+  const [refreshing, setRefreshing] = useState(false);
+  const [settingDefaultId, setSettingDefaultId] = useState<string | null>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchAddresses();
+    }, [fetchAddresses])
+  );
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await fetchAddresses();
+    } finally {
+      setRefreshing(false);
+    }
+  }, [fetchAddresses]);
 
   const handleEdit = (addressId: string) => {
     router.push({ pathname: '/profile/add-address', params: { id: addressId, edit: 'true' } });
   };
 
   const handleDelete = (addressId: string) => {
-    // RN's Alert.alert with multi-button confirm doesn't fire callbacks on web
-    // (RNW stub), so the Delete tap was silently no-op'ing. Use window.confirm
-    // on web; Alert.alert still works as expected on iOS/Android.
     if (Platform.OS === 'web') {
       const ok = window.confirm('Are you sure you want to delete this address?');
       if (ok) deleteAddress(addressId);
@@ -51,86 +74,148 @@ export default function AddressesScreen() {
   };
 
   const handleSetDefault = async (addressId: string) => {
+    if (settingDefaultId) return;
+
+    const current = useAuthStore.getState().addresses;
+    const target = current.find((a) => a.id === addressId);
+    if (!target || target.isDefault) return;
+
+    const previous = current;
+    setSettingDefaultId(addressId);
+
+    // Optimistic UI
+    useAuthStore.setState({
+      addresses: current.map((a) => ({
+        ...a,
+        isDefault: a.id === addressId,
+      })),
+      selectedAddressId: addressId,
+    });
+
     try {
-      const userId = useAuthStore.getState().user?.id;
-      if (userId) {
-        await supabase
-          .from('Address')
-          .update({ isDefault: false, updatedAt: new Date().toISOString() })
-          .eq('userId', userId);
-        await supabase
-          .from('Address')
-          .update({ isDefault: true, updatedAt: new Date().toISOString() })
-          .eq('id', addressId);
+      // Prefer dedicated endpoint; fall back to full PUT (works on older API builds)
+      try {
+        await api.post(`/addresses/${addressId}/default`);
+      } catch {
+        await updateAddress(addressId, {
+          type: target.type,
+          label: target.label,
+          street: target.street,
+          apartment: target.apartment,
+          city: target.city,
+          state: target.state,
+          zipCode: target.zipCode,
+          country: target.country,
+          latitude: target.latitude,
+          longitude: target.longitude,
+          isDefault: true,
+        });
       }
-      setSelectedAddress(addressId);
-      if (fetchAddresses) fetchAddresses();
-    } catch {
-      setSelectedAddress(addressId);
+      await fetchAddresses();
+    } catch (error: any) {
+      useAuthStore.setState({ addresses: previous });
+      Alert.alert(
+        'Error',
+        error?.response?.data?.error || error?.message || 'Failed to set default address'
+      );
+    } finally {
+      setSettingDefaultId(null);
     }
   };
 
   const renderAddress = ({ item }: { item: any }) => {
     const icon = ADDRESS_ICONS[item.type] || ADDRESS_ICONS[item.label] || 'location-outline';
-    const isDefault = item.isDefault;
+    const isDefault = !!item.isDefault;
+    const isSetting = settingDefaultId === item.id;
+    const title = formatTypeLabel(item.type, item.label);
+    const line = [
+      item.street,
+      [item.city, item.state].filter(Boolean).join(', '),
+      item.zipCode,
+    ]
+      .filter(Boolean)
+      .join(' · ');
 
     return (
       <View style={[styles.card, isDefault && styles.cardDefault]}>
-        {isDefault && <View style={styles.accentBorder} />}
-
-        <View style={styles.cardInner}>
-          <View style={styles.iconCircle}>
-            <Ionicons name={icon} size={24} color="#2E7AD9" />
+        <View style={styles.cardTop}>
+          <View style={[styles.iconCircle, isDefault && styles.iconCircleDefault]}>
+            <Ionicons name={icon} size={20} color={isDefault ? '#FFFFFF' : '#2E7AD9'} />
           </View>
 
           <View style={styles.info}>
-            <View style={styles.labelRow}>
-              <Text style={styles.label}>{item.label || item.type}</Text>
+            <View style={styles.titleRow}>
+              <Text style={styles.label} numberOfLines={1}>
+                {title}
+              </Text>
               {isDefault && (
-                <LinearGradient
-                  colors={['#2E7AD9', '#1E6AC9']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.defaultBadge}
-                >
-                  <Text style={styles.defaultBadgeText}>Default</Text>
-                </LinearGradient>
+                <View style={styles.defaultChip}>
+                  <Ionicons name="checkmark-circle" size={12} color="#2E7AD9" />
+                  <Text style={styles.defaultChipText}>Default</Text>
+                </View>
               )}
             </View>
             <Text style={styles.fullAddress} numberOfLines={2}>
-              {item.street}{item.city ? `, ${item.city}` : ''}{item.state ? `, ${item.state}` : ''} {item.zipCode || ''}
+              {line}
             </Text>
           </View>
 
-          <View style={styles.actions}>
+          <TouchableOpacity
+            style={[styles.starBtn, isDefault && styles.starBtnActive]}
+            onPress={() => handleSetDefault(item.id)}
+            disabled={isDefault || !!settingDefaultId}
+            activeOpacity={0.7}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            {isSetting ? (
+              <ActivityIndicator size="small" color="#2E7AD9" />
+            ) : (
+              <Ionicons
+                name={isDefault ? 'star' : 'star-outline'}
+                size={22}
+                color={isDefault ? '#F59E0B' : '#94A3B8'}
+              />
+            )}
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.cardFooter}>
+          {!isDefault ? (
             <TouchableOpacity
-              style={styles.actionBtn}
+              style={styles.setDefaultBtn}
+              onPress={() => handleSetDefault(item.id)}
+              disabled={!!settingDefaultId}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="star-outline" size={15} color="#2E7AD9" />
+              <Text style={styles.setDefaultText}>
+                {isSetting ? 'Updating...' : 'Set as default'}
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.setDefaultBtnDisabled}>
+              <Ionicons name="star" size={15} color="#F59E0B" />
+              <Text style={styles.setDefaultTextDisabled}>Default address</Text>
+            </View>
+          )}
+
+          <View style={styles.footerActions}>
+            <TouchableOpacity
+              style={styles.footerBtn}
               onPress={() => handleEdit(item.id)}
               activeOpacity={0.7}
             >
-              <Ionicons name="create-outline" size={20} color="#64748B" />
+              <Ionicons name="create-outline" size={16} color="#64748B" />
+              <Text style={styles.footerBtnText}>Edit</Text>
             </TouchableOpacity>
+            <View style={styles.footerDivider} />
             <TouchableOpacity
-              style={styles.actionBtn}
+              style={styles.footerBtn}
               onPress={() => handleDelete(item.id)}
               activeOpacity={0.7}
             >
-              <Ionicons name="trash-outline" size={20} color="#EF4444" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.actionBtn,
-                isDefault && styles.actionBtnDefault,
-              ]}
-              onPress={() => handleSetDefault(item.id)}
-              activeOpacity={0.7}
-              disabled={isDefault}
-            >
-              <Ionicons
-                name={isDefault ? 'star' : 'star-outline'}
-                size={20}
-                color={isDefault ? '#FFFFFF' : '#64748B'}
-              />
+              <Ionicons name="trash-outline" size={16} color="#EF4444" />
+              <Text style={[styles.footerBtnText, { color: '#EF4444' }]}>Delete</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -141,16 +226,17 @@ export default function AddressesScreen() {
   const renderEmpty = () => (
     <View style={styles.emptyState}>
       <View style={styles.emptyIcon}>
-        <Ionicons name="location-outline" size={40} color="#94A3B8" />
+        <Ionicons name="location-outline" size={36} color="#94A3B8" />
       </View>
       <Text style={styles.emptyTitle}>No saved addresses yet</Text>
-      <Text style={styles.emptyText}>Add your frequently used addresses for faster booking</Text>
+      <Text style={styles.emptyText}>
+        Add your frequently used addresses for faster booking
+      </Text>
     </View>
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Glassmorphic Header */}
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <View style={styles.header}>
         <View style={styles.headerContent}>
           <TouchableOpacity
@@ -158,7 +244,7 @@ export default function AddressesScreen() {
             onPress={() => router.back()}
             activeOpacity={0.7}
           >
-            <Ionicons name="arrow-back" size={24} color="#1E293B" />
+            <Ionicons name="arrow-back" size={22} color="#1E293B" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Saved Addresses</Text>
         </View>
@@ -171,13 +257,23 @@ export default function AddressesScreen() {
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={renderEmpty}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#2E7AD9']}
+            tintColor="#2E7AD9"
+          />
+        }
         ListFooterComponent={
           <TouchableOpacity
             style={styles.addButton}
             onPress={() => router.push('/profile/add-address')}
             activeOpacity={0.7}
           >
-            <Ionicons name="add" size={24} color="#2E7AD9" />
+            <View style={styles.addIconWrap}>
+              <Ionicons name="add" size={20} color="#2E7AD9" />
+            </View>
             <Text style={styles.addButtonText}>Add New Address</Text>
           </TouchableOpacity>
         }
@@ -191,169 +287,195 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F0F7FF',
   },
-
-  // Glassmorphic Header
   header: {
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    paddingTop: Platform.OS === 'ios' ? 0 : 16,
-    paddingBottom: 24,
-    paddingHorizontal: 24,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(46, 122, 217, 0.08)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 15,
-    elevation: 8,
+    backgroundColor: '#FFFFFF',
+    paddingTop: Platform.OS === 'android' ? 8 : 0,
+    paddingBottom: 16,
+    paddingHorizontal: 20,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(46, 122, 217, 0.12)',
   },
   headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
+    gap: 14,
   },
   backButton: {
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#F8FAFC',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: '600',
     color: '#1E293B',
   },
-
   listContent: {
-    padding: 24,
+    padding: 20,
+    paddingBottom: 32,
     flexGrow: 1,
+    gap: 12,
   },
 
-  // Address Card
   card: {
-    flexDirection: 'row',
-    borderRadius: 12,
-    marginBottom: 16,
     backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(15, 23, 42, 0.06)',
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
+    marginBottom: 4,
   },
   cardDefault: {
-    // accent border handles visual distinction
+    borderColor: 'rgba(46, 122, 217, 0.35)',
+    backgroundColor: '#F8FBFF',
   },
-  accentBorder: {
-    width: 4,
-    backgroundColor: '#2E7AD9',
-  },
-  cardInner: {
-    flex: 1,
+  cardTop: {
     flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    gap: 16,
+    alignItems: 'flex-start',
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 14,
   },
   iconCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 42,
+    height: 42,
+    borderRadius: 12,
     backgroundColor: '#E8F1FC',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#2E7AD9',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
+  },
+  iconCircleDefault: {
+    backgroundColor: '#2E7AD9',
   },
   info: {
     flex: 1,
     minWidth: 0,
+    paddingTop: 2,
   },
-  labelRow: {
+  starBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  starBtnActive: {
+    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+  },
+  titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
     marginBottom: 4,
   },
   label: {
+    flexShrink: 1,
     fontSize: 16,
     fontWeight: '600',
-    color: '#1E293B',
+    color: '#0F172A',
   },
-  defaultBadge: {
-    borderRadius: 999,
+  defaultChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(46, 122, 217, 0.1)',
     paddingHorizontal: 8,
-    paddingVertical: 2,
-    shadowColor: '#2E7AD9',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 2,
+    paddingVertical: 3,
+    borderRadius: 999,
   },
-  defaultBadgeText: {
+  defaultChipText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: '#2E7AD9',
   },
   fullAddress: {
     fontSize: 13,
     color: '#64748B',
-    lineHeight: 18,
+    lineHeight: 19,
   },
 
-  // Action buttons
-  actions: {
+  cardFooter: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    justifyContent: 'space-between',
+    gap: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(15, 23, 42, 0.06)',
+    backgroundColor: 'rgba(248, 250, 252, 0.8)',
   },
-  actionBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#E8F1FC',
-    justifyContent: 'center',
+  setDefaultBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderRadius: 10,
+    backgroundColor: 'rgba(46, 122, 217, 0.08)',
+  },
+  setDefaultText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#2E7AD9',
+  },
+  setDefaultBtnDisabled: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  setDefaultTextDisabled: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#94A3B8',
+  },
+  footerActions: {
+    flexDirection: 'row',
     alignItems: 'center',
   },
-  actionBtnDefault: {
-    backgroundColor: '#2E7AD9',
+  footerBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  footerBtnText: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#64748B',
+  },
+  footerDivider: {
+    width: StyleSheet.hairlineWidth,
+    height: 16,
+    backgroundColor: 'rgba(15, 23, 42, 0.12)',
   },
 
-  // Empty state
   emptyState: {
     alignItems: 'center',
-    paddingVertical: 48,
+    paddingVertical: 56,
   },
   emptyIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 72,
+    height: 72,
+    borderRadius: 36,
     backgroundColor: '#E8F1FC',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
-    shadowColor: '#2E7AD9',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 4,
   },
   emptyTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#64748B',
+    color: '#475569',
     marginBottom: 8,
   },
   emptyText: {
@@ -361,25 +483,33 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     textAlign: 'center',
     maxWidth: 260,
+    lineHeight: 20,
   },
 
-  // Add button
   addButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 12,
-    paddingVertical: 16,
-    borderWidth: 2,
-    borderColor: 'rgba(46, 122, 217, 0.25)',
-    borderStyle: 'dashed',
-    borderRadius: 12,
-    backgroundColor: 'transparent',
+    gap: 10,
     marginTop: 8,
+    paddingVertical: 16,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: 'rgba(46, 122, 217, 0.3)',
+    borderStyle: 'dashed',
+    backgroundColor: 'rgba(46, 122, 217, 0.03)',
+  },
+  addIconWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: 'rgba(46, 122, 217, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   addButtonText: {
-    fontSize: 16,
-    fontWeight: '500',
+    fontSize: 15,
+    fontWeight: '600',
     color: '#1E293B',
   },
 });

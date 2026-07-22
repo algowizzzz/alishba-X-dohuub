@@ -4,6 +4,7 @@ import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, fontSize } from '../../../../src/constants/theme';
 import { getCompanionListings } from '../../../../src/lib/queries';
+import { ServiceSearchBar } from '../../../../src/components/ui/ServiceSearchBar';
 
 const PINK = '#EC4899';
 
@@ -28,6 +29,7 @@ export default function CompanionsListScreen() {
   const [minExperience, setMinExperience] = useState('');
   const [companions, setCompanions] = useState<Companion[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     (async () => {
@@ -65,6 +67,15 @@ export default function CompanionsListScreen() {
     setSelectedSpecialties(p => p.includes(s) ? p.filter(x => x !== s) : [...p, s]);
 
   const filtered = companions.filter(c => {
+    const q = search.trim().toLowerCase();
+    if (
+      q &&
+      !c.name.toLowerCase().includes(q) &&
+      !c.bio.toLowerCase().includes(q) &&
+      !c.specialties.some((s) => s.toLowerCase().includes(q))
+    ) {
+      return false;
+    }
     if (selectedSpecialties.length > 0 && !selectedSpecialties.some(s => c.specialties.includes(s))) return false;
     if (minExperience && c.yearsExperience < parseInt(minExperience)) return false;
     return true;
@@ -95,6 +106,12 @@ export default function CompanionsListScreen() {
         </TouchableOpacity>
       </View>
 
+      <ServiceSearchBar
+        value={search}
+        onChangeText={setSearch}
+        placeholder="Search companions..."
+      />
+
       {loading ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator size="large" color={PINK} />
@@ -105,6 +122,7 @@ export default function CompanionsListScreen() {
         keyExtractor={i => i.id}
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
         ListEmptyComponent={<Text style={{ color: colors.text.secondary, textAlign: 'center', marginTop: 40 }}>No caregivers found.</Text>}
         renderItem={({ item }) => (
           <TouchableOpacity style={styles.card} onPress={() => goToDetail(item)} activeOpacity={0.8}>

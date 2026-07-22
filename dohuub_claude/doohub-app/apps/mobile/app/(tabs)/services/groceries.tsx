@@ -16,6 +16,7 @@ import { getServiceImage } from '../../../src/constants/serviceImages';
 import { getStoresByCategory, getGroceryListings } from '../../../src/lib/queries';
 import { useCartStore } from '../../../src/store/cartStore';
 import { Card, Rating, PoweredByDoHuubBadge } from '../../../src/components/ui';
+import { ServiceSearchBar } from '../../../src/components/ui/ServiceSearchBar';
 import { colors, spacing, fontSize, borderRadius } from '../../../src/constants/theme';
 
 export default function GroceriesScreen() {
@@ -27,6 +28,7 @@ export default function GroceriesScreen() {
   const [selectedVendor, setSelectedVendor] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [search, setSearch] = useState('');
   
   const { items: cartItems, addItem } = useCartStore();
 
@@ -149,10 +151,19 @@ export default function GroceriesScreen() {
   };
 
   if (selectedVendor) {
+    const q = search.trim().toLowerCase();
+    const filteredProducts = !q
+      ? listings
+      : listings.filter(
+          (item) =>
+            item.name?.toLowerCase().includes(q) ||
+            item.category?.toLowerCase().includes(q)
+        );
+
     return (
       <View style={styles.container}>
         <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={() => setSelectedVendor(null)}>
+          <TouchableOpacity style={styles.backButton} onPress={() => { setSelectedVendor(null); setSearch(''); }}>
             <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
           </TouchableOpacity>
           <Text style={styles.title}>Products</Text>
@@ -167,6 +178,12 @@ export default function GroceriesScreen() {
             </View>
           </TouchableOpacity>
         </View>
+
+        <ServiceSearchBar
+          value={search}
+          onChangeText={setSearch}
+          placeholder="Search products..."
+        />
 
         <View style={styles.filterTabs}>
           <TouchableOpacity
@@ -191,7 +208,7 @@ export default function GroceriesScreen() {
         </View>
 
         <FlatList
-          data={listings}
+          data={filteredProducts}
           renderItem={renderProductCard}
           keyExtractor={(item) => item.id}
           numColumns={2}
@@ -199,6 +216,7 @@ export default function GroceriesScreen() {
           columnWrapperStyle={styles.productRow}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         />
       </View>
     );
@@ -243,20 +261,27 @@ export default function GroceriesScreen() {
 
   // ── Food Delivery List ───────────────────────────────────────────────────
   if (subCategory === 'food') {
-    const foodVendors = vendors.map(v => ({
-      id: v.id,
-      vendorId: v.vendorId,
-      name: v.businessName,
-      cuisine: v.description || 'Multi-Cuisine',
-      rating: v.rating,
-      deliveryTime: '20-35 min',
-      isPoweredByDoHuub: v.isMichelle,
-      image: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=200&h=200&fit=crop',
-    }));
+    const q = search.trim().toLowerCase();
+    const foodVendors = vendors
+      .map(v => ({
+        id: v.id,
+        vendorId: v.vendorId,
+        name: v.businessName,
+        cuisine: v.description || 'Multi-Cuisine',
+        rating: v.rating,
+        deliveryTime: '20-35 min',
+        isPoweredByDoHuub: v.isMichelle,
+        image: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=200&h=200&fit=crop',
+      }))
+      .filter((v) =>
+        !q ||
+        v.name?.toLowerCase().includes(q) ||
+        v.cuisine?.toLowerCase().includes(q)
+      );
     return (
       <View style={styles.container}>
         <View style={styles.pickerHeader}>
-          <TouchableOpacity style={styles.pickerBackBtn} onPress={() => { setSubCategory(null); setVendors([]); }}>
+          <TouchableOpacity style={styles.pickerBackBtn} onPress={() => { setSubCategory(null); setVendors([]); setSearch(''); }}>
             <Ionicons name="arrow-back" size={20} color={colors.text.primary} />
           </TouchableOpacity>
           <View>
@@ -265,11 +290,18 @@ export default function GroceriesScreen() {
           </View>
         </View>
 
+        <ServiceSearchBar
+          value={search}
+          onChangeText={setSearch}
+          placeholder="Search restaurants..."
+        />
+
         <FlatList
           data={foodVendors}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.foodListContent}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
           renderItem={({ item }) => (
             <View style={styles.foodCard}>
               <View style={styles.foodCardTop}>
@@ -338,21 +370,28 @@ export default function GroceriesScreen() {
   }
 
   // ── Grocery List ─────────────────────────────────────────────────────────
-  const groceryVendors = vendors.map(v => ({
-    id: v.id,
-    vendorId: v.vendorId,
-    name: v.businessName,
-    type: v.description || 'Grocery',
-    rating: v.rating,
-    reviewCount: v.reviewCount,
-    isPoweredByDoHuub: v.isMichelle,
-    image: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=200&h=200&fit=crop',
-  }));
+  const qGrocery = search.trim().toLowerCase();
+  const groceryVendors = vendors
+    .map(v => ({
+      id: v.id,
+      vendorId: v.vendorId,
+      name: v.businessName,
+      type: v.description || 'Grocery',
+      rating: v.rating,
+      reviewCount: v.reviewCount,
+      isPoweredByDoHuub: v.isMichelle,
+      image: 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=200&h=200&fit=crop',
+    }))
+    .filter((v) =>
+      !qGrocery ||
+      v.name?.toLowerCase().includes(qGrocery) ||
+      v.type?.toLowerCase().includes(qGrocery)
+    );
 
   return (
     <View style={styles.container}>
       <View style={styles.pickerHeader}>
-        <TouchableOpacity style={styles.pickerBackBtn} onPress={() => { setSubCategory(null); setVendors([]); setSelectedVendor(null); }}>
+        <TouchableOpacity style={styles.pickerBackBtn} onPress={() => { setSubCategory(null); setVendors([]); setSelectedVendor(null); setSearch(''); }}>
           <Ionicons name="arrow-back" size={20} color={colors.text.primary} />
         </TouchableOpacity>
         <View>
@@ -361,12 +400,19 @@ export default function GroceriesScreen() {
         </View>
       </View>
 
+      <ServiceSearchBar
+        value={search}
+        onChangeText={setSearch}
+        placeholder="Search grocery stores..."
+      />
+
       <FlatList
         data={groceryVendors}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.foodListContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
         renderItem={({ item }) => (
           <View style={styles.groceryCard}>
             {/* Vendor Icon */}

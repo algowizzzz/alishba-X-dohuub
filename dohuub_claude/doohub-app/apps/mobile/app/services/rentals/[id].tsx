@@ -12,7 +12,7 @@ const GALLERY_IMAGES = [
   require('../../../assets/rental-4.png'),
 ];
 import { colors, fontSize } from '../../../src/constants/theme';
-import { getReviewsByVendor, getRentalById } from '../../../src/lib/queries';
+import { getReviewsByVendor, getRentalById, getReviewAuthorName } from '../../../src/lib/queries';
 
 const TEAL = '#14B8A6';
 
@@ -33,10 +33,7 @@ function formatRelativeDate(iso: string): string {
 }
 
 function reviewerName(r: any): string {
-  const p = r?.User?.UserProfile;
-  if (p?.firstName) return `${p.firstName} ${p.lastName?.[0] ?? ''}.`.trim();
-  if (r?.User?.email) return r.User.email.split('@')[0];
-  return 'Anonymous';
+  return getReviewAuthorName(r);
 }
 
 export default function PropertyDetailScreen() {

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, ActivityIndicator, SafeAreaView } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path } from 'react-native-svg';
@@ -16,7 +16,7 @@ import { signInWithGoogle } from '../../src/services/googleSignIn';
  * - Google Sign Up button (white bg, dark text)
  * - Email Sign Up button (white bg, blue text)
  * - Sign In button (transparent with white border)
- * - Terms footer in white
+ * - Terms footer pinned to bottom (safe area)
  */
 export default function WelcomeScreen() {
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -27,10 +27,9 @@ export default function WelcomeScreen() {
     try {
       const outcome = await signInWithGoogle();
       if (outcome === 'success') {
-        // onAuthStateChange (in app/_layout.tsx) will populate the auth
-        // store. Routing the user past auth happens via the auth guard there,
-        // but we nudge them out of /welcome immediately for snappy UX.
-        router.replace('/(tabs)');
+        // Prefer home tab explicitly — avoids any unmatched-route flash from
+        // the OAuth deep link (doohub://auth/callback) racing navigation.
+        router.replace('/(tabs)/');
       }
     } finally {
       setGoogleLoading(false);
@@ -46,11 +45,8 @@ export default function WelcomeScreen() {
   };
 
   return (
-    <View
-      style={styles.container}
-    >
+    <SafeAreaView style={styles.container}>
       <View style={styles.content}>
-        {/* Logo Image */}
         <Image
           source={require('../../assets/logo.png')}
           style={styles.logoImage}
@@ -59,9 +55,7 @@ export default function WelcomeScreen() {
 
         <Text style={styles.heading}>Create Your Account</Text>
 
-        {/* Buttons */}
         <View style={styles.buttons}>
-          {/* Google Sign Up - white bg with dark text */}
           <TouchableOpacity
             style={styles.googleButton}
             onPress={handleGoogleSignUp}
@@ -82,31 +76,31 @@ export default function WelcomeScreen() {
             )}
           </TouchableOpacity>
 
-          {/* Email Sign Up - white bg with blue text */}
           <TouchableOpacity style={styles.signUpButton} onPress={handleEmailSignUp}>
             <Ionicons name="mail" size={20} color="#FFFFFF" style={{ marginRight: spacing.sm }} />
             <Text style={styles.signUpButtonText}>Sign Up with Email</Text>
           </TouchableOpacity>
-
         </View>
 
-        {/* Sign In Link */}
         <View style={styles.signInContainer}>
           <Text style={styles.signInText}>Already have an account? </Text>
           <TouchableOpacity onPress={handleSignIn}>
             <Text style={styles.signInLink}>Sign In</Text>
           </TouchableOpacity>
         </View>
-
-        {/* Terms */}
-        <Text style={styles.terms}>
-          By continuing, you agree to our{' '}
-          <Text style={styles.termsLink}>Terms of Service</Text>
-          {' '}and{' '}
-          <Text style={styles.termsLink}>Privacy Policy</Text>
-        </Text>
       </View>
-    </View>
+
+      <Text style={styles.terms}>
+        By continuing, you agree to our{' '}
+        <Text style={styles.termsLink} onPress={() => router.push('/terms')}>
+          Terms of Service
+        </Text>
+        {' '}and{' '}
+        <Text style={styles.termsLink} onPress={() => router.push('/privacy')}>
+          Privacy Policy
+        </Text>
+      </Text>
+    </SafeAreaView>
   );
 }
 
@@ -188,9 +182,11 @@ const styles = StyleSheet.create({
     fontSize: fontSize.sm,
     color: 'rgba(255,255,255,0.7)',
     textAlign: 'center',
-    marginTop: spacing.xl,
-    maxWidth: 280,
+    maxWidth: 300,
     lineHeight: 20,
+    alignSelf: 'center',
+    paddingHorizontal: spacing.xl,
+    paddingBottom: spacing.md,
   },
   termsLink: {
     color: '#FFFFFF',

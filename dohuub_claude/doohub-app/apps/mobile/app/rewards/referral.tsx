@@ -6,10 +6,10 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
-  SafeAreaView,
   Share,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -90,7 +90,7 @@ export default function ReferralScreen() {
     .reduce((sum, r) => sum + r.pointsEarned, 0);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom', 'left', 'right']}>
       {/* Glassmorphic Header */}
       <View style={styles.glassHeader}>
         <TouchableOpacity
@@ -150,59 +150,101 @@ export default function ReferralScreen() {
 
         {/* How It Works */}
         <View style={styles.howItWorks}>
-          <Text style={styles.howItWorksTitle}>How it Works</Text>
-
-          {/* Step 1 */}
-          <View style={styles.stepItem}>
-            <View style={styles.stepIconCircle}>
-              <Ionicons name="people" size={16} color="rgb(126, 34, 206)" />
+          <View style={styles.howItWorksHeader}>
+            <View style={styles.howItWorksHeaderIcon}>
+              <Ionicons name="sparkles" size={18} color="#7E22CE" />
             </View>
-            <View style={styles.stepTextGroup}>
-              <Text style={styles.stepTitle}>Share your code</Text>
-              <Text style={styles.stepDescription}>Send your unique code to friends</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.howItWorksTitle}>How it Works</Text>
+              <Text style={styles.howItWorksSubtitle}>Earn rewards in 3 simple steps</Text>
             </View>
           </View>
 
-          {/* Step 2 */}
-          <View style={styles.stepItem}>
-            <View style={styles.stepIconCircle}>
-              <Ionicons name="checkmark-circle" size={16} color="rgb(126, 34, 206)" />
+          {[
+            {
+              step: '1',
+              icon: 'share-social-outline' as const,
+              title: 'Share your code',
+              description: 'Send your unique code to friends',
+            },
+            {
+              step: '2',
+              icon: 'person-add-outline' as const,
+              title: 'They sign up & order',
+              description: 'Friend joins and completes their first order',
+            },
+            {
+              step: '3',
+              icon: 'gift-outline' as const,
+              title: 'You both get rewarded!',
+              description: 'You get 60 pts  •  They get 35 pts',
+            },
+          ].map((item, index, arr) => (
+            <View key={item.step} style={styles.stepRow}>
+              <View style={styles.stepRail}>
+                <View style={styles.stepNumber}>
+                  <Text style={styles.stepNumberText}>{item.step}</Text>
+                </View>
+                {index < arr.length - 1 && <View style={styles.stepConnector} />}
+              </View>
+              <View style={[styles.stepCard, index === arr.length - 1 && styles.stepCardLast]}>
+                <View style={styles.stepIconCircle}>
+                  <Ionicons name={item.icon} size={16} color="#7E22CE" />
+                </View>
+                <View style={styles.stepTextGroup}>
+                  <Text style={styles.stepTitle}>{item.title}</Text>
+                  <Text style={styles.stepDescription}>{item.description}</Text>
+                </View>
+              </View>
             </View>
-            <View style={styles.stepTextGroup}>
-              <Text style={styles.stepTitle}>They sign up & order</Text>
-              <Text style={styles.stepDescription}>Friend joins and completes their first order</Text>
-            </View>
-          </View>
-
-          {/* Step 3 */}
-          <View style={styles.stepItem}>
-            <View style={styles.stepIconCircle}>
-              <Ionicons name="gift" size={16} color="rgb(126, 34, 206)" />
-            </View>
-            <View style={styles.stepTextGroup}>
-              <Text style={styles.stepTitle}>You both get rewarded!</Text>
-              <Text style={styles.stepDescription}>
-                <Text style={styles.stepBold}>You get 60 pts</Text>
-                {' \u2022 '}
-                <Text style={styles.stepBold}>They get 35 pts</Text>
-              </Text>
-            </View>
-          </View>
+          ))}
         </View>
 
         {/* Referral Stats */}
         <View style={styles.statsRow}>
-          <View style={[styles.statCard, { backgroundColor: '#E0EDFF' }]}>
-            <Text style={[styles.statValue, { color: '#1E293B' }]}>{totalReferrals}</Text>
+          <View style={[styles.statCard, styles.statCardBlue]}>
+            <View style={[styles.statIconWrap, { backgroundColor: 'rgba(46, 122, 217, 0.15)' }]}>
+              <Ionicons name="people" size={18} color="#2E7AD9" />
+            </View>
+            <Text
+              style={[styles.statValue, { color: '#1E40AF' }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.7}
+            >
+              {totalReferrals}
+            </Text>
             <Text style={[styles.statLabel, { color: '#64748B' }]}>Total Referrals</Text>
           </View>
-          <View style={[styles.statCard, { backgroundColor: 'rgba(245, 158, 11, 0.1)' }]}>
-            <Text style={[styles.statValue, { color: 'rgb(217, 119, 6)' }]}>{pendingReferrals}</Text>
-            <Text style={[styles.statLabel, { color: 'rgb(217, 119, 6)' }]}>Pending</Text>
+
+          <View style={[styles.statCard, styles.statCardAmber]}>
+            <View style={[styles.statIconWrap, { backgroundColor: 'rgba(245, 158, 11, 0.18)' }]}>
+              <Ionicons name="time" size={18} color="#D97706" />
+            </View>
+            <Text
+              style={[styles.statValue, { color: '#D97706' }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.7}
+            >
+              {pendingReferrals}
+            </Text>
+            <Text style={[styles.statLabel, { color: '#B45309' }]}>Pending</Text>
           </View>
-          <View style={[styles.statCard, { backgroundColor: 'rgba(34, 197, 94, 0.1)' }]}>
-            <Text style={[styles.statValue, { color: 'rgb(22, 163, 74)' }]}>{pointsFromReferrals.toLocaleString()}</Text>
-            <Text style={[styles.statLabel, { color: 'rgb(22, 163, 74)' }]}>Points Earned</Text>
+
+          <View style={[styles.statCard, styles.statCardGreen]}>
+            <View style={[styles.statIconWrap, { backgroundColor: 'rgba(34, 197, 94, 0.18)' }]}>
+              <Ionicons name="star" size={18} color="#16A34A" />
+            </View>
+            <Text
+              style={[styles.statValue, { color: '#16A34A' }]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.7}
+            >
+              {pointsFromReferrals.toLocaleString()}
+            </Text>
+            <Text style={[styles.statLabel, { color: '#15803D' }]}>Points Earned</Text>
           </View>
         </View>
 
@@ -266,7 +308,7 @@ export default function ReferralScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F0F7FF',
+    backgroundColor: '#FFFFFF',
   },
 
   // Glassmorphic Header
@@ -439,87 +481,152 @@ const styles = StyleSheet.create({
     color: '#1E293B',
   },
 
-  // How It Works — simplified: no step numbers/connectors, just icon circles + text
+  // How It Works
   howItWorks: {
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 32,
-    backgroundColor: 'rgba(147, 51, 234, 0.1)',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 24,
+    backgroundColor: '#FAF5FF',
     borderWidth: 1,
     borderColor: 'rgba(147, 51, 234, 0.2)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
+  },
+  howItWorksHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 16,
+    paddingBottom: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(126, 34, 206, 0.2)',
+  },
+  howItWorksHeaderIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: 'rgba(147, 51, 234, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   howItWorksTitle: {
     fontSize: 16,
-    fontWeight: '600',
-    color: 'rgb(126, 34, 206)',
-    marginBottom: 16,
+    fontWeight: '700',
+    color: '#6B21A8',
   },
-  stepItem: {
+  howItWorksSubtitle: {
+    marginTop: 2,
+    fontSize: 13,
+    color: '#7E22CE',
+  },
+  stepRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: 12,
+  },
+  stepRail: {
+    width: 28,
+    alignItems: 'center',
+  },
+  stepNumber: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#7E22CE',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepNumberText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  stepConnector: {
+    flex: 1,
+    width: 2,
+    backgroundColor: 'rgba(126, 34, 206, 0.25)',
+    marginVertical: 4,
+    minHeight: 16,
+  },
+  stepCard: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 12,
-    marginBottom: 16,
+    gap: 10,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(147, 51, 234, 0.12)',
+  },
+  stepCardLast: {
+    marginBottom: 0,
   },
   stepIconCircle: {
     width: 32,
     height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(147, 51, 234, 0.2)',
+    borderRadius: 10,
+    backgroundColor: 'rgba(147, 51, 234, 0.12)',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
   },
   stepTextGroup: {
     flex: 1,
+    minWidth: 0,
   },
   stepTitle: {
-    fontSize: 15,
-    fontWeight: '500',
-    color: 'rgb(88, 28, 135)',
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#581C87',
     marginBottom: 2,
   },
   stepDescription: {
-    fontSize: 14,
-    color: 'rgb(126, 34, 206)',
-    lineHeight: 20,
-  },
-  stepBold: {
-    fontWeight: '600',
+    fontSize: 13,
+    color: '#7E22CE',
+    lineHeight: 18,
   },
 
   // Stats Row
   statsRow: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 32,
+    gap: 10,
+    marginBottom: 28,
   },
   statCard: {
     flex: 1,
-    borderRadius: 12,
-    padding: 16,
+    minWidth: 0,
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 10,
     alignItems: 'center',
-    gap: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
+    gap: 6,
+    borderWidth: 1,
+  },
+  statCardBlue: {
+    backgroundColor: '#EFF6FF',
+    borderColor: 'rgba(46, 122, 217, 0.2)',
+  },
+  statCardAmber: {
+    backgroundColor: '#FFFBEB',
+    borderColor: 'rgba(245, 158, 11, 0.25)',
+  },
+  statCardGreen: {
+    backgroundColor: '#F0FDF4',
+    borderColor: 'rgba(34, 197, 94, 0.25)',
+  },
+  statIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   statValue: {
     fontSize: 22,
     fontWeight: '700',
   },
   statLabel: {
-    fontSize: 12,
+    fontSize: 11,
+    fontWeight: '600',
     textAlign: 'center',
   },
 

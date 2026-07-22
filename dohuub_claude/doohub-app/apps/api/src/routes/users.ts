@@ -114,14 +114,23 @@ router.put('/me', authenticate, async (req: AuthRequest, res) => {
   try {
     const { firstName, lastName, phone, avatar } = req.body;
 
+    const profileUpdate: { firstName?: string; lastName?: string; avatar?: string | null } = {};
+    if (typeof firstName === 'string') profileUpdate.firstName = firstName;
+    if (typeof lastName === 'string') profileUpdate.lastName = lastName;
+    if (avatar !== undefined) profileUpdate.avatar = avatar || null;
+
     const user = await prisma.user.update({
       where: { id: req.user!.id },
       data: {
-        phone,
+        ...(phone !== undefined ? { phone: phone || null } : {}),
         profile: {
           upsert: {
-            create: { firstName, lastName, avatar },
-            update: { firstName, lastName, avatar },
+            create: {
+              firstName: typeof firstName === 'string' ? firstName : '',
+              lastName: typeof lastName === 'string' ? lastName : '',
+              avatar: avatar || null,
+            },
+            update: profileUpdate,
           },
         },
       },
@@ -148,15 +157,29 @@ router.put('/me', authenticate, async (req: AuthRequest, res) => {
 // sign in again with the old credentials — without that the user is just
 // anonymized inside our DB but auth still works.
 router.delete('/me', authenticate, async (req: AuthRequest, res) => {
+  const userId = req.user?.id;
+  console.log('[DELETE /users/me] start', {
+    userId,
+    email: req.user?.email,
+    body: req.body,
+    hasSupabaseAdmin: Boolean(supabaseAdmin),
+  });
+
   try {
-    const { confirm } = req.body as { confirm?: string };
+    const { confirm } = (req.body || {}) as { confirm?: string };
     if (confirm !== 'DELETE') {
+      console.warn('[DELETE /users/me] missing/invalid confirm', { userId, confirm });
       return res.status(400).json({ error: 'Confirmation required: send { "confirm": "DELETE" }' });
     }
 
-    const userId = req.user!.id;
+    if (!userId) {
+      console.error('[DELETE /users/me] no userId on request after authenticate');
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
     const anonEmail = `deleted-${userId}@deleted.local`;
 
+    console.log('[DELETE /users/me] running prisma anonymization transaction', { userId });
     await prisma.$transaction([
       // Drop session/device data + payment instruments. These never have
       // outbound FK references.
@@ -199,6 +222,7 @@ router.delete('/me', authenticate, async (req: AuthRequest, res) => {
         },
       }),
     ]);
+    console.log('[DELETE /users/me] prisma transaction ok', { userId, anonEmail });
 
     // Sever the auth.users row so the old credentials can't sign in again.
     // Best-effort: if Supabase service-role isn't configured locally we still
@@ -207,15 +231,34 @@ router.delete('/me', authenticate, async (req: AuthRequest, res) => {
     // auth row.
     if (supabaseAdmin) {
       try {
-        await supabaseAdmin.auth.admin.deleteUser(userId);
+        console.log('[DELETE /users/me] deleting supabase auth user', { userId });
+        const { error: supabaseError } = await supabaseAdmin.auth.admin.deleteUser(userId);
+        if (supabaseError) {
+          console.error('[DELETE /users/me] supabase deleteUser returned error', {
+            userId,
+            message: supabaseError.message,
+            status: (supabaseError as { status?: number }).status,
+            name: supabaseError.name,
+          });
+        } else {
+          console.log('[DELETE /users/me] supabase auth user deleted', { userId });
+        }
       } catch (e) {
-        console.error('[delete /users/me] failed to remove auth.users row:', e);
+        console.error('[DELETE /users/me] failed to remove auth.users row:', e);
       }
+    } else {
+      console.warn('[DELETE /users/me] supabaseAdmin not configured — skipping auth.users delete');
     }
 
+    console.log('[DELETE /users/me] success', { userId });
     res.json({ success: true, message: 'Account deleted' });
   } catch (error) {
-    console.error('Delete user error:', error);
+    console.error('[DELETE /users/me] failed', {
+      userId,
+      error,
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     res.status(500).json({ error: 'Failed to delete account' });
   }
 });

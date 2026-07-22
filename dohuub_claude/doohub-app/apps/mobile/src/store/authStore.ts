@@ -57,7 +57,7 @@ interface AuthState {
   verifyOtp: (email: string, code: string, isRegistration: boolean) => Promise<User>;
   logout: () => Promise<void>;
   fetchUser: () => Promise<void>;
-  setSession: (session: Session) => void;
+  setSession: (session: Session, options?: { refreshUser?: boolean }) => void;
   clearSession: () => void;
 
   // Profile actions
@@ -74,16 +74,37 @@ interface AuthState {
   setOnboardingComplete: () => void;
 }
 
-// Helper: fetch user profile + role from public tables
+// Helper: fetch user profile + role from the API (same path as profile updates).
+// Falls back to Supabase only if the API is unreachable.
 async function fetchUserFromDb(authUserId: string, email: string): Promise<User> {
-  // Fetch User row (role, phone) + UserProfile (firstName, lastName, avatar)
+  try {
+    const response = await api.get<{ success: boolean; data?: any }>('/users/me');
+    if (response?.success && response.data) {
+      const dbUser = response.data;
+      return {
+        id: dbUser.id || authUserId,
+        email: dbUser.email || email,
+        phone: dbUser.phone || undefined,
+        role: dbUser.role || 'CUSTOMER',
+        isEmailVerified: true,
+        profile: {
+          firstName: dbUser.profile?.firstName || '',
+          lastName: dbUser.profile?.lastName || '',
+          avatar: dbUser.profile?.avatar || undefined,
+        },
+      };
+    }
+  } catch (err) {
+    console.warn('[auth] GET /users/me failed, falling back to Supabase', err);
+  }
+
+  // Fallback: public tables via Supabase (may be empty under RLS)
   const { data: dbUser, error: dbError } = await supabase
     .from('User')
     .select('id, email, phone, role, UserProfile(firstName, lastName, avatar)')
     .eq('id', authUserId)
     .single();
 
-  // If RLS error or any DB error, return a minimal user so auth flow continues
   if (dbError || !dbUser) {
     return {
       id: authUserId,
@@ -94,57 +115,69 @@ async function fetchUserFromDb(authUserId: string, email: string): Promise<User>
     };
   }
 
-  if (dbUser) {
-    const profile = Array.isArray(dbUser.UserProfile) ? dbUser.UserProfile[0] : dbUser.UserProfile;
-    return {
-      id: dbUser.id,
-      email: dbUser.email || email,
-      phone: dbUser.phone || undefined,
-      role: dbUser.role || 'CUSTOMER',
-      isEmailVerified: true,
-      profile: {
-        firstName: profile?.firstName || '',
-        lastName: profile?.lastName || '',
-        avatar: profile?.avatar || undefined,
-      },
-    };
-  }
-
-  // Fallback if public.User row not yet created (shouldn't happen with trigger)
+  const profile = Array.isArray(dbUser.UserProfile) ? dbUser.UserProfile[0] : dbUser.UserProfile;
   return {
-    id: authUserId,
-    email,
-    role: 'CUSTOMER',
+    id: dbUser.id,
+    email: dbUser.email || email,
+    phone: dbUser.phone || undefined,
+    role: dbUser.role || 'CUSTOMER',
     isEmailVerified: true,
-    profile: { firstName: '', lastName: '' },
+    profile: {
+      firstName: profile?.firstName || '',
+      lastName: profile?.lastName || '',
+      avatar: profile?.avatar || undefined,
+    },
   };
 }
 
-// Helper: load addresses from Supabase
+// Helper: load addresses from the API (same path as create/update/delete)
 async function loadAddresses(userId: string): Promise<{ addresses: Address[]; selectedId: string | null }> {
-  const { data } = await supabase
-    .from('Address')
-    .select('*')
-    .eq('userId', userId)
-    .order('isDefault', { ascending: false });
+  try {
+    const response = await api.get<{ success: boolean; data?: any[] }>('/addresses');
+    const rows = response?.data || [];
+    const addresses: Address[] = rows.map((a: any) => ({
+      id: a.id,
+      type: a.type,
+      label: a.label,
+      street: a.street,
+      apartment: a.apartment || undefined,
+      city: a.city,
+      state: a.state,
+      zipCode: a.zipCode,
+      country: a.country,
+      latitude: a.latitude ?? undefined,
+      longitude: a.longitude ?? undefined,
+      isDefault: !!a.isDefault,
+    }));
 
-  const addresses: Address[] = (data || []).map((a: any) => ({
-    id: a.id,
-    type: a.type,
-    label: a.label,
-    street: a.street,
-    apartment: a.apartment || undefined,
-    city: a.city,
-    state: a.state,
-    zipCode: a.zipCode,
-    country: a.country,
-    latitude: a.latitude || undefined,
-    longitude: a.longitude || undefined,
-    isDefault: a.isDefault,
-  }));
+    const defaultAddr = addresses.find((a) => a.isDefault);
+    return { addresses, selectedId: defaultAddr?.id || addresses[0]?.id || null };
+  } catch (err) {
+    console.warn('[auth] GET /addresses failed, falling back to Supabase', err);
+    const { data } = await supabase
+      .from('Address')
+      .select('*')
+      .eq('userId', userId)
+      .order('isDefault', { ascending: false });
 
-  const defaultAddr = addresses.find((a) => a.isDefault);
-  return { addresses, selectedId: defaultAddr?.id || addresses[0]?.id || null };
+    const addresses: Address[] = (data || []).map((a: any) => ({
+      id: a.id,
+      type: a.type,
+      label: a.label,
+      street: a.street,
+      apartment: a.apartment || undefined,
+      city: a.city,
+      state: a.state,
+      zipCode: a.zipCode,
+      country: a.country,
+      latitude: a.latitude || undefined,
+      longitude: a.longitude || undefined,
+      isDefault: !!a.isDefault,
+    }));
+
+    const defaultAddr = addresses.find((a) => a.isDefault);
+    return { addresses, selectedId: defaultAddr?.id || addresses[0]?.id || null };
+  }
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -166,6 +199,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       if (error) throw error;
 
+      await syncApiToken(data.session);
       const user = await fetchUserFromDb(data.user.id, email);
 
       set({
@@ -173,7 +207,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         session: data.session,
         isAuthenticated: true,
       });
-      await syncApiToken(data.session);
 
       // Load addresses in background
       loadAddresses(data.user.id).then(({ addresses, selectedId }) => {
@@ -224,6 +257,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         throw new Error('Verification did not return a session');
       }
 
+      await syncApiToken(data.session);
       const user = await fetchUserFromDb(data.user.id, data.user.email || email);
 
       set({
@@ -231,7 +265,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         session: data.session,
         isAuthenticated: true,
       });
-      await syncApiToken(data.session);
 
       // Load addresses in background — new registrations won't have any yet
       loadAddresses(data.user.id).then(({ addresses, selectedId }) => {
@@ -265,6 +298,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const { data: { session } } = await supabase.auth.getSession();
 
       if (session) {
+        await syncApiToken(session);
         const user = await fetchUserFromDb(session.user.id, session.user.email || '');
 
         set({
@@ -272,7 +306,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           session,
           isAuthenticated: true,
         });
-        await syncApiToken(session);
 
         // Load addresses
         const { addresses, selectedId } = await loadAddresses(session.user.id);
@@ -286,20 +319,30 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
-  setSession: (session: Session) => {
-    // Set basic auth state immediately, then enrich from DB
+  setSession: (session: Session, options?: { refreshUser?: boolean }) => {
+    const refreshUser = options?.refreshUser !== false;
+
+    // Set basic auth state immediately, then enrich from API
     set({
       session,
       isAuthenticated: true,
     });
-    syncApiToken(session);
 
-    fetchUserFromDb(session.user.id, session.user.email || '').then((user) => {
+    (async () => {
+      await syncApiToken(session);
+
+      if (!refreshUser && get().user) {
+        // Token refresh only — keep existing profile in memory
+        return;
+      }
+
+      const user = await fetchUserFromDb(session.user.id, session.user.email || '');
       set({ user });
-    });
 
-    loadAddresses(session.user.id).then(({ addresses, selectedId }) => {
+      const { addresses, selectedId } = await loadAddresses(session.user.id);
       set({ addresses, selectedAddressId: selectedId });
+    })().catch((err) => {
+      console.warn('[auth] setSession enrichment failed', err);
     });
   },
 
@@ -335,12 +378,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         set({
           user: {
             ...currentUser,
-            phone: updated.phone || currentUser.phone,
+            phone: updated.phone ?? data.phone ?? currentUser.phone,
             profile: {
-              ...currentUser.profile,
-              firstName: updated.profile?.firstName || '',
-              lastName: updated.profile?.lastName || '',
-              avatar: updated.profile?.avatar,
+              firstName: updated.profile?.firstName ?? data.firstName ?? '',
+              lastName: updated.profile?.lastName ?? data.lastName ?? '',
+              avatar: updated.profile?.avatar ?? data.avatar ?? currentUser.profile?.avatar,
             },
           },
         });

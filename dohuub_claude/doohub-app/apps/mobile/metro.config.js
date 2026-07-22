@@ -20,4 +20,19 @@ config.resolver.nodeModulesPaths = [
 
 config.resolver.sourceExts = [...config.resolver.sourceExts, 'mjs'];
 
+// Force react-native-webview to the compiled JS entry (Metro mishandles its `react-native` → src/index.ts field in this monorepo).
+const upstreamResolveRequest = config.resolver.resolveRequest;
+config.resolver.resolveRequest = (context, moduleName, platform) => {
+  if (moduleName === 'react-native-webview') {
+    return {
+      type: 'sourceFile',
+      filePath: path.resolve(workspaceRoot, 'node_modules/react-native-webview/index.js'),
+    };
+  }
+  if (upstreamResolveRequest) {
+    return upstreamResolveRequest(context, moduleName, platform);
+  }
+  return context.resolveRequest(context, moduleName, platform);
+};
+
 module.exports = config;

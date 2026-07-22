@@ -13,7 +13,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { colors, spacing, fontSize, borderRadius, borderWidth } from '../../../../src/constants/theme';
 import { ScreenHeader, ReviewCard } from '../../../../src/components/composite';
 import { Rating, EmptyState } from '../../../../src/components/ui';
-import { getReviewsByVendor } from '../../../../src/lib/queries';
+import { getReviewsByVendor, getReviewAuthorName } from '../../../../src/lib/queries';
 
 const FILTER_TABS = ['All', '5★', '4★', '3★', '2★', '1★'];
 
@@ -33,9 +33,7 @@ export default function CleaningReviewsScreen() {
       const data = await getReviewsByVendor(id);
       setReviews(data.map((r: any) => ({
         id: r.id,
-        authorName: r.User?.UserProfile
-          ? `${r.User.UserProfile.firstName} ${r.User.UserProfile.lastName?.charAt(0) || ''}.`
-          : 'Anonymous',
+        authorName: getReviewAuthorName(r),
         rating: r.rating,
         date: new Date(r.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
         comment: r.comment,

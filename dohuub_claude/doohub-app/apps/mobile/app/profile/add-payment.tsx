@@ -5,17 +5,16 @@ import {
   StyleSheet,
   ScrollView,
   TextInput,
-  SafeAreaView,
   TouchableOpacity,
   Alert,
   Platform,
   StatusBar,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { supabase } from '../../src/lib/supabase';
-import { useAuthStore } from '../../src/store/authStore';
+import api from '../../src/services/api';
 
 function detectCardType(cardNumber: string): string {
   const cleaned = cardNumber.replace(/\s/g, '');
@@ -132,29 +131,32 @@ export default function AddPaymentScreen() {
 
     setIsAdding(true);
     try {
-      const userId = useAuthStore.getState().user?.id;
-      if (!userId) throw new Error('Not authenticated');
-
       const cleanedNumber = cardNumber.replace(/\s/g, '');
       const [monthStr, yearStr] = expiry.split('/');
+      const cardType = detectCardType(cardNumber);
 
-      const { error } = await supabase.from('PaymentMethod').insert({
-        id: `pm-${Date.now()}`,
-        userId,
-        type: detectCardType(cardNumber),
-        last4: cleanedNumber.slice(-4),
-        expiryMonth: parseInt(monthStr),
-        expiryYear: 2000 + parseInt(yearStr),
-        isDefault: isDefault,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
+      const response = await api.post<{ success: boolean; data?: any; error?: string }>(
+        '/payments/methods',
+        {
+          last4: cleanedNumber.slice(-4),
+          brand: cardType.toLowerCase(),
+          expiryMonth: parseInt(monthStr, 10),
+          expiryYear: 2000 + parseInt(yearStr, 10),
+          isDefault,
+        }
+      );
 
-      if (error) throw error;
+      if (!response.success) {
+        throw new Error(response.error || 'Failed to add card');
+      }
 
       router.back();
     } catch (error: any) {
-      Alert.alert('Error', error?.message || 'Failed to add card. Please try again.');
+      const message =
+        error?.response?.data?.error ||
+        error?.message ||
+        'Failed to add card. Please try again.';
+      Alert.alert('Error', message);
     } finally {
       setIsAdding(false);
     }

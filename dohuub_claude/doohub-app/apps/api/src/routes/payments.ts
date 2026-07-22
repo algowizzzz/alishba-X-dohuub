@@ -430,6 +430,12 @@ router.post('/methods', authenticate, async (req: AuthRequest, res) => {
   try {
     const { last4, brand, expiryMonth, expiryYear, isDefault } = req.body;
 
+    if (!last4 || String(last4).length < 4) {
+      return res.status(400).json({ success: false, error: 'Card last4 is required' });
+    }
+
+    const normalizedBrand = String(brand || 'card').toLowerCase();
+
     if (isDefault) {
       await prisma.paymentMethod.updateMany({
         where: { userId: req.user!.id },
@@ -441,12 +447,12 @@ router.post('/methods', authenticate, async (req: AuthRequest, res) => {
       data: {
         userId: req.user!.id,
         stripePaymentMethodId: `pm_local_${Date.now()}`,
-        type: 'card',
-        last4,
-        brand,
-        expiryMonth,
-        expiryYear,
-        isDefault: isDefault || false,
+        type: normalizedBrand,
+        last4: String(last4).slice(-4),
+        brand: normalizedBrand,
+        expiryMonth: expiryMonth != null ? Number(expiryMonth) : null,
+        expiryYear: expiryYear != null ? Number(expiryYear) : null,
+        isDefault: !!isDefault,
       },
     });
 
@@ -454,6 +460,72 @@ router.post('/methods', authenticate, async (req: AuthRequest, res) => {
   } catch (error) {
     logger.error({ err: error }, 'add payment method failed');
     res.status(500).json({ success: false, error: 'Failed to add payment method' });
+  }
+});
+
+router.patch('/methods/:id', authenticate, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { last4, brand, expiryMonth, expiryYear, isDefault } = req.body;
+
+    const existing = await prisma.paymentMethod.findFirst({
+      where: { id, userId: req.user!.id },
+    });
+    if (!existing) {
+      return res.status(404).json({ success: false, error: 'Payment method not found' });
+    }
+
+    if (isDefault === true) {
+      await prisma.paymentMethod.updateMany({
+        where: { userId: req.user!.id },
+        data: { isDefault: false },
+      });
+    }
+
+    const data: {
+      last4?: string;
+      brand?: string;
+      type?: string;
+      expiryMonth?: number | null;
+      expiryYear?: number | null;
+      isDefault?: boolean;
+    } = {};
+
+    if (last4 != null) {
+      const digits = String(last4).replace(/\D/g, '');
+      if (digits.length < 4) {
+        return res.status(400).json({ success: false, error: 'Card last4 is required' });
+      }
+      data.last4 = digits.slice(-4);
+    }
+
+    if (brand != null) {
+      const normalizedBrand = String(brand).toLowerCase();
+      data.brand = normalizedBrand;
+      data.type = normalizedBrand;
+    }
+
+    if (expiryMonth !== undefined) {
+      data.expiryMonth = expiryMonth != null ? Number(expiryMonth) : null;
+    }
+
+    if (expiryYear !== undefined) {
+      data.expiryYear = expiryYear != null ? Number(expiryYear) : null;
+    }
+
+    if (typeof isDefault === 'boolean') {
+      data.isDefault = isDefault;
+    }
+
+    const method = await prisma.paymentMethod.update({
+      where: { id },
+      data,
+    });
+
+    res.json({ success: true, data: method });
+  } catch (error) {
+    logger.error({ err: error }, 'update payment method failed');
+    res.status(500).json({ success: false, error: 'Failed to update payment method' });
   }
 });
 

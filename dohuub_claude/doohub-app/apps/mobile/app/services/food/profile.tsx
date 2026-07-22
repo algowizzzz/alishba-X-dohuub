@@ -11,7 +11,7 @@ import {
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, fontSize, borderRadius } from '../../../src/constants/theme';
-import { getReviewsByVendor, getVendorById } from '../../../src/lib/queries';
+import { getReviewsByVendor, getReviewAuthorName, getVendorById } from '../../../src/lib/queries';
 
 function formatRelativeDate(iso: string): string {
   const d = new Date(iso);
@@ -26,10 +26,7 @@ function formatRelativeDate(iso: string): string {
 }
 
 function reviewerName(r: any): string {
-  const p = r?.User?.UserProfile;
-  if (p?.firstName) return `${p.firstName} ${p.lastName?.[0] ?? ''}.`.trim();
-  if (r?.User?.email) return r.User.email.split('@')[0];
-  return 'Anonymous';
+  return getReviewAuthorName(r);
 }
 
 export default function FoodVendorProfileScreen() {

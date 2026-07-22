@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, Image
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, fontSize } from '../../../src/constants/theme';
-import { getBeautyListings, getReviewsByVendor } from '../../../src/lib/queries';
+import { getBeautyListings, getReviewsByVendor, getReviewAuthorName } from '../../../src/lib/queries';
 
 const ACCENT = '#EC4899';
 const SERVICE_CATEGORIES = ['All', 'Makeup', 'Hair', 'Skincare', 'Nails', 'Spa'];
@@ -40,10 +40,7 @@ function formatRelativeDate(iso: string): string {
 }
 
 function reviewerName(r: any): string {
-  const p = r?.User?.UserProfile;
-  if (p?.firstName) return `${p.firstName} ${p.lastName?.[0] ?? ''}.`.trim();
-  if (r?.User?.email) return r.User.email.split('@')[0];
-  return 'Anonymous';
+  return getReviewAuthorName(r);
 }
 
 export default function BeautyServicesScreen() {

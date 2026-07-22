@@ -13,7 +13,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, fontSize, borderRadius, borderWidth } from '../../../src/constants/theme';
 import { Button, Rating, ImageCarousel, PoweredByDoHuubBadge } from '../../../src/components/ui';
-import { getVendorById, getCleaningListings, getReviewsByVendor } from '../../../src/lib/queries';
+import { getVendorById, getCleaningListings, getReviewsByVendor, getReviewAuthorName } from '../../../src/lib/queries';
 import { getServiceImages } from '../../../src/constants/serviceImages';
 
 // Boss cleaning logos for vendor display
@@ -95,7 +95,7 @@ function VendorPage({ vendorId }: { vendorId: string }) {
               </View>
               <View style={styles.ratingRow}>
                 <Ionicons name="star" size={14} color="#FACC15" />
-                <Text style={styles.ratingValue}>{(vendor.rating ?? 4.9).toFixed(1)}</Text>
+                <Text style={styles.ratingValue}>{Number(vendor.rating ?? 0).toFixed(1)}</Text>
                 <Text style={styles.reviewCountText}>({vendor.reviewCount ?? 0} reviews)</Text>
               </View>
             </View>
@@ -133,7 +133,7 @@ function VendorPage({ vendorId }: { vendorId: string }) {
                   <View style={styles.ratingRow}>
                     <Ionicons name="star" size={12} color="#F59E0B" />
                     <Text style={styles.serviceCardRating}>
-                      {(listing.rating ?? vendor.rating ?? 4.9).toFixed(1)}
+                      {Number(listing.rating ?? vendor.rating ?? 0).toFixed(1)}
                     </Text>
                   </View>
                   {listing.description ? (
@@ -203,7 +203,7 @@ function ServiceDetailPage({ vendorId, listingId }: { vendorId: string; listingI
           <View style={styles.ratingRow}>
             <Ionicons name="star" size={14} color="#F59E0B" />
             <Text style={styles.ratingText}>
-              {(listing.rating ?? vendor.rating ?? 4.9).toFixed(1)} ({listing.reviewCount ?? vendor.reviewCount ?? 0} reviews)
+              {Number(listing.rating ?? vendor.rating ?? 0).toFixed(1)} ({listing.reviewCount ?? vendor.reviewCount ?? 0} reviews)
             </Text>
           </View>
           {listing.description ? (
@@ -223,7 +223,7 @@ function ServiceDetailPage({ vendorId, listingId }: { vendorId: string; listingI
             {vendor.isMichelle && <PoweredByDoHuubBadge />}
             <View style={styles.ratingRow}>
               <Ionicons name="star" size={12} color="#F59E0B" />
-              <Text style={styles.vendorRatingSmall}>{(vendor.rating ?? 4.9).toFixed(1)} ({vendor.reviewCount ?? 0})</Text>
+              <Text style={styles.vendorRatingSmall}>{Number(vendor.rating ?? 0).toFixed(1)} ({vendor.reviewCount ?? 0})</Text>
             </View>
           </View>
         </View>
@@ -269,7 +269,7 @@ function ServiceDetailPage({ vendorId, listingId }: { vendorId: string; listingI
           {reviews.length > 0 ? reviews.slice(0, 3).map((review: any) => (
             <View key={review.id} style={styles.reviewCard}>
               <View style={styles.reviewTopRow}>
-                <Text style={styles.reviewerName}>{review.userName || 'Customer'}</Text>
+                <Text style={styles.reviewerName}>{getReviewAuthorName(review)}</Text>
                 <Text style={styles.reviewDate}>
                   {review.createdAt
                     ? (() => {
@@ -281,44 +281,22 @@ function ServiceDetailPage({ vendorId, listingId }: { vendorId: string; listingI
               </View>
               <View style={styles.starsRow}>
                 {[1,2,3,4,5].map((s) => (
-                  <Ionicons key={s} name="star" size={14} color={s <= (review.rating ?? 5) ? '#FACC15' : '#E5E7EB'} />
+                  <Ionicons key={s} name="star" size={14} color={s <= (review.rating ?? 0) ? '#FACC15' : '#E5E7EB'} />
                 ))}
               </View>
               <Text style={styles.reviewComment}>{review.comment}</Text>
-              {review.images?.length > 0 && (
+              {(review.photos?.length > 0 || review.images?.length > 0) && (
                 <View style={styles.reviewImagesRow}>
-                  {review.images.slice(0, 3).map((img: string, idx: number) => (
+                  {(review.photos || review.images).slice(0, 3).map((img: string, idx: number) => (
                     <Image key={idx} source={{ uri: img }} style={styles.reviewImagePlaceholder} resizeMode="cover" />
                   ))}
                 </View>
               )}
             </View>
           )) : (
-            // Mock reviews when none available
-            [
-              { id: 'm1', name: 'John D.', date: '2 days ago', rating: 5, comment: 'Excellent service! Very thorough and professional. My home has never looked better.', hasImages: true, photos: ['https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=200&h=200&fit=crop','https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=200&h=200&fit=crop','https://images.unsplash.com/photo-1527515637462-cff94eecc1ac?w=200&h=200&fit=crop'] },
-              { id: 'm2', name: 'Sarah M.', date: '1 week ago', rating: 5, comment: 'Highly recommend! The team was punctual and did an amazing job.', hasImages: true, photos: ['https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=200&h=200&fit=crop','https://images.unsplash.com/photo-1563453392212-326f5e854473?w=200&h=200&fit=crop'] },
-            ].map((mock) => (
-              <View key={mock.id} style={styles.reviewCard}>
-                <View style={styles.reviewTopRow}>
-                  <Text style={styles.reviewerName}>{mock.name}</Text>
-                  <Text style={styles.reviewDate}>{mock.date}</Text>
-                </View>
-                <View style={styles.starsRow}>
-                  {[1,2,3,4,5].map((s) => (
-                    <Ionicons key={s} name="star" size={14} color={s <= mock.rating ? '#FACC15' : '#E5E7EB'} />
-                  ))}
-                </View>
-                <Text style={styles.reviewComment}>{mock.comment}</Text>
-                {mock.photos && mock.photos.length > 0 && (
-                  <View style={styles.reviewImagesRow}>
-                    {mock.photos.map((photo, idx) => (
-                      <Image key={idx} source={{ uri: photo }} style={styles.reviewImagePlaceholder} resizeMode="cover" />
-                    ))}
-                  </View>
-                )}
-              </View>
-            ))
+            <Text style={{ color: '#64748B', fontSize: 14, marginTop: 4 }}>
+              No reviews yet for this provider.
+            </Text>
           )}
         </View>
 

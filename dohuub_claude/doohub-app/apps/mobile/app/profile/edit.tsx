@@ -6,13 +6,14 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
-  SafeAreaView,
   KeyboardAvoidingView,
   Platform,
   TextInput,
   ActivityIndicator,
   Image,
+  Keyboard,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../src/store/authStore';
@@ -40,7 +41,17 @@ export default function EditProfileScreen() {
     }
   };
 
+  const handlePhoneChange = (text: string) => {
+    // Digits only (optional leading + for country code)
+    const cleaned = text.replace(/[^\d+]/g, '');
+    const normalized = cleaned.startsWith('+')
+      ? `+${cleaned.slice(1).replace(/\+/g, '')}`
+      : cleaned.replace(/\+/g, '');
+    setPhone(normalized);
+  };
+
   const handleSave = async () => {
+    Keyboard.dismiss();
     const nameParts = fullName.trim().split(/\s+/);
     const firstName = nameParts[0] || '';
     const lastName = nameParts.slice(1).join(' ') || '';
@@ -50,11 +61,17 @@ export default function EditProfileScreen() {
       return;
     }
 
+    const phoneDigits = phone.replace(/\D/g, '');
+    if (phone.trim() && phoneDigits.length < 7) {
+      Alert.alert('Error', 'Please enter a valid phone number');
+      return;
+    }
+
     try {
       await updateProfile({
         firstName,
         lastName,
-        phone,
+        phone: phone.trim(),
         avatar: avatarUrl || undefined,
       });
       Alert.alert('Success', 'Profile updated successfully');
@@ -65,8 +82,7 @@ export default function EditProfileScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Glassmorphic Header */}
+    <SafeAreaView style={styles.container} edges={['top', 'bottom', 'left', 'right']}>
       <View style={styles.header}>
         <View style={styles.headerContent}>
           <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
@@ -77,23 +93,26 @@ export default function EditProfileScreen() {
       </View>
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.keyboardView}
       >
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
           showsVerticalScrollIndicator={false}
         >
-          {/* Profile Avatar */}
           <View style={styles.avatarSection}>
             <View style={styles.avatarWrapper}>
               <View style={styles.avatarCircle}>
-                {avatarUrl ? (
-                  <Image source={{ uri: avatarUrl }} style={styles.avatarImage} />
-                ) : (
-                  <Ionicons name="person" size={56} color="#64748B" />
-                )}
+                <Image
+                  source={
+                    avatarUrl
+                      ? { uri: avatarUrl }
+                      : require('../../assets/placeholder-image.jpeg')
+                  }
+                  style={styles.avatarImage}
+                />
                 {uploading && (
                   <View style={styles.avatarOverlay}>
                     <ActivityIndicator color="#FFFFFF" />
@@ -115,9 +134,7 @@ export default function EditProfileScreen() {
             </View>
           </View>
 
-          {/* Form Fields */}
           <View style={styles.form}>
-            {/* Full Name */}
             <View style={styles.fieldContainer}>
               <Text style={styles.label}>Full Name</Text>
               <TextInput
@@ -132,10 +149,10 @@ export default function EditProfileScreen() {
                 placeholder="Enter your full name"
                 placeholderTextColor="#94A3B8"
                 autoCapitalize="words"
+                returnKeyType="next"
               />
             </View>
 
-            {/* Phone Number */}
             <View style={styles.fieldContainer}>
               <Text style={styles.label}>Phone Number</Text>
               <TextInput
@@ -144,16 +161,16 @@ export default function EditProfileScreen() {
                   focusedField === 'phone' && styles.inputFocused,
                 ]}
                 value={phone}
-                onChangeText={setPhone}
+                onChangeText={handlePhoneChange}
                 onFocus={() => setFocusedField('phone')}
                 onBlur={() => setFocusedField(null)}
                 placeholder="(555) 123-4567"
                 placeholderTextColor="#94A3B8"
                 keyboardType="phone-pad"
+                maxLength={16}
               />
             </View>
 
-            {/* Email (disabled) */}
             <View style={styles.fieldContainer}>
               <Text style={styles.label}>Email</Text>
               <TextInput
@@ -165,23 +182,23 @@ export default function EditProfileScreen() {
             </View>
           </View>
         </ScrollView>
-
-        {/* Footer with Save Button */}
-        <View style={styles.footer}>
-          <TouchableOpacity
-            style={styles.saveButton}
-            onPress={handleSave}
-            disabled={isLoading}
-            activeOpacity={0.85}
-          >
-            {isLoading ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <Text style={styles.saveButtonText}>Save Changes</Text>
-            )}
-          </TouchableOpacity>
-        </View>
       </KeyboardAvoidingView>
+
+      {/* Pinned to screen bottom — not inside KeyboardAvoidingView */}
+      <View style={styles.footer}>
+        <TouchableOpacity
+          style={styles.saveButton}
+          onPress={handleSave}
+          disabled={isLoading}
+          activeOpacity={0.85}
+        >
+          {isLoading ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+            <Text style={styles.saveButtonText}>Save Changes</Text>
+          )}
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
@@ -189,7 +206,7 @@ export default function EditProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F0F7FF',
+    backgroundColor: '#FFFFFF',
   },
   header: {
     backgroundColor: '#FFFFFF',
@@ -289,9 +306,7 @@ const styles = StyleSheet.create({
   form: {
     gap: 20,
   },
-  fieldContainer: {
-    // each field block
-  },
+  fieldContainer: {},
   label: {
     fontSize: 15,
     fontWeight: '500',
@@ -326,10 +341,11 @@ const styles = StyleSheet.create({
   },
   footer: {
     paddingHorizontal: 24,
-    paddingVertical: 16,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(46, 122, 217, 0.1)',
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    paddingTop: 12,
+    paddingBottom: 8,
+    // borderTopWidth: 1,
+    // borderTopColor: 'rgba(46, 122, 217, 0.1)',
+    backgroundColor: '#FFFFFF',
   },
   saveButton: {
     backgroundColor: '#2E7AD9',

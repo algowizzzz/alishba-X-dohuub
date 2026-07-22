@@ -1,22 +1,23 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   Alert,
   KeyboardAvoidingView,
   Platform,
   TextInput,
   ActivityIndicator,
+  Keyboard,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { supabase } from '../../src/lib/supabase';
 import { useAuthStore } from '../../src/store/authStore';
 import { LinearGradient } from 'expo-linear-gradient';
+import { searchAddresses, ParsedAddress } from '../../src/services/geocoding';
 
 type AddressType = 'Home' | 'Work' | 'Other';
 
@@ -26,11 +27,19 @@ const ADDRESS_TYPES: { type: AddressType; icon: keyof typeof Ionicons.glyphMap }
   { type: 'Other', icon: 'location' },
 ];
 
+function mapTypeToUi(type?: string): AddressType {
+  const t = (type || '').toUpperCase();
+  if (t === 'WORK') return 'Work';
+  if (t === 'OTHER') return 'Other';
+  return 'Home';
+}
+
 export default function AddAddressScreen() {
   // Prefill params come from manual.tsx after a Nominatim suggestion is
   // picked or "Use current location" succeeds. Fall back to empty for the
-  // bare-form entry case.
+  // bare-form entry case. Edit mode loads from the store by `id`.
   const params = useLocalSearchParams<{
+    id?: string;
     type?: string;
     edit?: string;
     street?: string;
@@ -41,25 +50,122 @@ export default function AddAddressScreen() {
     latitude?: string;
     longitude?: string;
   }>();
-  const isEditing = params.edit === 'true';
+  const isEditing = params.edit === 'true' && !!params.id;
+  const addresses = useAuthStore((s) => s.addresses);
+  const existing = isEditing ? addresses.find((a) => a.id === params.id) : undefined;
 
-  const [addressType, setAddressType] = useState<AddressType>((params.type as AddressType) || 'Home');
-  const [label, setLabel] = useState<string>((params.type as string) || 'Home');
-  const [country, setCountry] = useState(params.country || 'United States');
-  const [street, setStreet] = useState(params.street || '');
-  const [city, setCity] = useState(params.city || '');
-  const [state, setState] = useState(params.state || '');
-  const [zipCode, setZipCode] = useState(params.zipCode || '');
+  const [addressType, setAddressType] = useState<AddressType>(
+    mapTypeToUi(existing?.type || params.type)
+  );
+  const [label, setLabel] = useState<string>(
+    existing?.label || (params.type as string) || 'Home'
+  );
+  const [country, setCountry] = useState(existing?.country || params.country || 'United States');
+  const [street, setStreet] = useState(existing?.street || params.street || '');
+  const [city, setCity] = useState(existing?.city || params.city || '');
+  const [state, setState] = useState(existing?.state || params.state || '');
+  const [zipCode, setZipCode] = useState(existing?.zipCode || params.zipCode || '');
   const [deliveryInstructions, setDeliveryInstructions] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
 
-  const prefilledLat = params.latitude ? parseFloat(params.latitude) : undefined;
-  const prefilledLon = params.longitude ? parseFloat(params.longitude) : undefined;
+  const [suggestions, setSuggestions] = useState<ParsedAddress[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const [coords, setCoords] = useState<{ latitude?: number; longitude?: number }>({
+    latitude: existing?.latitude ?? (params.latitude ? parseFloat(params.latitude) : undefined),
+    longitude: existing?.longitude ?? (params.longitude ? parseFloat(params.longitude) : undefined),
+  });
+  const [isDefault, setIsDefault] = useState(!!existing?.isDefault);
+
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastRequestRef = useRef(0);
+  const selectingSuggestionRef = useRef(false);
+  const hydratedRef = useRef(false);
+
+  // Prefill when store address becomes available (edit mode)
+  useEffect(() => {
+    if (!isEditing || !params.id || hydratedRef.current) return;
+
+    const addr = addresses.find((a) => a.id === params.id);
+    if (!addr) {
+      // Ensure addresses are loaded, then hydrate on next run
+      useAuthStore.getState().fetchAddresses();
+      return;
+    }
+
+    hydratedRef.current = true;
+    setAddressType(mapTypeToUi(addr.type));
+    setLabel(addr.label || mapTypeToUi(addr.type));
+    setStreet(addr.street || '');
+    setCity(addr.city || '');
+    setState(addr.state || '');
+    setZipCode(addr.zipCode || '');
+    setCountry(addr.country || 'United States');
+    setIsDefault(!!addr.isDefault);
+    setCoords({
+      latitude: addr.latitude,
+      longitude: addr.longitude,
+    });
+  }, [isEditing, params.id, addresses]);
+
+  useEffect(
+    () => () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    },
+    []
+  );
+
+  const handleStreetChange = (query: string) => {
+    setStreet(query);
+    // Clear coords when user types manually after a suggestion pick
+    setCoords({});
+
+    if (selectingSuggestionRef.current) {
+      selectingSuggestionRef.current = false;
+      return;
+    }
+
+    if (query.trim().length < 3) {
+      setShowSuggestions(false);
+      setSuggestions([]);
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      return;
+    }
+
+    setShowSuggestions(true);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      const requestId = ++lastRequestRef.current;
+      setIsSearching(true);
+      const results = await searchAddresses(query);
+      if (requestId === lastRequestRef.current) {
+        setSuggestions(results);
+        setIsSearching(false);
+      }
+    }, 400);
+  };
+
+  const handleSelectSuggestion = (suggestion: ParsedAddress) => {
+    selectingSuggestionRef.current = true;
+    setStreet(suggestion.street || suggestion.displayName.split(',')[0] || '');
+    setCity(suggestion.city || '');
+    setState(suggestion.state || '');
+    setZipCode(suggestion.zipCode || '');
+    if (suggestion.country) setCountry(suggestion.country);
+    setCoords({
+      latitude: suggestion.latitude,
+      longitude: suggestion.longitude,
+    });
+    setShowSuggestions(false);
+    setSuggestions([]);
+    setFocusedField(null);
+  };
 
   const isFormValid = street.trim() && city.trim() && state.trim() && zipCode.trim() && country.trim();
 
   const handleSave = async () => {
+    Keyboard.dismiss();
     if (!isFormValid) {
       Alert.alert('Error', 'Please fill in all required fields');
       return;
@@ -67,26 +173,26 @@ export default function AddAddressScreen() {
 
     setIsSaving(true);
     try {
-      const userId = useAuthStore.getState().user?.id;
+      const type = addressType.toUpperCase() as 'HOME' | 'WORK' | 'OTHER';
+      const payload = {
+        type,
+        label: addressType === 'Other' ? label.trim() || 'Other' : addressType,
+        street: street.trim(),
+        city: city.trim(),
+        state: state.trim(),
+        zipCode: zipCode.trim(),
+        country: country.trim(),
+        isDefault,
+        ...(coords.latitude !== undefined &&
+          Number.isFinite(coords.latitude) && { latitude: coords.latitude }),
+        ...(coords.longitude !== undefined &&
+          Number.isFinite(coords.longitude) && { longitude: coords.longitude }),
+      };
 
-      if (userId) {
-        const { error } = await supabase.from('Address').insert({
-          id: `addr-${Date.now()}`,
-          userId,
-          type: addressType.toUpperCase(),
-          label: addressType === 'Other' ? label : addressType,
-          street,
-          city,
-          state,
-          zipCode,
-          country,
-          ...(prefilledLat !== undefined && Number.isFinite(prefilledLat) && { latitude: prefilledLat }),
-          ...(prefilledLon !== undefined && Number.isFinite(prefilledLon) && { longitude: prefilledLon }),
-          isDefault: false,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        });
-        if (error) throw error;
+      if (isEditing && params.id) {
+        await useAuthStore.getState().updateAddress(params.id, payload);
+      } else {
+        await useAuthStore.getState().addAddress(payload);
       }
 
       if (router.canGoBack()) {
@@ -95,7 +201,11 @@ export default function AddAddressScreen() {
         router.replace('/(auth)/address-setup');
       }
     } catch (error: any) {
-      Alert.alert('Error', error?.message || 'Failed to save address. Please try again.');
+      const message =
+        error?.response?.data?.error ||
+        error?.message ||
+        'Failed to save address. Please try again.';
+      Alert.alert('Error', message);
     } finally {
       setIsSaving(false);
     }
@@ -108,7 +218,6 @@ export default function AddAddressScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Glassmorphic Header */}
       <View style={styles.header}>
         <View style={styles.headerContent}>
           <TouchableOpacity
@@ -123,15 +232,15 @@ export default function AddAddressScreen() {
       </View>
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.keyboardView}
       >
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
           showsVerticalScrollIndicator={false}
         >
-          {/* Address Type */}
           <Text style={styles.sectionLabel}>Address Type</Text>
           <View style={styles.typeSelector}>
             {ADDRESS_TYPES.map(({ type: t, icon }) => {
@@ -159,7 +268,6 @@ export default function AddAddressScreen() {
             })}
           </View>
 
-          {/* Custom Label (only for Other) */}
           {addressType === 'Other' && (
             <View style={styles.fieldGroup}>
               <Text style={styles.fieldLabel}>Label</Text>
@@ -175,7 +283,6 @@ export default function AddAddressScreen() {
             </View>
           )}
 
-          {/* Country */}
           <View style={styles.fieldGroup}>
             <Text style={styles.fieldLabel}>Country</Text>
             <TextInput
@@ -189,22 +296,71 @@ export default function AddAddressScreen() {
             />
           </View>
 
-          {/* Street Address */}
-          <View style={styles.fieldGroup}>
+          <View style={[styles.fieldGroup, { zIndex: 10 }]}>
             <Text style={styles.fieldLabel}>Street Address</Text>
-            <TextInput
-              style={getInputStyle('street')}
-              value={street}
-              onChangeText={setStreet}
-              placeholder="123 Main Street, Apt 4B"
-              placeholderTextColor="#94A3B8"
-              autoCapitalize="words"
-              onFocus={() => setFocusedField('street')}
-              onBlur={() => setFocusedField(null)}
-            />
+            <View style={styles.streetInputWrap}>
+              <TextInput
+                style={[...getInputStyle('street'), styles.streetInput]}
+                value={street}
+                onChangeText={handleStreetChange}
+                placeholder="Start typing an address..."
+                placeholderTextColor="#94A3B8"
+                autoCapitalize="words"
+                onFocus={() => {
+                  setFocusedField('street');
+                  if (street.trim().length >= 3 && suggestions.length > 0) {
+                    setShowSuggestions(true);
+                  }
+                }}
+                onBlur={() => {
+                  setTimeout(() => {
+                    setFocusedField(null);
+                    setShowSuggestions(false);
+                  }, 200);
+                }}
+              />
+              {isSearching && (
+                <ActivityIndicator
+                  size="small"
+                  color="#2E7AD9"
+                  style={styles.streetSpinner}
+                />
+              )}
+            </View>
+
+            {showSuggestions && focusedField === 'street' && (
+              <View style={styles.suggestionsBox}>
+                {isSearching && suggestions.length === 0 ? (
+                  <View style={styles.suggestionEmpty}>
+                    <Text style={styles.suggestionEmptyText}>Searching...</Text>
+                  </View>
+                ) : suggestions.length === 0 ? (
+                  <View style={styles.suggestionEmpty}>
+                    <Text style={styles.suggestionEmptyText}>No matches found</Text>
+                  </View>
+                ) : (
+                  suggestions.map((item, index) => (
+                    <TouchableOpacity
+                      key={`${item.latitude}-${item.longitude}-${index}`}
+                      style={[
+                        styles.suggestionItem,
+                        index < suggestions.length - 1 && styles.suggestionItemBorder,
+                      ]}
+                      onPress={() => handleSelectSuggestion(item)}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="location-outline" size={18} color="#2E7AD9" />
+                      <Text style={styles.suggestionText} numberOfLines={2}>
+                        {item.displayName}
+                      </Text>
+                    </TouchableOpacity>
+                  ))
+                )}
+              </View>
+            )}
+            <Text style={styles.hintText}>Type at least 3 characters for address suggestions</Text>
           </View>
 
-          {/* City */}
           <View style={styles.fieldGroup}>
             <Text style={styles.fieldLabel}>City</Text>
             <TextInput
@@ -219,7 +375,6 @@ export default function AddAddressScreen() {
             />
           </View>
 
-          {/* State + Zip */}
           <View style={styles.row}>
             <View style={[styles.fieldGroup, { flex: 1 }]}>
               <Text style={styles.fieldLabel}>State</Text>
@@ -230,7 +385,7 @@ export default function AddAddressScreen() {
                 placeholder="NY"
                 placeholderTextColor="#94A3B8"
                 autoCapitalize="characters"
-                maxLength={2}
+                maxLength={30}
                 onFocus={() => setFocusedField('state')}
                 onBlur={() => setFocusedField(null)}
               />
@@ -251,7 +406,6 @@ export default function AddAddressScreen() {
             </View>
           </View>
 
-          {/* Delivery Instructions */}
           <View style={styles.fieldGroup}>
             <Text style={styles.fieldLabel}>Delivery Instructions (Optional)</Text>
             <TextInput
@@ -268,36 +422,40 @@ export default function AddAddressScreen() {
             />
           </View>
         </ScrollView>
-
-        {/* Save Button */}
-        <View style={styles.ctaContainer}>
-          <TouchableOpacity
-            onPress={handleSave}
-            disabled={!isFormValid || isSaving}
-            activeOpacity={0.8}
-            style={styles.saveButtonWrapper}
-          >
-            {isFormValid ? (
-              <LinearGradient
-                colors={['#2E7AD9', '#1E6AC9']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={[styles.saveButton, isSaving && { opacity: 0.7 }]}
-              >
-                {isSaving ? (
-                  <ActivityIndicator color="#FFFFFF" size="small" />
-                ) : (
-                  <Text style={styles.saveButtonText}>Save Address</Text>
-                )}
-              </LinearGradient>
-            ) : (
-              <View style={[styles.saveButton, styles.saveButtonDisabled]}>
-                <Text style={styles.saveButtonTextDisabled}>Save Address</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        </View>
       </KeyboardAvoidingView>
+
+      {/* Pinned to screen bottom — does not jump with keyboard */}
+      <View style={styles.ctaContainer}>
+        <TouchableOpacity
+          onPress={handleSave}
+          disabled={!isFormValid || isSaving}
+          activeOpacity={0.8}
+          style={styles.saveButtonWrapper}
+        >
+          {isFormValid ? (
+            <LinearGradient
+              colors={['#2E7AD9', '#1E6AC9']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={[styles.saveButton, isSaving && { opacity: 0.7 }]}
+            >
+              {isSaving ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                  <Text style={styles.saveButtonText}>
+                    {isSaving ? 'Saving...' : isEditing ? 'Save Changes' : 'Save Address'}
+                  </Text>
+              )}
+            </LinearGradient>
+          ) : (
+            <View style={[styles.saveButton, styles.saveButtonDisabled]}>
+              <Text style={styles.saveButtonTextDisabled}>
+                {isEditing ? 'Save Changes' : 'Save Address'}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
@@ -307,8 +465,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F0F7FF',
   },
-
-  // Glassmorphic Header
   header: {
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
     paddingTop: Platform.OS === 'ios' ? 0 : 16,
@@ -347,7 +503,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1E293B',
   },
-
   keyboardView: {
     flex: 1,
   },
@@ -355,8 +510,6 @@ const styles = StyleSheet.create({
     padding: 24,
     paddingBottom: 32,
   },
-
-  // Address Type Selector
   sectionLabel: {
     fontSize: 15,
     fontWeight: '500',
@@ -398,8 +551,6 @@ const styles = StyleSheet.create({
     color: '#2E7AD9',
     fontWeight: '600',
   },
-
-  // Form Fields
   fieldGroup: {
     marginBottom: 20,
   },
@@ -430,6 +581,61 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 8,
   },
+  streetInputWrap: {
+    position: 'relative',
+    justifyContent: 'center',
+  },
+  streetInput: {
+    paddingRight: 44,
+  },
+  streetSpinner: {
+    position: 'absolute',
+    right: 14,
+  },
+  suggestionsBox: {
+    marginTop: 8,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(46, 122, 217, 0.2)',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  suggestionItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  suggestionItemBorder: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(46, 122, 217, 0.12)',
+  },
+  suggestionText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#1E293B',
+    lineHeight: 20,
+  },
+  suggestionEmpty: {
+    paddingVertical: 16,
+    paddingHorizontal: 14,
+    alignItems: 'center',
+  },
+  suggestionEmptyText: {
+    fontSize: 13,
+    color: '#94A3B8',
+  },
+  hintText: {
+    marginTop: 6,
+    fontSize: 12,
+    color: '#94A3B8',
+  },
   textArea: {
     height: 88,
     paddingTop: 14,
@@ -438,8 +644,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 16,
   },
-
-  // CTA
   ctaContainer: {
     padding: 24,
     backgroundColor: 'rgba(255, 255, 255, 0.95)',

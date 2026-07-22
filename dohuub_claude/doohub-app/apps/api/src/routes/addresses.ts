@@ -22,7 +22,19 @@ router.get('/', authenticate, async (req: AuthRequest, res) => {
 // Create address
 router.post('/', authenticate, async (req: AuthRequest, res) => {
   try {
-    const { type, label, street, apartment, city, state, zipCode, country, isDefault } = req.body;
+    const {
+      type,
+      label,
+      street,
+      apartment,
+      city,
+      state,
+      zipCode,
+      country,
+      isDefault,
+      latitude,
+      longitude,
+    } = req.body;
 
     // If this is the default address, unset others
     if (isDefault) {
@@ -44,6 +56,12 @@ router.post('/', authenticate, async (req: AuthRequest, res) => {
         zipCode,
         country: country || 'USA',
         isDefault: isDefault || false,
+        ...(latitude != null && Number.isFinite(Number(latitude))
+          ? { latitude: Number(latitude) }
+          : {}),
+        ...(longitude != null && Number.isFinite(Number(longitude))
+          ? { longitude: Number(longitude) }
+          : {}),
       },
     });
 
@@ -58,7 +76,19 @@ router.post('/', authenticate, async (req: AuthRequest, res) => {
 router.put('/:id', authenticate, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params;
-    const { type, label, street, apartment, city, state, zipCode, country, isDefault } = req.body;
+    const {
+      type,
+      label,
+      street,
+      apartment,
+      city,
+      state,
+      zipCode,
+      country,
+      isDefault,
+      latitude,
+      longitude,
+    } = req.body;
 
     // Verify ownership
     const existing = await prisma.address.findFirst({
@@ -80,15 +110,21 @@ router.put('/:id', authenticate, async (req: AuthRequest, res) => {
     const address = await prisma.address.update({
       where: { id },
       data: {
-        type,
-        label,
-        street,
-        apartment,
-        city,
-        state,
-        zipCode,
-        country,
-        isDefault,
+        ...(type !== undefined && { type }),
+        ...(label !== undefined && { label }),
+        ...(street !== undefined && { street }),
+        ...(apartment !== undefined && { apartment }),
+        ...(city !== undefined && { city }),
+        ...(state !== undefined && { state }),
+        ...(zipCode !== undefined && { zipCode }),
+        ...(country !== undefined && { country }),
+        ...(isDefault !== undefined && { isDefault }),
+        ...(latitude != null && Number.isFinite(Number(latitude))
+          ? { latitude: Number(latitude) }
+          : {}),
+        ...(longitude != null && Number.isFinite(Number(longitude))
+          ? { longitude: Number(longitude) }
+          : {}),
       },
     });
 

@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { getVendorById, getReviewsByVendor } from '../../src/lib/queries';
+import { getVendorById, getReviewsByVendor, getReviewAuthorName } from '../../src/lib/queries';
 
 const cleaningLogos = [
   require('../../assets/cleaning/logos/logo1.png'),
@@ -25,10 +25,7 @@ function formatRelativeDate(iso: string): string {
 }
 
 function reviewerName(r: any): string {
-  const p = r?.User?.UserProfile;
-  if (p?.firstName) return `${p.firstName} ${p.lastName?.[0] ?? ''}.`.trim();
-  if (r?.User?.email) return r.User.email.split('@')[0];
-  return 'Anonymous';
+  return getReviewAuthorName(r);
 }
 
 /**

@@ -31,9 +31,11 @@ function RootLayout() {
 
   // Listen to Supabase auth state changes
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (session) {
-        useAuthStore.getState().setSession(session);
+        // Don't wipe in-memory profile on every token refresh
+        const refreshUser = event !== 'TOKEN_REFRESHED';
+        useAuthStore.getState().setSession(session, { refreshUser });
       } else {
         useAuthStore.getState().clearSession();
       }
@@ -73,6 +75,10 @@ function RootLayout() {
         <Stack.Screen name="onboarding" />
         <Stack.Screen name="(auth)" options={{ presentation: 'modal' }} />
         <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="chat/conversation" />
+        <Stack.Screen name="terms" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="privacy" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="auth/callback" />
       </Stack>
     </QueryClientProvider>
   );

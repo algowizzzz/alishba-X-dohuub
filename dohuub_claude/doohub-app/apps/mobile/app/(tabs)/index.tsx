@@ -7,9 +7,8 @@ import {
   TouchableOpacity,
   RefreshControl,
   Image,
-  Platform,
-  StatusBar,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../src/store/authStore';
@@ -97,10 +96,11 @@ export default function HomeScreen() {
 
   const handleNotificationsPress = () => {
     setShowNotifications(true);
+    setHasUnreadNotifications(false);
   };
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       {/* Header with glassmorphism - matching boss */}
       <View style={styles.header}>
         <MainHeader
@@ -195,18 +195,18 @@ export default function HomeScreen() {
         onSelectAddress={(addr) => setSelectedAddress(addr.id)}
         onAddNew={() => router.push('/location/manual')}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F0F7FF',
+    backgroundColor: '#FFFFFF',
   },
   header: {
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 8 : 60,
+    paddingTop: 8,
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
     shadowColor: '#000',

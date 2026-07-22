@@ -6,29 +6,23 @@ import {
   FlatList,
   TouchableOpacity,
   RefreshControl,
-  SafeAreaView,
+  useWindowDimensions,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useRewardsStore } from '../../src/store/rewardsStore';
 
-/**
- * Points History Screen — matches boss wireframe (PointsHistoryScreen.tsx)
- *
- * Layout order (top-to-bottom):
- *  1. Glassmorphic header with back pill + "Points History"
- *  2. Summary stats grid (Total Earned / Redeemed / Expired)
- *  3. Filter tabs: All | Earned | Redeemed | Expired (horizontal pills)
- *  4. Transactions grouped by month — each item is a card with shadow
- *  5. Points Redemption Info footer card
- */
+type FilterKey = 'All' | 'EARNED' | 'REDEEMED' | 'EXPIRED';
 
-const FILTER_TABS: { key: string; label: string }[] = [
+const FILTER_TABS: { key: FilterKey; label: string }[] = [
   { key: 'All', label: 'All' },
   { key: 'EARNED', label: 'Earned' },
   { key: 'REDEEMED', label: 'Redeemed' },
   { key: 'EXPIRED', label: 'Expired' },
 ];
+
+const EARNED_TYPES = new Set(['EARNED', 'REFERRAL', 'BONUS']);
 
 const TRANSACTION_LABELS: Record<string, string> = {
   EARNED: 'Earned',
@@ -44,6 +38,12 @@ const TRANSACTION_ICONS: Record<string, { name: keyof typeof Ionicons.glyphMap; 
   EXPIRED: { name: 'time', color: '#EF4444' },
   REFERRAL: { name: 'people', color: 'rgb(147, 51, 234)' },
   BONUS: { name: 'gift', color: 'rgb(245, 158, 11)' },
+};
+
+const matchesFilter = (type: string, filter: FilterKey) => {
+  if (filter === 'All') return true;
+  if (filter === 'EARNED') return EARNED_TYPES.has(type);
+  return type === filter;
 };
 
 const getTransactionColor = (type: string) => {
@@ -98,13 +98,15 @@ interface TransactionSection {
 }
 
 export default function PointsHistoryScreen() {
-  const { transactions, isLoading, fetchTransactions } = useRewardsStore();
-  const [activeFilter, setActiveFilter] = useState('All');
+  const { width } = useWindowDimensions();
+  const isCompact = width < 380;
+  const { transactions, fetchTransactions } = useRewardsStore();
+  const [activeFilter, setActiveFilter] = useState<FilterKey>('All');
   const [refreshing, setRefreshing] = useState(false);
 
   const loadData = useCallback(async () => {
-    await fetchTransactions(activeFilter);
-  }, [fetchTransactions, activeFilter]);
+    await fetchTransactions();
+  }, [fetchTransactions]);
 
   useEffect(() => {
     loadData();
@@ -116,14 +118,14 @@ export default function PointsHistoryScreen() {
     setRefreshing(false);
   }, [loadData]);
 
-  const handleFilterChange = (filter: string) => {
-    setActiveFilter(filter);
-  };
+  const filteredTransactions = useMemo(
+    () => transactions.filter((tx) => matchesFilter(tx.type, activeFilter)),
+    [transactions, activeFilter]
+  );
 
-  // Calculate summary stats from all transactions
   const summaryStats = useMemo(() => {
     const earned = transactions
-      .filter((tx) => tx.type === 'EARNED' || tx.type === 'BONUS' || tx.type === 'REFERRAL')
+      .filter((tx) => EARNED_TYPES.has(tx.type))
       .reduce((sum, tx) => sum + tx.amount, 0);
     const redeemed = transactions
       .filter((tx) => tx.type === 'REDEEMED')
@@ -134,30 +136,25 @@ export default function PointsHistoryScreen() {
     return { earned, redeemed, expired };
   }, [transactions]);
 
-  // Group transactions by month
   const groupedTransactions = useMemo((): TransactionSection[] => {
     const groups: Record<string, TransactionSection['data']> = {};
 
-    transactions.forEach((tx) => {
+    filteredTransactions.forEach((tx) => {
       const date = new Date(tx.createdAt);
       const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-
-      if (!groups[key]) {
-        groups[key] = [];
-      }
+      if (!groups[key]) groups[key] = [];
       groups[key].push(tx);
     });
 
     return Object.entries(groups)
       .sort(([a], [b]) => b.localeCompare(a))
-      .map(([key, data]) => {
+      .map(([, data]) => {
         const date = new Date(data[0].createdAt);
         const title = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
         return { title, data };
       });
-  }, [transactions]);
+  }, [filteredTransactions]);
 
-  // Flatten grouped data for FlatList with section headers
   const flatData = useMemo(() => {
     const items: Array<
       | { type: 'header'; title: string; id: string }
@@ -176,61 +173,72 @@ export default function PointsHistoryScreen() {
 
   const renderListHeader = () => (
     <View style={styles.headerContent}>
-      {/* Summary Stats — above filter tabs per boss wireframe */}
       <View style={styles.statsGrid}>
         <View style={styles.statCard}>
-          <Text style={[styles.statValue, { color: 'rgb(22, 163, 74)' }]}>
+          <Text
+            style={[styles.statValue, { color: 'rgb(22, 163, 74)' }, isCompact && styles.statValueCompact]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.75}
+          >
             +{summaryStats.earned.toLocaleString()}
           </Text>
           <Text style={styles.statLabel}>Total Earned</Text>
         </View>
         <View style={styles.statCard}>
-          <Text style={[styles.statValue, { color: '#2E7AD9' }]}>
+          <Text
+            style={[styles.statValue, { color: '#2E7AD9' }, isCompact && styles.statValueCompact]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.75}
+          >
             -{summaryStats.redeemed.toLocaleString()}
           </Text>
           <Text style={styles.statLabel}>Total Redeemed</Text>
         </View>
         <View style={styles.statCard}>
-          <Text style={[styles.statValue, { color: '#EF4444' }]}>
+          <Text
+            style={[styles.statValue, { color: '#EF4444' }, isCompact && styles.statValueCompact]}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.75}
+          >
             -{summaryStats.expired.toLocaleString()}
           </Text>
           <Text style={styles.statLabel}>Total Expired</Text>
         </View>
       </View>
-
-      {/* Filter Tabs */}
-      <View style={styles.filterTabs}>
-        {FILTER_TABS.map((tab) => (
-          <TouchableOpacity
-            key={tab.key}
-            style={[
-              styles.filterTab,
-              activeFilter === tab.key && styles.filterTabActive,
-            ]}
-            onPress={() => handleFilterChange(tab.key)}
-          >
-            <Text
-              style={[
-                styles.filterTabText,
-                activeFilter === tab.key && styles.filterTabTextActive,
-              ]}
-            >
-              {tab.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
     </View>
   );
 
+  const REDEMPTION_TIPS = [
+    { icon: 'cash-outline' as const, text: '100 points = $1 discount' },
+    { icon: 'lock-closed-outline' as const, text: 'Minimum 100 points to redeem' },
+    { icon: 'time-outline' as const, text: 'Points expire 12 months after earning' },
+    { icon: 'shield-checkmark-outline' as const, text: 'Only valid on “Powered by DoHuub” services' },
+  ];
+
   const renderListFooter = () => (
     <View style={styles.redemptionInfoCard}>
-      <Text style={styles.redemptionInfoTitle}>Points Redemption Info</Text>
+      <View style={styles.redemptionInfoHeader}>
+        <View style={styles.redemptionInfoIconWrap}>
+          <Ionicons name="information-circle" size={22} color="#B45309" />
+        </View>
+        <View style={styles.redemptionInfoHeaderText}>
+          <Text style={styles.redemptionInfoTitle}>Points Redemption Info</Text>
+          <Text style={styles.redemptionInfoSubtitle}>How your rewards work</Text>
+        </View>
+      </View>
+
       <View style={styles.redemptionInfoList}>
-        <Text style={styles.redemptionInfoItem}>{'\u2022'}  100 points = $1 discount</Text>
-        <Text style={styles.redemptionInfoItem}>{'\u2022'}  Minimum 100 points to redeem</Text>
-        <Text style={styles.redemptionInfoItem}>{'\u2022'}  Points expire 12 months after earning</Text>
-        <Text style={styles.redemptionInfoItem}>{'\u2022'}  Only valid on "Powered by DoHuub" services</Text>
+        {REDEMPTION_TIPS.map((tip) => (
+          <View key={tip.text} style={styles.redemptionInfoRow}>
+            <View style={styles.redemptionTipIcon}>
+              <Ionicons name={tip.icon} size={16} color="#B45309" />
+            </View>
+            <Text style={styles.redemptionInfoItem}>{tip.text}</Text>
+          </View>
+        ))}
       </View>
     </View>
   );
@@ -245,21 +253,18 @@ export default function PointsHistoryScreen() {
     }
 
     const tx = item.data;
-    const iconConfig = TRANSACTION_ICONS[tx.type] || TRANSACTION_ICONS.EARNED;
+    const iconConfig = TRANSACTION_ICONS[tx.type] || { name: 'gift' as const, color: '#64748B' };
     const badgeStyle = getBadgeStyle(tx.type);
     const badgeLabel = TRANSACTION_LABELS[tx.type] || 'Transaction';
     const pointsColor = getTransactionColor(tx.type);
 
     return (
       <View style={styles.transactionCard}>
-        {/* Icon circle */}
         <View style={[styles.txIconCircle, { backgroundColor: '#F0F7FF' }]}>
           <Ionicons name={iconConfig.name} size={20} color={iconConfig.color} />
         </View>
 
-        {/* Content */}
         <View style={styles.txContent}>
-          {/* Top row: description + points */}
           <View style={styles.txTopRow}>
             <Text style={styles.txDescription} numberOfLines={1}>
               {tx.description}
@@ -269,7 +274,6 @@ export default function PointsHistoryScreen() {
             </Text>
           </View>
 
-          {/* Bottom row: badge + dot + date */}
           <View style={styles.txBottomRow}>
             <View style={[styles.txBadge, { backgroundColor: badgeStyle.bg }]}>
               <Text style={[styles.txBadgeText, { color: badgeStyle.text }]}>
@@ -299,16 +303,43 @@ export default function PointsHistoryScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Glassmorphic Header */}
+    <SafeAreaView style={styles.container} edges={['top', 'bottom', 'left', 'right']}>
       <View style={styles.glassHeader}>
-        <TouchableOpacity
-          style={styles.backPill}
-          onPress={() => router.back()}
-        >
+        <TouchableOpacity style={styles.backPill} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={20} color="#1E293B" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Points History</Text>
+      </View>
+
+      <View style={styles.filterWrap}>
+        <View style={styles.filterTrack}>
+          {FILTER_TABS.map((tab) => {
+            const active = activeFilter === tab.key;
+            return (
+              <TouchableOpacity
+                key={tab.key}
+                style={[styles.filterTab, active && styles.filterTabActive]}
+                onPress={() => setActiveFilter(tab.key)}
+                activeOpacity={0.85}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+              >
+                <Text
+                  style={[
+                    styles.filterTabText,
+                    isCompact && styles.filterTabTextCompact,
+                    active && styles.filterTabTextActive,
+                  ]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.7}
+                >
+                  {tab.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
       </View>
 
       <FlatList
@@ -331,23 +362,15 @@ export default function PointsHistoryScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F0F7FF',
+    backgroundColor: '#FFFFFF',
   },
 
-  // Glassmorphic Header
   glassHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 24,
     paddingVertical: 16,
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 15,
-    elevation: 4,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(46, 122, 217, 0.08)',
     gap: 16,
@@ -371,23 +394,69 @@ const styles = StyleSheet.create({
     color: '#1E293B',
   },
 
+  filterWrap: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 8,
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(46, 122, 217, 0.1)',
+  },
+  filterTrack: {
+    flexDirection: 'row',
+    backgroundColor: '#E8F1FC',
+    borderRadius: 14,
+    padding: 4,
+    gap: 4,
+  },
+  filterTab: {
+    flex: 1,
+    minWidth: 0,
+    paddingVertical: 10,
+    paddingHorizontal: 4,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filterTabActive: {
+    backgroundColor: '#2E7AD9',
+    shadowColor: 'rgba(46, 122, 217, 0.35)',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  filterTabText: {
+    fontSize: 13,
+    color: '#64748B',
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  filterTabTextCompact: {
+    fontSize: 12,
+  },
+  filterTabTextActive: {
+    color: '#FFFFFF',
+  },
+
   headerContent: {
     marginBottom: 8,
   },
 
-  // Summary Stats Grid — above filters per wireframe
   statsGrid: {
     flexDirection: 'row',
-    paddingHorizontal: 24,
+    paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 8,
-    gap: 12,
+    gap: 10,
   },
   statCard: {
     flex: 1,
+    minWidth: 0,
     backgroundColor: '#ffffff',
     borderRadius: 12,
-    padding: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 8,
     alignItems: 'center',
     gap: 4,
     shadowColor: '#000',
@@ -400,44 +469,15 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
   },
+  statValueCompact: {
+    fontSize: 15,
+  },
   statLabel: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#64748B',
+    textAlign: 'center',
   },
 
-  // Filter Tabs
-  filterTabs: {
-    flexDirection: 'row',
-    paddingHorizontal: 24,
-    paddingVertical: 16,
-    gap: 8,
-  },
-  filterTab: {
-    flex: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 8,
-    borderRadius: 20,
-    backgroundColor: '#E8F1FC',
-    alignItems: 'center',
-  },
-  filterTabActive: {
-    backgroundColor: '#2E7AD9',
-    shadowColor: 'rgba(46, 122, 217, 0.3)',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 12,
-    elevation: 4,
-  },
-  filterTabText: {
-    fontSize: 14,
-    color: '#64748B',
-    fontWeight: '500',
-  },
-  filterTabTextActive: {
-    color: '#ffffff',
-  },
-
-  // Month Headers
   monthHeader: {
     paddingHorizontal: 24,
     paddingVertical: 8,
@@ -449,11 +489,10 @@ const styles = StyleSheet.create({
     color: '#64748B',
   },
 
-  // Transaction Cards — individual cards with shadow per wireframe
   transactionCard: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginHorizontal: 24,
+    marginHorizontal: 16,
     marginBottom: 12,
     padding: 16,
     backgroundColor: '#ffffff',
@@ -471,14 +510,10 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
   },
   txContent: {
     flex: 1,
+    minWidth: 0,
   },
   txTopRow: {
     flexDirection: 'row',
@@ -500,6 +535,7 @@ const styles = StyleSheet.create({
   txBottomRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
     gap: 6,
   },
   txBadge: {
@@ -520,38 +556,77 @@ const styles = StyleSheet.create({
     color: '#64748B',
   },
 
-  // Redemption Info
   redemptionInfoCard: {
-    marginHorizontal: 24,
-    marginTop: 16,
-    marginBottom: 16,
+    marginHorizontal: 16,
+    marginTop: 20,
+    marginBottom: 24,
     padding: 16,
-    borderRadius: 12,
-    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    borderRadius: 16,
+    backgroundColor: '#FFFBEB',
     borderWidth: 1,
-    borderColor: 'rgba(245, 158, 11, 0.2)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
+    borderColor: 'rgba(245, 158, 11, 0.25)',
+    shadowColor: '#B45309',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
     elevation: 2,
   },
+  redemptionInfoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 14,
+    paddingBottom: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(180, 83, 9, 0.2)',
+  },
+  redemptionInfoIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: 'rgba(245, 158, 11, 0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  redemptionInfoHeaderText: {
+    flex: 1,
+    minWidth: 0,
+  },
   redemptionInfoTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: 'rgb(180, 83, 9)',
-    marginBottom: 8,
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#92400E',
+  },
+  redemptionInfoSubtitle: {
+    marginTop: 2,
+    fontSize: 13,
+    color: '#B45309',
   },
   redemptionInfoList: {
-    gap: 4,
+    gap: 10,
+  },
+  redemptionInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+  },
+  redemptionTipIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
   },
   redemptionInfoItem: {
+    flex: 1,
     fontSize: 14,
-    color: 'rgb(146, 64, 14)',
+    color: '#92400E',
     lineHeight: 20,
+    fontWeight: '500',
   },
 
-  // Empty State
   emptyState: {
     alignItems: 'center',
     paddingVertical: 48,
@@ -583,7 +658,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
   },
 
-  // List
   listContent: {
     paddingBottom: 32,
     flexGrow: 1,

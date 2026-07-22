@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, Modal
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, fontSize } from '../../../src/constants/theme';
+import { ServiceSearchBar } from '../../../src/components/ui/ServiceSearchBar';
 
 const TEAL = '#14B8A6';
 
@@ -32,8 +33,13 @@ export default function RentalPropertiesListScreen() {
   const [bedrooms,   setBedrooms]   = useState('Any');
   const [bathrooms,  setBathrooms]  = useState('Any');
   const [priceRange, setPriceRange] = useState('Any');
+  const [search, setSearch] = useState('');
 
   const filtered = PROPERTIES.filter(p => {
+    const q = search.trim().toLowerCase();
+    if (q && !p.name.toLowerCase().includes(q) && !p.location.toLowerCase().includes(q) && !p.propertyType.toLowerCase().includes(q)) {
+      return false;
+    }
     if (propType !== 'All' && p.propertyType !== propType) return false;
     if (bedrooms !== 'Any') {
       if (bedrooms === '4+' && p.bedrooms < 4) return false;
@@ -91,11 +97,18 @@ export default function RentalPropertiesListScreen() {
         </TouchableOpacity>
       </View>
 
+      <ServiceSearchBar
+        value={search}
+        onChangeText={setSearch}
+        placeholder="Search properties..."
+      />
+
       <FlatList
         data={filtered}
         keyExtractor={i => i.id}
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
         ListHeaderComponent={<Text style={styles.countText}>{filtered.length} properties available</Text>}
         renderItem={({ item }) => (
           <TouchableOpacity style={styles.card} activeOpacity={0.9} onPress={() => goToDetail(item)}>
