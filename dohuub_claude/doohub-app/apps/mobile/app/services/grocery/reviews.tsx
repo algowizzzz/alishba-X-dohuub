@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, Ima
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, fontSize } from '../../../src/constants/theme';
+import { StarRow } from '../../../src/components/ui';
 
 const GREEN = '#10B981';
 const AVATAR_URL = 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=80&h=80&fit=crop';
@@ -42,11 +43,7 @@ export default function GroceryVendorReviewsScreen() {
       <View style={styles.ratingSummary}>
         <View style={styles.ratingLeft}>
           <Text style={styles.ratingBig}>{rating}</Text>
-          <View style={styles.starsRow}>
-            {[1,2,3,4,5].map(s => (
-              <Ionicons key={s} name="star" size={16} color={s <= Math.floor(rating) ? '#FACC15' : '#E5E7EB'} />
-            ))}
-          </View>
+          <StarRow rating={rating} size={18} style={{ marginVertical: 4 }} />
           <Text style={styles.reviewCnt}>{reviewCount} reviews</Text>
         </View>
         <View style={styles.ratingBars}>
@@ -74,11 +71,7 @@ export default function GroceryVendorReviewsScreen() {
                   <Text style={styles.reviewDate}>{review.date}</Text>
                 </View>
               </View>
-              <View style={styles.starsRow}>
-                {[1,2,3,4,5].map(s => (
-                  <Ionicons key={s} name="star" size={13} color={s <= review.rating ? '#FACC15' : '#E5E7EB'} />
-                ))}
-              </View>
+              <StarRow rating={review.rating} size={15} />
             </View>
             <Text style={styles.reviewComment}>{review.comment}</Text>
             {review.photos && review.photos.length > 0 && (

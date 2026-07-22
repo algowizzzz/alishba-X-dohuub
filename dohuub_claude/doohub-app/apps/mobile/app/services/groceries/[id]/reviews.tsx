@@ -6,9 +6,9 @@ import {
   FlatList,
   TouchableOpacity,
   RefreshControl,
-  SafeAreaView,
-  ActivityIndicator,
+    ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
 import { colors, spacing, fontSize, borderRadius, borderWidth } from '../../../../src/constants/theme';
 import { ScreenHeader, ReviewCard } from '../../../../src/components/composite';
@@ -54,7 +54,7 @@ export default function GroceriesReviewsScreen() {
   };
 
   const avgRating = reviews.length > 0
-    ? (reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length).toFixed(1)
+    ? (reviews.reduce((sum, r) => sum + (Number(r.rating) || 0), 0) / reviews.length).toFixed(1)
     : '0.0';
 
   const filteredReviews = reviews.filter((review) => {
@@ -68,7 +68,7 @@ export default function GroceriesReviewsScreen() {
       <View style={styles.summary}>
         <View style={styles.ratingBig}>
           <Text style={styles.ratingValue}>{avgRating}</Text>
-          <Rating value={parseFloat(avgRating)} size="md" />
+          <Rating rating={parseFloat(avgRating) || 0} size="md" showCount={false} showValue={false} />
           <Text style={styles.reviewCount}>{reviews.length} reviews</Text>
         </View>
       </View>
@@ -98,7 +98,7 @@ export default function GroceriesReviewsScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <ScreenHeader title="Reviews" showBack />
 
       <FlatList

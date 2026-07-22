@@ -56,7 +56,7 @@ export function ReviewCard({
         <View style={styles.headerInfo}>
           <Text style={styles.authorName}>{authorName}</Text>
           <View style={styles.ratingRow}>
-            <Rating value={rating} size="sm" />
+            <Rating value={rating} size="sm" showValue={false} showCount={false} />
             <Text style={styles.date}>{date}</Text>
           </View>
         </View>

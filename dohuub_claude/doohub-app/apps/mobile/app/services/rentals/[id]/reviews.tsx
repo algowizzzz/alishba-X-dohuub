@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView } from
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, fontSize } from '../../../../src/constants/theme';
+import { StarRow } from '../../../../src/components/ui';
 
 const TEAL = '#14B8A6';
 
@@ -52,9 +53,7 @@ export default function PropertyReviewsScreen() {
           <>
             <View style={styles.ratingSummary}>
               <Text style={styles.ratingBig}>{avgRating}</Text>
-              <View style={styles.starsRow}>
-                {[1,2,3,4,5].map(s => <Ionicons key={s} name="star" size={22} color="#FACC15" />)}
-              </View>
+              <StarRow rating={parseFloat(avgRating) || 0} size={22} />
               <Text style={styles.ratingCount}>{REVIEWS.length} reviews</Text>
             </View>
             <View style={styles.filterRow}>
@@ -72,9 +71,7 @@ export default function PropertyReviewsScreen() {
               <Text style={styles.reviewName}>{item.name}</Text>
               <Text style={styles.reviewDate}>{item.date}</Text>
             </View>
-            <View style={styles.starsRow}>
-              {[1,2,3,4,5].map(s => <Ionicons key={s} name="star" size={14} color={s <= item.rating ? '#FACC15' : '#E5E7EB'} />)}
-            </View>
+            <StarRow rating={Number(item.rating) || 0} size={16} />
             <Text style={styles.reviewComment}>{item.comment}</Text>
           </View>
         )}

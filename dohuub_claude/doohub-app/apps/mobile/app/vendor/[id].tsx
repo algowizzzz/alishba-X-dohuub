@@ -6,6 +6,7 @@ import {
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { getVendorById, getReviewsByVendor, getReviewAuthorName } from '../../src/lib/queries';
+import { StarRow } from '../../src/components/ui';
 
 const cleaningLogos = [
   require('../../assets/cleaning/logos/logo1.png'),
@@ -155,11 +156,7 @@ export default function VendorProfileScreen() {
             <View style={s.ratingSummaryRow}>
               <View style={s.ratingSummaryLeft}>
                 <Text style={s.ratingSummaryNumber}>{displayRating.toFixed(1)}</Text>
-                <View style={s.starsRow}>
-                  {[1,2,3,4,5].map(star => (
-                    <Ionicons key={star} name="star" size={14} color="#FACC15" />
-                  ))}
-                </View>
+                <StarRow rating={displayRating} size={16} />
                 <Text style={s.ratingSummaryCount}>{displayReviews} reviews</Text>
               </View>
               <View style={s.ratingBars}>
@@ -189,11 +186,7 @@ export default function VendorProfileScreen() {
                     <Text style={s.reviewName}>{reviewerName(review)}</Text>
                     <Text style={s.reviewDate}>{formatRelativeDate(review.createdAt)}</Text>
                   </View>
-                  <View style={s.starsRow}>
-                    {[1,2,3,4,5].map(star => (
-                      <Ionicons key={star} name="star" size={14} color={star <= (review.rating ?? 5) ? '#FACC15' : '#E5E7EB'} />
-                    ))}
-                  </View>
+                  <StarRow rating={Number(review.rating) || 0} size={14} />
                 </View>
               </View>
               <Text style={s.reviewComment}>{review.comment}</Text>

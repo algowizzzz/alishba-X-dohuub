@@ -5,16 +5,16 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
-  ActivityIndicator,
+    ActivityIndicator,
   Image,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, fontSize, borderRadius, borderWidth } from '../../../src/constants/theme';
-import { Button, Rating, ImageCarousel, PoweredByDoHuubBadge } from '../../../src/components/ui';
+import { Button, Rating, ImageCarousel, PoweredByDoHuubBadge, ServiceImage } from '../../../src/components/ui';
 import { getVendorById, getHandymanListings, getReviewsByVendor } from '../../../src/lib/queries';
-import { getServiceImages } from '../../../src/constants/serviceImages';
+import { getServiceImages, getServiceImage } from '../../../src/constants/serviceImages';
 
 const ACCENT = '#EAB308';
 
@@ -52,21 +52,21 @@ function VendorPage({ vendorId }: { vendorId: string }) {
   }, [vendorId]);
 
   if (loading) return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <Header title="" />
       <View style={styles.centered}><ActivityIndicator size="large" color={colors.primary} /></View>
     </SafeAreaView>
   );
 
   if (!vendor) return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <Header title="Handyman Services" />
       <View style={styles.centered}><Text style={styles.errorText}>Provider not found</Text></View>
     </SafeAreaView>
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <Header title={vendor.businessName} />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* Vendor Header Card — with View Profile inside */}
@@ -112,16 +112,18 @@ function VendorPage({ vendorId }: { vendorId: string }) {
                   params: { id: vendorId, listingId: listing.id },
                 } as any)}
               >
-                <Image
-                  source={{ uri: listing.images?.[0] || getServiceImages('handyman')[index % 4] }}
+                <ServiceImage
+                  uri={listing.images?.[0]}
+                  fallbackUri={getServiceImage('handyman', index)}
                   style={styles.serviceCardImage}
+                  icon="construct-outline"
                 />
                 <View style={styles.serviceCardInfo}>
                   <Text style={styles.serviceCardName} numberOfLines={2}>{listing.title}</Text>
                   <View style={styles.ratingRow}>
                     <Ionicons name="star" size={12} color="#F59E0B" />
                     <Text style={styles.serviceCardRating}>
-                      {(listing.rating ?? vendor.rating ?? 4.9).toFixed(1)}
+                      {Number(listing.rating ?? vendor.rating ?? 0).toFixed(1)}
                     </Text>
                   </View>
                   {listing.description ? (
@@ -164,27 +166,34 @@ function ServiceDetailPage({ vendorId, listingId }: { vendorId: string; listingI
   }, [vendorId, listingId]);
 
   if (loading) return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <Header title="" />
       <View style={styles.centered}><ActivityIndicator size="large" color={colors.primary} /></View>
     </SafeAreaView>
   );
 
   if (!listing || !vendor) return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <Header title="Service Details" />
       <View style={styles.centered}><Text style={styles.errorText}>Service not found</Text></View>
     </SafeAreaView>
   );
 
-  const images = getServiceImages('handyman', listing.images?.length > 0 ? listing.images : null);
-  const included = listing.whatsIncluded || [];
+  const images = getServiceImages('handyman', listing.images);
+  const included = listing.whatsIncluded || listing.services || [];
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <Header title="Service Details" />
 
-      <ImageCarousel images={images} height={240} />
+      <ImageCarousel
+        images={images}
+        height={240}
+        fallbackUri={getServiceImage('handyman', 0)}
+        rounded
+        inset={20}
+        borderRadius={20}
+      />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* Title + Rating */}
@@ -193,7 +202,7 @@ function ServiceDetailPage({ vendorId, listingId }: { vendorId: string; listingI
           <View style={styles.ratingRow}>
             <Ionicons name="star" size={14} color="#F59E0B" />
             <Text style={styles.ratingText}>
-              {(listing.rating ?? vendor.rating ?? 4.9).toFixed(1)} ({listing.reviewCount ?? vendor.reviewCount ?? 0} reviews)
+              {Number(listing.rating ?? vendor.rating ?? 0).toFixed(1)} ({listing.reviewCount ?? vendor.reviewCount ?? 0} reviews)
             </Text>
           </View>
           {listing.description ? (
@@ -424,7 +433,11 @@ const styles = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
   },
-  serviceCardImage: { width: '100%', height: 96, backgroundColor: '#E3F0FF' },
+  serviceCardImage: {
+    width: '100%',
+    height: 120,
+    backgroundColor: '#FEF9C3',
+  },
   serviceCardInfo: { padding: 12, gap: 4 },
   serviceCardName: { fontSize: 14, fontWeight: '500', color: '#1E293B' },
   serviceCardRating: { fontSize: 12, color: '#1E293B' },

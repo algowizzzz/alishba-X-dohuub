@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { prisma } from '@doohub/database';
 import { optionalAuth, authenticate, requireRole, requireActiveVendor, AuthRequest } from '../middleware/auth';
 import { setAuthUserRole } from '../utils/supabase';
+import { applyReviewStatsToVendor, getReviewStatsByVendorIds } from '../utils/reviewStats';
 
 const router = Router();
 
@@ -1283,7 +1284,10 @@ router.get('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Vendor not found' });
     }
 
-    res.json({ success: true, data: vendor });
+    const stats = await getReviewStatsByVendorIds([id]);
+    const data = applyReviewStatsToVendor(vendor, stats);
+
+    res.json({ success: true, data });
   } catch (error) {
     console.error('Get vendor error:', error);
     res.status(500).json({ error: 'Failed to get vendor' });

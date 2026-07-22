@@ -5,16 +5,17 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
   ActivityIndicator,
   Image,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, fontSize, borderRadius, borderWidth } from '../../../src/constants/theme';
 import { Button, Rating, ImageCarousel, PoweredByDoHuubBadge } from '../../../src/components/ui';
+import { ServiceImage } from '../../../src/components/ui/ServiceImage';
 import { getVendorById, getCleaningListings, getReviewsByVendor, getReviewAuthorName } from '../../../src/lib/queries';
-import { getServiceImages } from '../../../src/constants/serviceImages';
+import { getServiceImages, getServiceImage } from '../../../src/constants/serviceImages';
 
 // Boss cleaning logos for vendor display
 const cleaningLogos = [
@@ -39,6 +40,7 @@ const PointsBanner = () => (
 function VendorPage({ vendorId }: { vendorId: string }) {
   const [vendor, setVendor] = useState<any>(null);
   const [listings, setListings] = useState<any[]>([]);
+  const [reviews, setReviews] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -47,6 +49,7 @@ function VendorPage({ vendorId }: { vendorId: string }) {
         const [v, l] = await Promise.all([getVendorById(vendorId), getCleaningListings(vendorId)]);
         setVendor(v);
         setListings(l ?? []);
+        try { setReviews(await getReviewsByVendor(vendorId)); } catch { setReviews([]); }
       } catch (e) {
         setVendor(null);
         setListings([]);
@@ -57,32 +60,42 @@ function VendorPage({ vendorId }: { vendorId: string }) {
   }, [vendorId]);
 
   if (loading) return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <Header title="" />
       <View style={styles.centered}><ActivityIndicator size="large" color={colors.primary} /></View>
     </SafeAreaView>
   );
 
   if (!vendor) return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <Header title="Cleaning Services" />
       <View style={styles.centered}><Text style={styles.errorText}>Provider not found</Text></View>
     </SafeAreaView>
   );
 
+  const liveReviewCount = reviews.length;
+  const liveRating =
+    liveReviewCount > 0
+      ? reviews.reduce((sum, r) => sum + (Number(r.rating) || 0), 0) / liveReviewCount
+      : Number(vendor.rating ?? 0);
+
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <Header title={vendor.businessName} />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* Vendor Summary — white card matching boss */}
         <View style={styles.vendorSummaryCard}>
           <View style={styles.vendorCardRow}>
             <View style={styles.vendorLogoCircle}>
-              <Image
-                source={vendor.logo ? { uri: vendor.logo } : cleaningLogos[parseInt(vendorId, 10) % cleaningLogos.length || 0]}
-                style={styles.vendorLogo}
-                resizeMode="cover"
-              />
+              {vendor.logo ? (
+                <ServiceImage uri={vendor.logo} style={styles.vendorLogo} icon="sparkles" />
+              ) : (
+                <Image
+                  source={cleaningLogos[Math.abs(String(vendorId).charCodeAt(0)) % cleaningLogos.length]}
+                  style={styles.vendorLogo}
+                  resizeMode="cover"
+                />
+              )}
             </View>
             <View style={styles.vendorCardInfo}>
               <View style={styles.vendorNameRow}>
@@ -95,8 +108,8 @@ function VendorPage({ vendorId }: { vendorId: string }) {
               </View>
               <View style={styles.ratingRow}>
                 <Ionicons name="star" size={14} color="#FACC15" />
-                <Text style={styles.ratingValue}>{Number(vendor.rating ?? 0).toFixed(1)}</Text>
-                <Text style={styles.reviewCountText}>({vendor.reviewCount ?? 0} reviews)</Text>
+                <Text style={styles.ratingValue}>{liveRating.toFixed(1)}</Text>
+                <Text style={styles.reviewCountText}>({liveReviewCount} reviews)</Text>
               </View>
             </View>
           </View>
@@ -124,16 +137,18 @@ function VendorPage({ vendorId }: { vendorId: string }) {
                   params: { id: vendorId, listingId: listing.id },
                 } as any)}
               >
-                <Image
-                  source={{ uri: listing.images?.[0] || getServiceImages('cleaning')[index % 4] }}
+                <ServiceImage
+                  uri={listing.images?.[0]}
+                  fallbackUri={getServiceImage('cleaning', index)}
                   style={styles.serviceCardImage}
+                  icon="sparkles"
                 />
                 <View style={styles.serviceCardInfo}>
                   <Text style={styles.serviceCardName} numberOfLines={2}>{listing.title}</Text>
                   <View style={styles.ratingRow}>
                     <Ionicons name="star" size={12} color="#F59E0B" />
                     <Text style={styles.serviceCardRating}>
-                      {Number(listing.rating ?? vendor.rating ?? 0).toFixed(1)}
+                      {liveRating.toFixed(1)}
                     </Text>
                   </View>
                   {listing.description ? (
@@ -174,27 +189,40 @@ function ServiceDetailPage({ vendorId, listingId }: { vendorId: string; listingI
   }, [vendorId, listingId]);
 
   if (loading) return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <Header title="" />
       <View style={styles.centered}><ActivityIndicator size="large" color={colors.primary} /></View>
     </SafeAreaView>
   );
 
   if (!listing || !vendor) return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <Header title="Service Details" />
       <View style={styles.centered}><Text style={styles.errorText}>Service not found</Text></View>
     </SafeAreaView>
   );
 
-  const images = getServiceImages('cleaning', listing.images?.length > 0 ? listing.images : null);
+  const images = getServiceImages('cleaning', listing.images);
   const included = listing.whatsIncluded || [];
+  // Prefer live reviews over seeded Vendor.reviewCount (often inflated)
+  const liveReviewCount = reviews.length;
+  const liveRating =
+    liveReviewCount > 0
+      ? reviews.reduce((sum, r) => sum + (Number(r.rating) || 0), 0) / liveReviewCount
+      : Number(vendor.rating ?? 0);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <Header title="Service Details" />
 
-      <ImageCarousel images={images} height={240} />
+      <ImageCarousel
+        images={images}
+        height={240}
+        fallbackUri={getServiceImage('cleaning', 0)}
+        rounded
+        inset={20}
+        borderRadius={20}
+      />
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* Title + Rating */}
@@ -203,7 +231,7 @@ function ServiceDetailPage({ vendorId, listingId }: { vendorId: string; listingI
           <View style={styles.ratingRow}>
             <Ionicons name="star" size={14} color="#F59E0B" />
             <Text style={styles.ratingText}>
-              {Number(listing.rating ?? vendor.rating ?? 0).toFixed(1)} ({listing.reviewCount ?? vendor.reviewCount ?? 0} reviews)
+              {liveRating.toFixed(1)} ({liveReviewCount} reviews)
             </Text>
           </View>
           {listing.description ? (
@@ -214,16 +242,18 @@ function ServiceDetailPage({ vendorId, listingId }: { vendorId: string; listingI
         {/* Vendor Card */}
         <View style={styles.vendorCardSmall}>
           <View style={styles.vendorLogoSmall}>
-            {vendor.logo
-              ? <Image source={{ uri: vendor.logo }} style={styles.vendorLogoSmallImg} />
-              : <Ionicons name="sparkles" size={18} color={colors.primary} />}
+            {vendor.logo ? (
+              <ServiceImage uri={vendor.logo} style={styles.vendorLogoSmallImg} icon="sparkles" />
+            ) : (
+              <Ionicons name="sparkles" size={18} color={colors.primary} />
+            )}
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.vendorNameSmall}>{vendor.businessName}</Text>
             {vendor.isMichelle && <PoweredByDoHuubBadge />}
             <View style={styles.ratingRow}>
               <Ionicons name="star" size={12} color="#F59E0B" />
-              <Text style={styles.vendorRatingSmall}>{Number(vendor.rating ?? 0).toFixed(1)} ({vendor.reviewCount ?? 0})</Text>
+              <Text style={styles.vendorRatingSmall}>{liveRating.toFixed(1)} ({liveReviewCount})</Text>
             </View>
           </View>
         </View>
@@ -280,8 +310,13 @@ function ServiceDetailPage({ vendorId, listingId }: { vendorId: string; listingI
                 </Text>
               </View>
               <View style={styles.starsRow}>
-                {[1,2,3,4,5].map((s) => (
-                  <Ionicons key={s} name="star" size={14} color={s <= (review.rating ?? 0) ? '#FACC15' : '#E5E7EB'} />
+                {[1, 2, 3, 4, 5].map((s) => (
+                  <Ionicons
+                    key={s}
+                    name={s <= (Number(review.rating) || 0) ? 'star' : 'star-outline'}
+                    size={14}
+                    color={s <= (Number(review.rating) || 0) ? '#F59E0B' : '#94A3B8'}
+                  />
                 ))}
               </View>
               <Text style={styles.reviewComment}>{review.comment}</Text>
@@ -477,22 +512,28 @@ const styles = StyleSheet.create({
   serviceCard: {
     width: '47%',
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
+    borderRadius: 16,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(46, 122, 217, 0.15)',
+    borderColor: 'rgba(46, 122, 217, 0.12)',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
     elevation: 2,
   },
-  serviceCardImage: { width: '100%', height: 96, backgroundColor: '#E3F0FF' },
+  serviceCardImage: {
+    width: '100%',
+    height: 120,
+    backgroundColor: '#E8F1FC',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+  },
   serviceCardInfo: { padding: 12, gap: 4 },
-  serviceCardName: { fontSize: 14, fontWeight: '500', color: '#1E293B' },
+  serviceCardName: { fontSize: 14, fontWeight: '600', color: '#1E293B' },
   serviceCardRating: { fontSize: 12, color: '#1E293B' },
   serviceCardDesc: { fontSize: 12, color: '#64748B', lineHeight: 16 },
-  serviceCardPrice: { fontSize: 14, fontWeight: '600', color: '#2E7AD9', marginTop: 4 },
+  serviceCardPrice: { fontSize: 14, fontWeight: '700', color: '#2E7AD9', marginTop: 4 },
 
   // Points Banner
   pointsBanner: {

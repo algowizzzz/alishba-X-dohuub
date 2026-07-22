@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView } from
 import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, fontSize } from '../../../../src/constants/theme';
+import { StarRow } from '../../../../src/components/ui';
 import { getReviewsByVendor, getReviewAuthorName } from '../../../../src/lib/queries';
 
 const FILTER_TABS = ['All', '5★', '4★', '3★', '2★', '1★'];
@@ -40,7 +41,7 @@ export default function BeautyReviewsScreen() {
     : reviews.filter(r => r.rating === parseInt(activeFilter));
 
   const avgRating = reviews.length > 0
-    ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)
+    ? (reviews.reduce((s, r) => s + (Number(r.rating) || 0), 0) / reviews.length).toFixed(1)
     : '—';
 
   return (
@@ -65,9 +66,7 @@ export default function BeautyReviewsScreen() {
             {/* Rating Summary */}
             <View style={styles.ratingSummary}>
               <Text style={styles.ratingBig}>{avgRating}</Text>
-              <View style={styles.starsRow}>
-                {[1,2,3,4,5].map(s => <Ionicons key={s} name="star" size={20} color="#FACC15" />)}
-              </View>
+              <StarRow rating={parseFloat(avgRating) || 0} size={22} />
               <Text style={styles.ratingCount}>{reviews.length} reviews</Text>
             </View>
 
@@ -87,9 +86,7 @@ export default function BeautyReviewsScreen() {
               <Text style={styles.reviewName}>{reviewerName(item)}</Text>
               <Text style={styles.reviewDate}>{formatRelativeDate(item.createdAt)}</Text>
             </View>
-            <View style={styles.starsRow}>
-              {[1,2,3,4,5].map(s => <Ionicons key={s} name="star" size={14} color={s <= item.rating ? '#FACC15' : '#E5E7EB'} />)}
-            </View>
+            <StarRow rating={Number(item.rating) || 0} size={16} />
             <Text style={styles.reviewComment}>{item.comment}</Text>
           </View>
         )}

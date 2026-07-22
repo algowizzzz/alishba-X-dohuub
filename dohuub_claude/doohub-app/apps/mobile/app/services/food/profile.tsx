@@ -11,6 +11,7 @@ import {
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, fontSize, borderRadius } from '../../../src/constants/theme';
+import { StarRow } from '../../../src/components/ui';
 import { getReviewsByVendor, getReviewAuthorName, getVendorById } from '../../../src/lib/queries';
 
 function formatRelativeDate(iso: string): string {
@@ -133,9 +134,7 @@ export default function FoodVendorProfileScreen() {
           <View style={styles.ratingCard}>
             <View style={styles.ratingLeft}>
               <Text style={styles.ratingBig}>{rating}</Text>
-              <View style={styles.starsRow}>
-                {[1,2,3,4,5].map(s => <Ionicons key={s} name="star" size={14} color="#FACC15" />)}
-              </View>
+              <StarRow rating={Number(rating) || 0} size={16} style={{ marginVertical: 4 }} />
               <Text style={styles.reviewCount}>250 reviews</Text>
             </View>
             <View style={{ flex: 1, gap: 4 }}>

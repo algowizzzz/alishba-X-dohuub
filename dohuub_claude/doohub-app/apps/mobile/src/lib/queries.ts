@@ -24,8 +24,20 @@ function normalizeVendor(vendor: any) {
 /** Keep both PascalCase Vendor and camelCase vendor for existing screens. */
 function normalizeListing(item: any) {
   const vendor = normalizeVendor(item.vendor || item.Vendor);
+  let images = item.images;
+  if (typeof images === 'string') {
+    try {
+      const parsed = JSON.parse(images);
+      images = Array.isArray(parsed) ? parsed : images ? [images] : [];
+    } catch {
+      images = images ? [images] : [];
+    }
+  }
+  if (!Array.isArray(images)) images = [];
+
   return {
     ...item,
+    images,
     vendorId: item.vendorId || vendor?.id,
     Vendor: vendor,
     vendor,

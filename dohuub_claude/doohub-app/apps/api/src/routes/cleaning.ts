@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '@doohub/database';
 import { optionalAuth, authenticate, AuthRequest } from '../middleware/auth';
+import { applyReviewStatsToVendor, getReviewStatsByVendorIds } from '../utils/reviewStats';
 
 const router = Router();
 
@@ -49,9 +50,18 @@ router.get('/', optionalAuth, async (req: AuthRequest, res) => {
 
     const total = await prisma.cleaningListing.count({ where });
 
+    // Replace seeded Vendor.rating/reviewCount with real Review aggregates
+    const stats = await getReviewStatsByVendorIds(listings.map((l) => l.vendorId));
+    const data = listings.map((listing) => ({
+      ...listing,
+      vendor: listing.vendor
+        ? applyReviewStatsToVendor(listing.vendor, stats)
+        : listing.vendor,
+    }));
+
     res.json({
       success: true,
-      data: listings,
+      data,
       pagination: {
         page: pageNum,
         limit: limitNum,
@@ -124,7 +134,15 @@ router.get('/:id', async (req, res) => {
       return res.status(404).json({ error: 'Listing not found' });
     }
 
-    res.json({ success: true, data: listing });
+    const stats = await getReviewStatsByVendorIds([listing.vendorId]);
+    const data = {
+      ...listing,
+      vendor: listing.vendor
+        ? applyReviewStatsToVendor(listing.vendor, stats)
+        : listing.vendor,
+    };
+
+    res.json({ success: true, data });
   } catch (error) {
     console.error('Get cleaning listing error:', error);
     res.status(500).json({ error: 'Failed to get listing' });
