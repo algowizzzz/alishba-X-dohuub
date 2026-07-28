@@ -213,6 +213,7 @@ npx expo start --clear
 
 - [`PAYMENT_README.md`](./PAYMENT_README.md) — User-side payment flow status (demo vs live Stripe) and what’s left on mobile
 - [`STRIPE_SETUP.md`](./STRIPE_SETUP.md) — Stripe keys, Railway env, webhooks, troubleshooting
+- [`docs/PWA_BLUEPRINT.md`](./docs/PWA_BLUEPRINT.md) — Full consumer PWA structure, screens, sidebar, design tokens, libraries
 
 ## License
 
